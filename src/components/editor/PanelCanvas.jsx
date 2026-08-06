@@ -1,0 +1,254 @@
+import { useState, useCallback, useRef, useEffect } from 'react'
+import CharacterBlock from './CharacterBlock'
+import ObjectBlock from './ObjectBlock'
+import SFXBlock from './SFXBlock'
+import NarrationBlock from './NarrationBlock'
+import ConnectionArrows from './ConnectionArrows'
+import CompositionGuides from './CompositionGuides'
+
+export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef }) {
+  const [connDrag, setConnDrag] = useState(null)
+  const canvasRef2 = useRef(null)
+  const wrapperRef = useRef(null)
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setContainerSize(prev => (prev.width === Math.floor(rect.width) && prev.height === Math.floor(rect.height)) ? prev : { width: Math.floor(rect.width), height: Math.floor(rect.height) })
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const aspectW = aspectRatio === 'square' ? 1 : aspectRatio === 'vertical' || aspectRatio === 'portrait-hd' ? 9 : 16
+  const aspectH = aspectRatio === 'square' ? 1 : aspectRatio === 'vertical' || aspectRatio === 'portrait-hd' ? 16 : 9
+  const maxW = Math.min(containerSize.width || 820, 820)
+  const maxH = containerSize.height || 9999
+  let canvasW = maxW
+  let canvasH = Math.round(canvasW * (aspectH / aspectW))
+  if (canvasH > maxH) {
+    canvasH = maxH
+    canvasW = Math.round(canvasH * (aspectW / aspectH))
+  }
+
+  if (!panel) return null
+
+  const panelObjects = panel.objects || []
+  const panelSfx = panel.sfx || []
+  const panelBackground = panel.background || (panel.backgroundId ? { x: 0.05, y: 0.1, width: 0.9, height: 0.45 } : null)
+  const backgroundDef = backgrounds?.find(bg => bg.id === panel.backgroundId)
+
+  const handleConnOutStart = useCallback((characterId, e) => {
+    const canvas = canvasRef2.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+
+    const fromChar = panel.characters.find(c => c.characterId === characterId)
+    if (!fromChar) return
+    const portOffset = 18 / rect.height
+    // OUT port is the outside top-left corner of the character block.
+    const startX = fromChar.x
+    const startY = fromChar.y - portOffset
+
+    setConnDrag({ fromId: characterId, startX, startY, currentX: startX, currentY: startY })
+
+    const handleMove = (ev) => {
+      const x = (ev.clientX - rect.left) / rect.width
+      const y = (ev.clientY - rect.top) / rect.height
+      setConnDrag(prev => prev ? { ...prev, currentX: Math.max(0, Math.min(1, x)), currentY: Math.max(0, Math.min(1, y)) } : null)
+    }
+
+    const handleUp = (ev) => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      setConnDrag(null)
+    }
+
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+  }, [panel.characters])
+
+  const handleConnInEnd = useCallback((targetType, targetId) => {
+    if (!connDrag) return
+    if (targetType === 'character' && connDrag.fromId === targetId) {
+      setConnDrag(null)
+      return
+    }
+    const exists = connections.some(c => c.from === connDrag.fromId && c.to === targetId && (c.toType || 'character') === targetType)
+    if (!exists) {
+      onAddConnection(connDrag.fromId, targetId, targetType)
+    }
+    setConnDrag(null)
+  }, [connDrag, connections, onAddConnection])
+
+  const getPortScreenPos = useCallback((characterId, type) => {
+    const ch = panel.characters.find(c => c.characterId === characterId)
+    if (!ch) return null
+    const rect = canvasRef2.current?.getBoundingClientRect()
+    const portOffset = rect ? 18 / rect.height : 0.035
+    if (type === 'out') return { x: ch.x, y: ch.y - portOffset }
+    return { x: ch.x + ch.width, y: ch.y - portOffset }
+  }, [panel.characters])
+
+  const getObjectPortScreenPos = useCallback((objectId) => {
+    const obj = panelObjects.find(item => item.objectId === objectId)
+    const rect = canvasRef2.current?.getBoundingClientRect()
+    const portOffset = rect ? 18 / rect.height : 0.035
+    return obj ? { x: obj.x + obj.width / 2, y: obj.y - portOffset } : null
+  }, [panelObjects])
+
+  const setCanvasRef = useCallback((el) => {
+    canvasRef.current = el
+    canvasRef2.current = el
+  }, [])
+
+  return (
+    <div ref={wrapperRef} style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div ref={setCanvasRef} className="panel-canvas" style={{ width: canvasW || '100%', height: canvasH || '100%' }} onMouseDown={e => { const t = e.target; if (t === e.currentTarget || (t.style.pointerEvents === 'none' && t.parentElement === e.currentTarget)) onCanvasClick?.() }}>
+      <CompositionGuides grid={grid} visible={gridVisible} horizon={panel.horizon} onMoveHorizon={y => onUpdateHorizon?.({ ...panel.horizon, y })} />
+      {panelBackground && backgroundDef && (
+        <ObjectBlock
+          panelObj={panelBackground}
+          objDef={backgroundDef}
+          isBackground
+          showInputPort={true}
+          onSelect={() => {}}
+          onMove={(x, y) => onUpdateBackground({ x, y })}
+          onResize={(updates) => onUpdateBackground(updates)}
+          onRemove={() => onRemoveBackground?.()}
+          onConnInEnd={() => handleConnInEnd('background', panel.backgroundId)}
+        />
+      )}
+      {panel.characters.length === 0 && panelObjects.length === 0 && panelSfx.length === 0 && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--color-text-muted)',
+          fontSize: 13,
+          pointerEvents: 'none',
+        }}>
+          añade personajes, objetos o onomatopeyas desde abajo
+        </div>
+      )}
+
+      {panelSfx.map((s, idx) => (
+        <SFXBlock
+          key={idx}
+          sfx={s}
+          isSelected={selectedSfxIdx === idx}
+          onSelect={() => onSelectSfx(idx)}
+          onMove={(x, y) => onUpdateSfx(idx, { x, y })}
+          onResize={(width, height) => onUpdateSfx(idx, { width, height })}
+          onUpdate={(updates) => onUpdateSfx(idx, updates)}
+          onRemove={() => onRemoveSfx?.(idx)}
+        />
+      ))}
+
+      {panel.narration && (
+        <NarrationBlock
+          panelNarr={panel.narration}
+          isSelected={selectedNarr}
+          onSelect={onSelectNarr}
+          onMove={(x, y) => onUpdateNarr({ x, y })}
+          onResize={(updates) => onUpdateNarr(updates)}
+          onRemove={onRemoveNarr}
+        />
+      )}
+
+      <ConnectionArrows
+        connections={connections}
+        panelCharacters={panel.characters}
+        characters={characters}
+        getPortScreenPos={getPortScreenPos}
+        getObjectPortScreenPos={getObjectPortScreenPos}
+        objects={objects}
+        backgrounds={backgrounds}
+      />
+
+      {/* Temporary connection line while dragging */}
+      {connDrag && (
+        <svg
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 15,
+            overflow: 'visible',
+          }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={connDrag.startX * 100}
+            y1={connDrag.startY * 100}
+            x2={connDrag.currentX * 100}
+            y2={connDrag.currentY * 100}
+            stroke="#777"
+            strokeWidth="0.22"
+            strokeDasharray="0.7 0.7"
+            vectorEffect="non-scaling-stroke"
+            opacity="0.7"
+          />
+          <circle
+            cx={connDrag.currentX * 100}
+            cy={connDrag.currentY * 100}
+            r="0.25"
+            fill="#777"
+            opacity="0.7"
+          />
+        </svg>
+      )}
+
+      {panelObjects.map((obj, idx) => {
+        const objDef = objects.find(o => o.id === obj.objectId)
+        if (!objDef) return null
+        return (
+          <ObjectBlock
+            key={`${obj.objectId}-${idx}`}
+            panelObj={obj}
+            objDef={objDef}
+            isSelected={selectedObjIdx === idx}
+            onSelect={() => onSelectObj(idx)}
+            onMove={(x, y) => onUpdateObj(idx, { x, y })}
+            onResize={(updates) => onUpdateObj(idx, updates)}
+            onRemove={() => onRemoveObj?.(idx)}
+            onConnInEnd={(id) => handleConnInEnd('object', id)}
+            isConnDrag={!!connDrag}
+          />
+        )
+      })}
+
+      {panel.characters.map((ch, idx) => {
+        const charDef = characters.find(c => c.id === ch.characterId)
+        if (!charDef) return null
+        return (
+          <CharacterBlock
+            key={`${ch.characterId}-${idx}`}
+            panelChar={ch}
+            charDef={charDef}
+            isSelected={selectedCharIdx === idx}
+            onSelect={() => onSelectChar(idx)}
+            onMove={(x, y) => onUpdateChar(idx, { x, y })}
+            onResize={(updates) => onUpdateChar(idx, updates)}
+            onRemove={() => onRemoveChar?.(idx)}
+            onConnOutStart={handleConnOutStart}
+            onConnInEnd={(id) => handleConnInEnd('character', id)}
+            isConnDrag={!!connDrag}
+            connDragFrom={connDrag?.fromId}
+          />
+        )
+      })}
+    </div>
+    </div>
+  )
+}
