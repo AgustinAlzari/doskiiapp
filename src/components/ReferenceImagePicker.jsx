@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export default function ReferenceImagePicker({ entityId, entityName, value = [], onChange }) {
+export default function ReferenceImagePicker({ entityId, entityName, value = [], onChange, label = 'imagen de referencia' }) {
   const [preview, setPreview] = useState(null)
   const reference = value[0]
 
@@ -22,7 +22,7 @@ export default function ReferenceImagePicker({ entityId, entityName, value = [],
 
   return (
     <div>
-      <label className="label">imagen de referencia</label>
+      <label className="label">{label}</label>
       {reference ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {preview && <img src={preview} alt="referencia" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 5, border: '1px solid var(--color-border)' }} />}

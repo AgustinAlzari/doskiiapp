@@ -3,11 +3,11 @@ import { DIALOGUE_TYPES, DIRECTIONS, SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, 
 function describePosition(x = 0, y = 0, width = 0, height = 0) {
   const centerX = x + width / 2
   const centerY = y + height / 2
-  const horizontal = centerX < 0.33 ? 'izquierda' : centerX > 0.66 ? 'derecha' : 'centro'
-  const vertical = centerY < 0.33 ? 'arriba' : centerY > 0.66 ? 'abajo' : 'centro vertical'
+  const horizontal = centerX < 0.33 ? 'left' : centerX > 0.66 ? 'right' : 'center'
+  const vertical = centerY < 0.33 ? 'top' : centerY > 0.66 ? 'bottom' : 'middle'
   const area = width * height
-  const size = area < 0.04 ? 'muy pequeño' : area < 0.08 ? 'pequeño' : area < 0.18 ? 'mediano' : area < 0.3 ? 'grande' : 'dominante'
-  return { position: `${vertical}, ${horizontal}`, size }
+  const size = area < 0.04 ? 'very small' : area < 0.08 ? 'small' : area < 0.18 ? 'medium' : area < 0.3 ? 'large' : 'dominant'
+  return { position: `${vertical} ${horizontal}`, size }
 }
 
 function describeLandscapePlacement(background) {
@@ -16,39 +16,22 @@ function describeLandscapePlacement(background) {
   const centerY = y + height / 2
   const area = width * height
 
-  // A landscape has pictorial depth semantics, not character-style placement.
   if (area >= 0.42 && width >= 0.65) {
-    return 'paisaje envolvente y abierto: los personajes están DENTRO del paisaje, rodeados por él. El paisaje se extiende hasta los bordes del cuadro y CONTINÚA más allá de lo visible. NO es una imagen insertada, encapsulada, flotante, enmarcada ni con bordes. El paisaje ES el espacio, no una decoración pegada.'
+    return 'Immersive, full-scene landscape. Characters and objects exist WITHIN this space, surrounded by it. The landscape extends to all edges and continues beyond the frame. Do NOT treat it as a floating image, card, or framed element.'
   }
   if (centerY >= 0.62) {
-    if (centerX < 0.35) return 'paisaje en primer plano a la izquierda, como un telón matérico que se extiende desde el borde izquierdo del cuadro; los personajes están DENTRO de este espacio, no delante de una imagen. NO es una imagen flotante ni un cuadro con marco.'
-    if (centerX > 0.65) return 'paisaje en primer plano a la derecha, como un telón matérico que se extiende desde el borde derecho del cuadro; los personajes están DENTRO de este espacio, no delante de una imagen. NO es una imagen flotante ni un cuadro con marco.'
-    return 'paisaje en primer plano abajo, como un telón matérico que se extiende desde el borde inferior del cuadro; los personajes están DENTRO de este espacio, no delante de una imagen. NO es una imagen flotante ni un cuadro con marco.'
+    if (centerX < 0.35) return 'Foreground landscape on the left, extending from the left edge. Characters are inside this space, not in front of an image.'
+    if (centerX > 0.65) return 'Foreground landscape on the right, extending from the right edge. Characters are inside this space, not in front of an image.'
+    return 'Foreground landscape at the bottom, extending from the lower edge. Characters are inside this space, not in front of an image.'
   }
   if (centerY <= 0.4 && area < 0.42) {
-    return 'paisaje lejano en la parte superior, como una lejanía pictórica al estilo de una pintura china; se desvanece hacia el borde superior del cuadro. NO rodea a los personajes, NO es un objeto pegado ni una imagen con marco.'
+    return 'Distant background at the top, fading toward the upper edge. Does not surround characters.'
   }
-  return 'paisaje parcial en profundidad, integrado en la escena y limitado a la zona indicada; se extiende naturalmente sin marcos ni bordes visibles. NO dibujar un contorno alrededor.'
-}
-
-function describeGridAlignment(x, y, width, height, grid = 'thirds') {
-  const cx = x + width / 2
-  const cy = y + height / 2
-  const columns = grid === 'halves' ? ['izquierda', 'derecha'] : ['izquierda', 'centro', 'derecha']
-  const rows = grid === 'halves' ? ['superior', 'inferior'] : ['superior', 'central', 'inferior']
-  const col = columns[Math.min(columns.length - 1, Math.floor(cx * columns.length))]
-  const row = rows[Math.min(rows.length - 1, Math.floor(cy * rows.length))]
-  return `${row} ${col} de la grilla de ${grid === 'halves' ? 'mitades' : 'tercios'}`
+  return 'Partial landscape integrated into the scene, limited to the indicated area. Extends naturally without visible borders or frames.'
 }
 
 function coordinates(item) {
-  return `x ${Math.round(item.x * 100)}%, y ${Math.round(item.y * 100)}%, ancho ${Math.round(item.width * 100)}%, alto ${Math.round(item.height * 100)}%`
-}
-
-function formatRule(stripAspectRatio) {
-  const ar = ASPECT_RATIOS.find(item => item.id === stripAspectRatio)
-  if (!ar) return 'REGLA DE FORMATO: conservar exactamente la proporción definida por la imagen de salida.'
-  return `FORMATO DE SALIDA OBLIGATORIO: ${ar.ratio} (${ar.label}, ${ar.desc}). El lienzo final debe tener exactamente una relación de ancho:alto ${ar.ratio}. No generar 1:1, 16:9, 9:16 ni otra proporción alternativa. No recortar, deformar ni convertir la orientación. Diseñar toda la composición dentro de este rectángulo.`
+  return `x ${Math.round(item.x * 100)}%, y ${Math.round(item.y * 100)}%, w ${Math.round(item.width * 100)}%, h ${Math.round(item.height * 100)}%`
 }
 
 function connectionTargetName(connection, characters, objects, backgrounds = []) {
@@ -63,20 +46,211 @@ function connectionTargetName(connection, characters, objects, backgrounds = [])
 
 function referenceText(entity) {
   return entity.referenceImages?.length
-    ? ` Referencia visual adjunta: ${entity.referenceImages.map(image => image.fileName).join(', ')}. Usar para conservar identidad, forma, materiales y rasgos distintivos.`
+    ? ` Visual reference attached: ${entity.referenceImages.map(image => image.fileName).join(', ')}. Use to preserve identity, form, materials, and distinctive features.`
     : ''
 }
 
-export function generatePanelPrompt(panel, characters, generalStyle, backgrounds = [], objects = [], stripAspectRatio = null) {
+export function projectStyleText(project) {
+  if (!project) return ''
+  const parts = []
+  if (project.genre) parts.push(`Genre/tone: ${project.genre}`)
+  if (project.drawingStyle) parts.push(`Drawing style: ${project.drawingStyle}`)
+  if (project.world) parts.push(`Setting/world: ${project.world}`)
+  if (project.styleNotes) parts.push(project.styleNotes)
+  return parts.join('. ')
+}
+
+export function paletteText(project) {
+  if (!project) return ''
+  if (project.colorMode === 'bw') return 'COLOR PALETTE: black-and-white line art. Grayscale only, no color.'
+  const colors = (project.palette || []).filter(c => c.hex)
+  if (!colors.length) return ''
+  const parts = colors.map(c => `${c.label || c.role}: ${c.hex}`)
+  const modeLabel = project.colorMode === 'duotone'
+    ? 'DUOTONE PALETTE (use only these tones):'
+    : project.colorMode === 'limited'
+      ? 'LIMITED COLOR PALETTE:'
+      : 'COLOR PALETTE:'
+  return `${modeLabel} ${parts.join(', ')}.`
+}
+
+function resolveAspectRatio(stripAspectRatio, project) {
+  return stripAspectRatio || project?.defaultAspectRatio || 'hd'
+}
+
+const BALLOON_LABELS = {
+  narration: 'narración',
+  speech: 'diálogo',
+  thought: 'pensamiento',
+}
+
+const DIALOGUE_TYPE_LABELS = {
+  speech: 'speech',
+  thought: 'thought',
+  shout: 'shout',
+  whisper: 'whisper',
+}
+
+function dialoguePlacementText(d) {
+  const cx = Math.round((d.x + d.width / 2) * 100)
+  const cy = Math.round((d.y + d.height / 2) * 100)
+  const zone = cy < 0.33 ? 'in the upper area' : cy > 0.66 ? 'in the lower area' : 'in the middle area'
+  return `${zone} (balloon center at x ${cx}%, y ${cy}%)`
+}
+
+export function orderedPanelDialogues(panel, characters = []) {
+  const panelCharacters = panel?.characters || []
+  const occurrences = new Map()
+  const typeName = (id) => DIALOGUE_TYPES.find(v => v.id === id)?.id || 'speech'
+
+  const stackCount = new Map()
+  panelCharacters.forEach(item => {
+    const hasMain = !!item.dialogue
+    const extras = (item.extraDialogues || []).filter(e => e.text).length
+    stackCount.set(item.characterId, (hasMain ? 1 : 0) + extras)
+  })
+
+  const defaultPos = (item, k, total) => {
+    const width = 0.3
+    const height = 0.1
+    const yTop = item.y - 0.12 - (total - 1 - k) * 0.11
+    const direction = item.x < 0.5 ? 1 : -1
+    const xCenter = item.x + item.width / 2
+    const xShift = direction * 0.05 * (total - 1 - k)
+    return {
+      x: Math.max(0, Math.min(1 - width, xCenter - width / 2 + xShift)),
+      y: Math.max(0, Math.min(1 - height, yTop)),
+      width,
+      height,
+    }
+  }
+
+  const byInstance = new Map()
+  const firstY = new Map()
+  const speakerOrder = new Map()
+
+  panelCharacters.forEach((item, charIdx) => {
+    const definition = characters.find(c => c.id === item.characterId)
+    if (!definition) return
+    const occurrence = (occurrences.get(item.characterId) || 0) + 1
+    occurrences.set(item.characterId, occurrence)
+    const name = `${definition.name} ${occurrence}`
+    if (!byInstance.has(name)) {
+      byInstance.set(name, [])
+      speakerOrder.set(name, speakerOrder.size)
+    }
+    const total = stackCount.get(item.characterId) || 0
+    const push = (dialogue) => {
+      byInstance.get(name).push(dialogue)
+      if (firstY.get(name) == null) firstY.set(name, dialogue.y)
+    }
+    let k = 0
+
+    if (item.dialogue) {
+      const base = defaultPos(item, k, total)
+      const pos = item.dialoguePos ? { ...base, ...item.dialoguePos } : base
+      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), isExtra: false, extraIdx: null, order: 0, ...pos })
+      k++
+    }
+    ;(item.extraDialogues || []).forEach((extra, eIdx) => {
+      if (!extra.text) return
+      const base = defaultPos(item, k, total)
+      const pos = extra.pos ? { ...base, ...extra.pos } : base
+      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), isExtra: true, extraIdx: eIdx, order: eIdx + 1, ...pos })
+      k++
+    })
+  })
+
+  const speakers = [...byInstance.keys()].sort((a, b) => {
+    const byY = (firstY.get(a) ?? 0) - (firstY.get(b) ?? 0)
+    if (byY !== 0) return byY
+    return speakerOrder.get(a) - speakerOrder.get(b)
+  })
+
+  const ordered = []
+  const maxLen = Math.max(...speakers.map(s => byInstance.get(s).length), 0)
+  for (let i = 0; i < maxLen; i++) {
+    speakers.forEach(s => {
+      if (byInstance.get(s)[i]) ordered.push(byInstance.get(s)[i])
+    })
+  }
+
+  const numbered = ordered.map((d, idx) => ({ ...d, number: idx + 1 }))
+
+  const seen = new Map()
+  return numbered.map(d => {
+    const sub = (seen.get(d.name) || 0) + 1
+    seen.set(d.name, sub)
+    const total = byInstance.get(d.name).length
+    const label = total > 1 ? `${d.name} ·${sub}` : d.name
+    return { ...d, subIndex: sub, instanceTotal: total, label }
+  })
+}
+
+export function layoutFileNameFor(strip, panelIndex) {
+  const base = (strip?.id || 'strip').slice(0, 8)
+  return `${base}-layout-${panelIndex + 1}.jpg`
+}
+
+export function usedBalloonTypes(panel) {
+  const types = new Set()
+  if (panel?.narration?.text) types.add('narration')
+  ;(panel?.characters || []).forEach(char => {
+    const check = (text, type) => {
+      if (!text) return
+      const t = type || 'speech'
+      if (t === 'thought') types.add('thought')
+      else if (t === 'speech' || t === 'shout' || t === 'whisper') types.add('speech')
+    }
+    check(char.dialogue, char.dialogueType)
+    ;(char.extraDialogues || []).forEach(extra => check(extra.text, extra.type))
+  })
+  return types
+}
+
+const BALLOON_LETTERING_RULES = [
+  'Typography MUST be hand-lettered, drawn with a brush pen: irregular, slightly wobbly, with varying stroke weight. NEVER a computer, digital, or sans-serif typeface.',
+  'The balloon outline stroke must be THICK and heavy (visibly bold), not thin.',
+  'If a tail is present it must be wavy and trembling, with undulating edges (Crumb style) — never a straight line or a simple smooth curve.',
+]
+
+function balloonGraphicsText(project, panel) {
+  const balloons = project?.balloons
+  if (!balloons) return ''
+  const used = [...usedBalloonTypes(panel)].filter(type => balloons[type])
+  if (!used.length) return ''
+
+  const parts = used.map(type => {
+    const balloon = balloons[type]
+    const label = BALLOON_LABELS[type] || type
+    const pieces = []
+    if (balloon.description?.trim()) pieces.push(balloon.description.trim())
+    if (balloon.fileName) pieces.push(`use the attached reference image "${balloon.fileName}" exactly as the balloon graphic`)
+    return `${label.toUpperCase()}: ${pieces.join('. ')}`
+  })
+
+  const lines = ['BALLOON GRAPHICS:']
+  parts.forEach(part => lines.push(`- ${part}`))
+  lines.push(`- COMMON RULES (apply to every balloon): ${BALLOON_LETTERING_RULES.join(' ')}`)
+  return lines.join('\n')
+}
+
+export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null) {
   const lines = []
+  const chars = Array.isArray(characters) ? characters : []
+  const bgs = Array.isArray(backgrounds) ? backgrounds : []
+  const objs = Array.isArray(objects) ? objects : []
   const panelCharacters = panel.characters || []
   const panelConnections = panel.connections || []
   const outgoing = new Map()
   const connectedCharacters = new Set()
+  const resolvedAspect = resolveAspectRatio(stripAspectRatio, project)
+  const ar = ASPECT_RATIOS.find(item => item.id === resolvedAspect)
+  const ratioLabel = ar ? ar.ratio : 'defined'
 
   panelConnections.forEach(connection => {
-    const targetName = connectionTargetName(connection, characters, objects, backgrounds)
-    const source = characters.find(item => item.id === connection.from)
+    const targetName = connectionTargetName(connection, chars, objs, bgs)
+    const source = chars.find(item => item.id === connection.from)
     if (source && targetName) {
       outgoing.set(source.id, targetName)
       connectedCharacters.add(source.id)
@@ -84,189 +258,192 @@ export function generatePanelPrompt(panel, characters, generalStyle, backgrounds
     }
   })
 
-  // Global constraints come first so the image model sees them before details.
-  const ar = ASPECT_RATIOS.find(item => item.id === stripAspectRatio)
-  lines.push(`IMAGEN ${ar ? ar.label.toUpperCase() : ''} ${ar ? ar.ratio : ''}. LA IMAGEN DEBE TENER EXACTAMENTE PROPORCIÓN ${ar ? ar.ratio : 'definida'}. NO OTRA PROPORCIÓN. NO RECORTAR. NO DEFORMAR.`)
-  lines.push('')
-  lines.push('INSTRUCCIONES DE COMPOSICION PARA UNA HISTORIETA')
-  lines.push(formatRule(stripAspectRatio))
-  lines.push('REGLA DE LECTURA: respetar posiciones, tamaños, profundidad, relaciones y orden de capas indicados a continuación.')
+  // --- HEADER ---
+  const layoutFileName = layoutFileNameFor(strip, panelIndex)
+  lines.push(`IMAGE FORMAT: ${ratioLabel}. The final canvas must have exactly a ${ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this rectangle.`)
+  lines.push(`POSITIONAL LAYOUT: The file "${layoutFileName}" is a layout reference image showing exact element sizes, positions, and spatial relationships. Use it as a precise compositional guide.`)
   lines.push('')
 
-  if (generalStyle) {
-    lines.push(`ESTILO GLOBAL: ${generalStyle}`)
+  const projectStyle = projectStyleText(project)
+  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  if (styleText) {
+    lines.push(`GLOBAL STYLE: ${styleText}`)
     lines.push('')
   }
 
+  const palette = paletteText(project)
+  if (palette) {
+    lines.push(palette)
+    lines.push('')
+  }
+
+  const balloons = balloonGraphicsText(project, panel)
+  if (balloons) {
+    lines.push(balloons)
+    lines.push('')
+  }
+
+  lines.push('ATTACHED REFERENCES: for any element with an attached reference image, preserve its identity, form, materials, and distinctive features exactly, in the same line-art style as the rest of the panel.')
+  lines.push('')
+
+  // --- SCENE ---
   if (panel.timeTransition) {
     const transition = TIME_TRANSITIONS.find(item => item.id === panel.timeTransition)
-    if (transition) lines.push(`CONTINUIDAD TEMPORAL: ${transition.label}.`)
+    if (transition) lines.push(`TIME TRANSITION: ${transition.label}.`)
   }
-  if (panel.scene) lines.push(`ESCENA: ${panel.scene}`)
-  lines.push(`GUIA DE COMPOSICION: usar una grilla de ${panel.grid === 'halves' ? 'mitades (1 línea vertical y 1 horizontal)' : 'tercios (2 líneas verticales y 2 horizontales)'} como motor de ubicación; las guías no se dibujan en la imagen final.`)
-  if (panel.horizon) lines.push(`LINEA DE HORIZONTE: altura ${Math.round(panel.horizon.y * 100)}% del cuadro.${panel.horizon.description ? ` Descripción: ${panel.horizon.description}.` : ''} Dibujarla detrás del paisaje, personajes y objetos.`)
+  if (panel.scene) lines.push(`SCENE: ${panel.scene}`)
+  if (panel.horizon) lines.push(`HORIZON LINE: at ${Math.round(panel.horizon.y * 100)}% of the panel height.${panel.horizon.description ? ` Description: ${panel.horizon.description}.` : ''} Draw behind landscape, characters, and objects.`)
 
   if (panel.shotType) {
     const shot = SHOT_TYPES.find(item => item.id === panel.shotType)
-    if (shot) lines.push(`CAMARA Y ENCUADRE: ${shot.name}. ${shot.desc}.`)
+    if (shot) lines.push(`CAMERA AND FRAMING: ${shot.name}. ${shot.desc}.`)
   }
   if (panel.hatch && panel.hatch !== 'none') {
     const hatch = HATCH_TYPES.find(item => item.id === panel.hatch)
-    if (hatch) lines.push(`TRATAMIENTO GRAFICO: ${hatch.name}; ${hatch.desc}.`)
+    if (hatch) lines.push(`GRAPHIC TREATMENT: ${hatch.name}; ${hatch.desc}.`)
   }
 
+  // --- LAYERS ---
   lines.push('')
-  lines.push('CAPAS Y PROFUNDIDAD:')
+  lines.push('LAYERS AND DEPTH (back to front): landscape, then objects, then characters.')
   if (panel.backgroundId) {
-    const backgroundDef = backgrounds.find(item => item.id === panel.backgroundId)
+    const backgroundDef = bgs.find(item => item.id === panel.backgroundId)
     if (backgroundDef) {
       const background = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
       const placement = describeLandscapePlacement(background)
-      lines.push(`- PAISAJE, CAPA ESPACIAL: "${backgroundDef.name}". ${backgroundDef.promptText}.${referenceText(backgroundDef)} ${placement}. CRÍTICO: El paisaje es el espacio pictórico real dentro de la escena. NO es una viñeta, tarjeta, fotografía pegada ni objeto independiente. Los personajes y objetos están DENTRO del paisaje, no delante de una imagen. Su rectángulo conserva exactamente sus proporciones y su tamaño relativo en el cuadro.`)
+      lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${backgroundDef.promptText}.${referenceText(backgroundDef)} ${placement}`)
     }
   } else {
-    lines.push('- Sin paisaje definido: no inventar un fondo dominante.')
+    lines.push('- No landscape defined: do not invent a dominant background.')
   }
 
+  // --- OBJECTS ---
   const panelObjects = panel.objects || []
   if (panelObjects.length > 0) {
     lines.push('')
-    lines.push('OBJETOS EN ESCENA:')
+    lines.push('OBJECTS IN SCENE:')
     panelObjects.forEach(item => {
-      const definition = objects.find(object => object.id === item.objectId)
+      const definition = objs.find(object => object.id === item.objectId)
       if (!definition) return
-      const { position, size } = describePosition(item.x, item.y, item.width, item.height)
-      lines.push(`- "${definition.name}": ${definition.promptText}.${referenceText(definition)}${item.note ? ` Sobre el objeto: ${item.note}.` : ''} Posición: ${position}. Coordenadas y tamaño: ${coordinates(item)}. Alineación: ${describeGridAlignment(item.x, item.y, item.width, item.height, panel.grid)}. Tamaño relativo: ${size}. Capa delante del fondo.`)
+      const { size } = describePosition(item.x, item.y, item.width, item.height)
+      lines.push(`- "${definition.name}": ${definition.promptText}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     })
   }
 
+  // --- CHARACTERS ---
   lines.push('')
-  lines.push('PERSONAJES Y ACCIONES:')
+  lines.push('CHARACTERS AND ACTIONS:')
   const characterOccurrences = new Map()
   panelCharacters.forEach(item => {
-    const definition = characters.find(character => character.id === item.characterId)
+    const definition = chars.find(character => character.id === item.characterId)
     if (!definition) return
     const occurrence = (characterOccurrences.get(item.characterId) || 0) + 1
     characterOccurrences.set(item.characterId, occurrence)
     const instanceName = `${definition.name} ${occurrence}`
-    const { position, size } = describePosition(item.x, item.y, item.width, item.height)
-    lines.push(`- PERSONAJE "${instanceName}": ${definition.promptText}.${referenceText(definition)} Posición exacta: ${position}. Coordenadas y tamaño: ${coordinates(item)}. Alineación: ${describeGridAlignment(item.x, item.y, item.width, item.height, panel.grid)}. Tamaño relativo: ${size}.`)
-    if (item.expression) lines.push(`  Expresión: ${item.expression}.`)
+    const { size } = describePosition(item.x, item.y, item.width, item.height)
+    lines.push(`- CHARACTER "${instanceName}": ${definition.promptText}.${referenceText(definition)} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
+    if (item.expression) lines.push(`  Expression: ${item.expression}.`)
     if (item.actions?.length > 0) {
-      lines.push(`  Acción: ${item.actions.join(', ')}.`)
+      lines.push(`  Action: ${item.actions.join(', ')}.`)
       item.actions.forEach(action => {
         const effect = ACTION_EFFECTS[action]
         const description = effect?.motionLines && MOTION_LINE_DESCS[effect.motionLines]
-        if (description) lines.push(`  Efecto visual de la acción: ${description}.`)
+        if (description) lines.push(`  Visual effect: ${description}.`)
       })
     }
-
-    // A connection is the authoritative gaze instruction; never emit a conflicting side direction.
-    if (outgoing.has(item.characterId)) {
-      lines.push(`  MIRADA Y RELACION: ${instanceName} observa a ${outgoing.get(item.characterId)}.`)
-    } else if (!connectedCharacters.has(item.characterId)) {
-      const direction = DIRECTIONS.find(value => value.id === item.direction)
-      if (direction) lines.push(`  Orientación corporal: ${direction.name}.`)
+    if (item.actionNotes) {
+      lines.push(`  Action description: ${item.actionNotes}.`)
     }
 
-    if (item.dialogue) {
-      const type = DIALOGUE_TYPES.find(value => value.id === item.dialogueType)
-      const verb = type?.id === 'thought' ? 'piensa' : type?.id === 'shout' ? 'grita' : type?.id === 'whisper' ? 'susurra' : 'dice'
-      lines.push(`  Texto: ${instanceName} ${verb}: "${item.dialogue}".`)
+    if (!connectedCharacters.has(item.characterId)) {
+      const direction = DIRECTIONS.find(value => value.id === item.direction)
+      if (direction) lines.push(`  Body orientation: ${direction.name}.`)
     }
   })
 
+  // --- DIALOGUES ---
+  const orderedDialogues = orderedPanelDialogues(panel, chars)
+
+  // --- VISUAL RELATIONSHIPS ---
   if (panelConnections.length > 0) {
     lines.push('')
-    lines.push('RELACIONES VISUALES OBLIGATORIAS:')
+    lines.push('VISUAL RELATIONSHIPS:')
     panelConnections.forEach(connection => {
-      const source = characters.find(item => item.id === connection.from)
-      const target = connectionTargetName(connection, characters, objects, backgrounds)
-      if (source && target) lines.push(`- ${source.name} observa a ${target}. La mirada y la atención visual deben dirigirse hacia ese objetivo.`)
+      const source = chars.find(item => item.id === connection.from)
+      const target = connectionTargetName(connection, chars, objs, bgs)
+      if (source && target) lines.push(`- ${source.name} looks at ${target}. Gaze and visual attention must be directed toward that target.`)
     })
   }
 
+  // --- TEXT ELEMENTS ---
   const panelSfx = panel.sfx || []
   const hasNarration = panel.narration && panel.narration.text
   if (hasNarration || panelSfx.some(item => item.text)) {
     lines.push('')
-    lines.push('TEXTOS Y ELEMENTOS GRAFICOS:')
+    lines.push('TEXT AND GRAPHIC ELEMENTS:')
     if (hasNarration) {
       const narr = panel.narration
-      const { position, size } = describePosition(narr.x, narr.y, narr.width, narr.height)
-      const style = narr.framed ? 'EN RECUADRO' : 'TEXTO SUELTO'
-      lines.push(`- Narración [${style}]: "${narr.text}". Posición: ${position}. Coordenadas y tamaño: ${coordinates(narr)}. Alineación: ${describeGridAlignment(narr.x, narr.y, narr.width, narr.height, panel.grid)}. Tamaño relativo: ${size}.${narr.framed ? ' Texto dentro de un recuadro con borde visible.' : ' Texto flotante sin recuadro.'}`)
+      const { size } = describePosition(narr.x, narr.y, narr.width, narr.height)
+      const style = narr.framed ? 'FRAMED' : 'FREEFORM'
+      lines.push(`- Narration [${style}]: "${narr.text}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}`)
     }
     panelSfx.forEach(item => {
       if (!item.text) return
-      const { position, size } = describePosition(item.x, item.y, item.width, item.height)
-      lines.push(`- Onomatopeya "${item.text}": posición ${position}, tamaño ${size}, estilo ${item.style}.`)
+      const { size } = describePosition(item.x, item.y, item.width, item.height)
+      lines.push(`- Sound effect "${item.text}": coordinates ${coordinates(item)}, size ${size}, style ${item.style}.`)
     })
   }
 
-  // Narration gaze references
+  // Narration gaze
   if (hasNarration) {
     panelCharacters.forEach(item => {
       if (item.gazeTarget?.type === 'narration') {
-        const definition = characters.find(character => character.id === item.characterId)
+        const definition = chars.find(character => character.id === item.characterId)
         if (definition) {
           const occurrence = characterOccurrences.get(item.characterId) || 1
-          lines.push(`  MIRADA: ${definition.name} ${occurrence} observa el cuadro de narración.`)
+          lines.push(`  GAZE: ${definition.name} ${occurrence} looks at the narration box.`)
         }
       }
     })
   }
 
-  // Position map
-  const mapElements = []
-  if (panel.narration && panel.narration.text) {
-    const narr = panel.narration
-    mapElements.push({ label: 'N', name: 'narración', cx: narr.x + narr.width / 2, cy: narr.y + narr.height / 2 })
-  }
-  if (panel.backgroundId) {
-    const bg = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
-    mapElements.push({ label: 'B', name: 'fondo', cx: bg.x + bg.width / 2, cy: bg.y + bg.height / 2 })
-  }
-  panelCharacters.forEach((item, idx) => {
-    const def = characters.find(c => c.id === item.characterId)
-    if (def) mapElements.push({ label: `P${idx + 1}`, name: def.name, cx: item.x + item.width / 2, cy: item.y + item.height / 2 })
-  })
-  panelObjects.forEach((item, idx) => {
-    const def = objects.find(o => o.id === item.objectId)
-    if (def) mapElements.push({ label: `O${idx + 1}`, name: def.name, cx: item.x + item.width / 2, cy: item.y + item.height / 2 })
-  })
-  const panelSfxForMap = panel.sfx || []
-  panelSfxForMap.forEach((item, idx) => {
-    if (item.text) mapElements.push({ label: `S${idx + 1}`, name: item.text, cx: item.x + item.width / 2, cy: item.y + item.height / 2 })
-  })
-
-  if (mapElements.length > 0) {
+  // --- DIALOGUE SEQUENCE (reinforcement) ---
+  if (orderedDialogues.length > 0) {
     lines.push('')
-    lines.push('MAPA DE POSICIONES:')
-    const rows = ['arriba', 'centro vertical', 'abajo']
-    const grid = [[], [], []]
-    mapElements.forEach(el => {
-      const col = el.cx < 0.33 ? 0 : el.cx > 0.66 ? 2 : 1
-      const row = el.cy < 0.33 ? 0 : el.cy > 0.66 ? 2 : 1
-      grid[row][col].push(`[${el.label}] ${el.name}`)
-    })
-    for (let r = 0; r < 3; r++) {
-      const parts = []
-      for (let c = 0; c < 3; c++) {
-        parts.push(grid[r][c].length > 0 ? grid[r][c].join(', ') : '—')
+    lines.push('DIALOGUE SEQUENCE — STRICT, MUST BE REPRODUCED EXACTLY (verbatim, in this logical order):')
+    lines.push(`PHYSICAL PLACEMENT: follow "${layoutFileName}" for each balloon's exact position, size, and order on canvas (highest priority). The sequence below is the logical reading order only.`)
+    const lastByChar = {}
+    orderedDialogues.forEach((d, idx) => {
+      const placement = dialoguePlacementText(d)
+      const typeLabel = DIALOGUE_TYPE_LABELS[d.type] || d.type
+      const prev = lastByChar[d.name]
+      const linked = prev != null
+        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. If you wish to show the connection, draw only a thin dashed line between them. Keep a clear visible gap between these balloons and any balloon from another speaker.`
+        : ''
+      lastByChar[d.name] = d.number
+      if (idx === 0) {
+        lines.push(`${d.number}. "${d.label}" speaks FIRST: his balloon is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.`)
+      } else {
+        lines.push(`${d.number}. "${d.label}" responds: his balloon is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${linked}`)
       }
-      lines.push(`  ${rows[r]}: ${parts.join(' | ')}`)
-    }
+    })
+
+    lines.push('BALLOON STYLE AND LETTERING: strictly follow the balloon style defined in BALLOON GRAPHICS above; do not alter the wording, the lettering, or the balloon shape.')
   }
 
+  // --- FOOTER ---
   lines.push('')
-  lines.push(`RECORDATORIO FINAL: generar un único cuadro de historieta completo en proporción ${ASPECT_RATIOS.find(item => item.id === stripAspectRatio)?.ratio || 'definida'}, con composición clara, capas respetadas y sin alterar las relaciones indicadas. PROPORCIÓN DE SALIDA: ${ASPECT_RATIOS.find(item => item.id === stripAspectRatio)?.ratio || 'definida'}. NO CAMBIAR LA PROPORCIÓN.`)
+  lines.push(`FINAL REMINDER: Generate a single comic panel in ${ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutFileName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`)
+  lines.push(`FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from the character it belongs to, and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`)
   return lines.join('\n')
 }
 
-export function generateAllPanelsPrompt(strip, characters, backgrounds = [], objects = []) {
-  return strip.panels.map((panel, index) => {
-    const prompt = generatePanelPrompt(panel, characters, strip.generalStyle, backgrounds, objects, strip.aspectRatio)
-    return `=== CUADRO ${index + 1} ===\n\n${prompt}`
+export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null) {
+  const chars = Array.isArray(characters) ? characters : []
+  const bgs = Array.isArray(backgrounds) ? backgrounds : []
+  const objs = Array.isArray(objects) ? objects : []
+  return (strip?.panels || []).map((panel, index) => {
+    const prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, index, strip, project)
+    return `=== PANEL ${index + 1} ===\n\n${prompt}`
   }).join('\n\n')
 }

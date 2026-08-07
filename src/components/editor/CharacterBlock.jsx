@@ -8,10 +8,12 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
   const [dragOverIn, setDragOverIn] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const isResizingRef = useRef(false)
 
   const isConnSource = connDragFrom === panelChar.characterId
 
   const handleMouseDown = useCallback((e) => {
+    if (isResizingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -39,6 +41,7 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()
+    isResizingRef.current = true
     setResizing(true)
     resizeStart.current = { mx: e.clientX, my: e.clientY, x: panelChar.x, y: panelChar.y, w: panelChar.width, h: panelChar.height }
 
@@ -57,6 +60,7 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
       onResize({ x, y, width, height })
     }
     const handleUp = () => {
+      isResizingRef.current = false
       setResizing(false)
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
@@ -136,6 +140,11 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
       <div className="char-block-body">
         {panelChar.actions?.length > 0 && (
           <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{panelChar.actions.join(', ')}</span>
+        )}
+        {panelChar.actionNotes && (
+          <span style={{ fontSize: 10, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {panelChar.actionNotes}
+          </span>
         )}
         {(() => {
           const firstWithMotion = (panelChar.actions || []).find(a => ACTION_EFFECTS[a]?.motionLines)

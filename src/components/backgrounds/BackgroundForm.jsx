@@ -3,7 +3,7 @@ import useBackgroundStore from '../../store/backgroundStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 
-export default function BackgroundForm({ background, onSaved, onCancel }) {
+export default function BackgroundForm({ background, projectId, onSaved, onCancel }) {
   const save = useBackgroundStore(s => s.save)
   const isNew = !background?.id
 
@@ -18,7 +18,7 @@ export default function BackgroundForm({ background, onSaved, onCancel }) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    await save({ ...background, id: background?.id || crypto.randomUUID(), name, promptText, color, referenceImages })
+    await save({ ...background, id: background?.id || crypto.randomUUID(), projectId: background?.projectId || projectId, name, promptText, color, referenceImages })
     setSaving(false)
     onSaved()
   }

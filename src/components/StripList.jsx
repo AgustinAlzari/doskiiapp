@@ -12,10 +12,11 @@ function formatDate(iso) {
   return `${day} ${month} ${year}, ${h}:${m}`
 }
 
-export default function StripList({ onNew, onEdit }) {
+export default function StripList({ projectId, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
   const loaded = useStripStore(s => s.loaded)
   const remove = useStripStore(s => s.remove)
+  const scopedStrips = strips.filter(s => s.projectId === projectId)
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
@@ -26,7 +27,7 @@ export default function StripList({ onNew, onEdit }) {
         <button className="btn btn-primary" onClick={onNew}>nueva tira</button>
       </div>
 
-      {strips.length === 0 ? (
+      {scopedStrips.length === 0 ? (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -42,7 +43,7 @@ export default function StripList({ onNew, onEdit }) {
         </div>
       ) : (
         <div className="strip-grid">
-          {strips.map(strip => (
+          {scopedStrips.map(strip => (
             <div
               key={strip.id}
               className="strip-card"

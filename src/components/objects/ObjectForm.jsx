@@ -3,7 +3,7 @@ import useObjectStore from '../../store/objectStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 
-export default function ObjectForm({ object, onSaved, onCancel }) {
+export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
   const save = useObjectStore(s => s.save)
   const isNew = !object?.id
 
@@ -18,7 +18,7 @@ export default function ObjectForm({ object, onSaved, onCancel }) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    await save({ ...object, id: object?.id || crypto.randomUUID(), name, promptText, color, referenceImages })
+    await save({ ...object, id: object?.id || crypto.randomUUID(), projectId: object?.projectId || projectId, name, promptText, color, referenceImages })
     setSaving(false)
     onSaved()
   }

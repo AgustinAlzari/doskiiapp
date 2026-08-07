@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import useObjectStore from '../../store/objectStore'
+import useProjectStore from '../../store/projectStore'
 
 function ObjectThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -19,10 +20,22 @@ function ObjectThumb({ referenceImages }) {
   return <div className="entity-card-thumb entity-card-thumb-empty" />
 }
 
-export default function ObjectList({ onNew, onEdit }) {
+export default function ObjectList({ projectId, onNew, onEdit }) {
   const objects = useObjectStore(s => s.objects)
   const loaded = useObjectStore(s => s.loaded)
   const remove = useObjectStore(s => s.remove)
+  const save = useObjectStore(s => s.save)
+  const projects = useProjectStore(s => s.projects)
+  const scoped = objects.filter(o => o.projectId === projectId)
+
+  const copyToProject = async (obj, targetId) => {
+    await save({
+      ...obj,
+      id: crypto.randomUUID(),
+      projectId: targetId,
+      createdAt: new Date().toISOString(),
+    })
+  }
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
@@ -33,13 +46,13 @@ export default function ObjectList({ onNew, onEdit }) {
         <button className="btn btn-primary" onClick={onNew}>nuevo objeto</button>
       </div>
 
-      {objects.length === 0 ? (
+      {scoped.length === 0 ? (
         <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
           sin objetos aún. crea uno para empezar.
         </div>
       ) : (
         <div className="entity-grid">
-          {objects.map(obj => (
+          {scoped.map(obj => (
             <div
               key={obj.id}
               className="entity-card"
@@ -53,7 +66,22 @@ export default function ObjectList({ onNew, onEdit }) {
                 {obj.promptText || 'sin descripción'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-                <div className="color-dot" style={{ background: obj.color || '#999' }} />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="color-dot" style={{ background: obj.color || '#999' }} />
+                  {projects.length > 1 && (
+                    <select
+                      className="input"
+                      style={{ fontSize: 10, maxWidth: 88, cursor: 'pointer', padding: '1px 2px', height: 'auto' }}
+                      value=""
+                      onClick={e => e.stopPropagation()}
+                      onChange={async (e) => { if (e.target.value) { await copyToProject(obj, e.target.value); e.target.value = '' } }}
+                      title="copiar a otro proyecto"
+                    >
+                      <option value="">copiar</option>
+                      {projects.filter(p => p.id !== projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+                </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
                   onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(obj.id) }}

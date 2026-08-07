@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 
-export default function AutoTextarea({ value, onChange, placeholder, minRows = 3, maxRows = 20, className = 'input textarea', style = {} }) {
+export default function AutoTextarea({ value, onChange, placeholder, minRows = 3, maxRows = 20, className = 'input textarea', style = {}, ...rest }) {
   const ref = useRef(null)
 
   const adjustHeight = () => {
@@ -26,6 +26,7 @@ export default function AutoTextarea({ value, onChange, placeholder, minRows = 3
       placeholder={placeholder}
       rows={minRows}
       style={{ overflow: 'hidden', resize: 'none', ...style }}
+      {...rest}
     />
   )
 }

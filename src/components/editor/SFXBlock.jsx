@@ -6,8 +6,10 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const isResizingRef = useRef(false)
 
   const handleMouseDown = useCallback((e) => {
+    if (isResizingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -35,6 +37,7 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
 
   const handleResizeDown = useCallback((e) => {
     e.stopPropagation()
+    isResizingRef.current = true
     setResizing(true)
     resizeStart.current = { mx: e.clientX, my: e.clientY, w: sfx.width, h: sfx.height }
 
@@ -50,6 +53,7 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
       )
     }
     const handleUp = () => {
+      isResizingRef.current = false
       setResizing(false)
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)

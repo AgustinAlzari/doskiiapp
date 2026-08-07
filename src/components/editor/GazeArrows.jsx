@@ -1,4 +1,4 @@
-export default function GazeArrows({ panel, characters, objects }) {
+export default function GazeArrows({ panel, characters, objects, onClearGaze }) {
   if (!panel) return null
 
   const panelChars = panel.characters || []
@@ -40,6 +40,7 @@ export default function GazeArrows({ panel, characters, objects }) {
 
       return {
         id: `${ch.characterId}-${ch.gazeTarget.type}-${ch.gazeTarget.id}`,
+        characterId: ch.characterId,
         x1: sourceX * 100,
         y1: sourceY * 100,
         x2: targetX * 100,
@@ -59,7 +60,6 @@ export default function GazeArrows({ panel, characters, objects }) {
         inset: 0,
         width: '100%',
         height: '100%',
-        pointerEvents: 'none',
         zIndex: 10,
         overflow: 'visible',
       }}
@@ -97,7 +97,7 @@ export default function GazeArrows({ panel, characters, objects }) {
         const labelY = cy - 6
 
         return (
-          <g key={arrow.id}>
+          <g key={arrow.id} style={{ cursor: 'pointer' }} onClick={() => onClearGaze?.(arrow.characterId)}>
             <path
               d={pathD}
               stroke={arrow.color}
@@ -116,6 +116,7 @@ export default function GazeArrows({ panel, characters, objects }) {
               fontSize="9"
               fontWeight="500"
               opacity="0.8"
+              pointerEvents="none"
             >
               {arrow.label}
             </text>

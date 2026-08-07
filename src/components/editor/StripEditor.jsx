@@ -6,10 +6,9 @@ import useObjectStore from '../../store/objectStore'
 import { SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, SFX_STYLES, ASPECT_RATIOS } from '../../data/actionPresets'
 import PanelCanvas from './PanelCanvas'
 import CharacterPropsPanel from './CharacterPropsPanel'
-import PromptExporter from '../export/PromptExporter'
 import AutoTextarea from './AutoTextarea'
 
-export default function StripEditor({ strip, onBack, onEditCharacter }) {
+export default function StripEditor({ strip, project, onBack, onEditCharacter, onShowPrompts }) {
   const save = useStripStore(s => s.save)
   const characters = useCharacterStore(s => s.characters)
   const backgrounds = useBackgroundStore(s => s.backgrounds)
@@ -20,11 +19,11 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
   const [selectedObjIdx, setSelectedObjIdx] = useState(null)
   const [selectedSfxIdx, setSelectedSfxIdx] = useState(null)
   const [selectedNarr, setSelectedNarr] = useState(false)
+  const [selectedBalloon, setSelectedBalloon] = useState(null)
   const [saveState, setSaveState] = useState(null)
   const [showDescModal, setShowDescModal] = useState(false)
   const [descDraft, setDescDraft] = useState('')
   const [gridVisible, setGridVisible] = useState(true)
-  const [showPrompts, setShowPrompts] = useState(false)
   const canvasRef = useRef(null)
 
   const deselectAll = useCallback(() => {
@@ -32,6 +31,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedBalloon(null)
   }, [])
 
   const panel = data.panels[selectedPanelIdx]
@@ -51,6 +51,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
   const updateCharacterInPanel = useCallback((panelIdx, charIdx, updates) => {
     setData(prev => {
       const panels = [...prev.panels]
+      if (!panels[panelIdx]?.characters?.[charIdx]) return prev
       const characters = [...panels[panelIdx].characters]
       characters[charIdx] = { ...characters[charIdx], ...updates }
       panels[panelIdx] = { ...panels[panelIdx], characters }
@@ -72,7 +73,10 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
         expression: '',
         dialogue: '',
         dialogueType: 'speech',
+        dialoguePosition: null,
+        extraDialogues: [],
         actions: [],
+        actionNotes: '',
         gazeTarget: null,
       })
       panels[panelIdx] = { ...panels[panelIdx], characters }
@@ -131,6 +135,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
   const updateObjectInPanel = useCallback((panelIdx, objIdx, updates) => {
     setData(prev => {
       const panels = [...prev.panels]
+      if (!panels[panelIdx]?.objects?.[objIdx]) return prev
       const objects = [...(panels[panelIdx].objects || [])]
       objects[objIdx] = { ...objects[objIdx], ...updates }
       panels[panelIdx] = { ...panels[panelIdx], objects }
@@ -168,6 +173,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
   const updateSfxInPanel = useCallback((panelIdx, sfxIdx, updates) => {
     setData(prev => {
       const panels = [...prev.panels]
+      if (!panels[panelIdx]?.sfx?.[sfxIdx]) return prev
       const sfx = [...(panels[panelIdx].sfx || [])]
       sfx[sfxIdx] = { ...sfx[sfxIdx], ...updates }
       panels[panelIdx] = { ...panels[panelIdx], sfx }
@@ -216,15 +222,71 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
     setSelectedNarr(false)
   }, [])
 
+  // Balloons (dialogue positions on canvas)
+  const updateDialoguePos = useCallback((panelIdx, characterId, isExtra, extraIdx, updates) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const characters = [...(panels[panelIdx].characters || [])]
+      const charIdx = characters.findIndex(c => c.characterId === characterId)
+      if (charIdx < 0) return prev
+      const char = characters[charIdx]
+      if (isExtra) {
+        const extras = [...(char.extraDialogues || [])]
+        if (!extras[extraIdx]) return prev
+        extras[extraIdx] = { ...extras[extraIdx], pos: { ...(extras[extraIdx].pos || {}), ...updates } }
+        characters[charIdx] = { ...char, extraDialogues: extras }
+      } else {
+        characters[charIdx] = { ...char, dialoguePos: { ...(char.dialoguePos || {}), ...updates } }
+      }
+      panels[panelIdx] = { ...panels[panelIdx], characters }
+      return { ...prev, panels }
+    })
+  }, [])
+
+  const moveBalloon = useCallback((balloon, { x, y }) => {
+    updateDialoguePos(selectedPanelIdx, balloon.characterId, balloon.isExtra, balloon.extraIdx, { x, y })
+  }, [selectedPanelIdx, updateDialoguePos])
+
+  const resizeBalloon = useCallback((balloon, updates) => {
+    updateDialoguePos(selectedPanelIdx, balloon.characterId, balloon.isExtra, balloon.extraIdx, updates)
+  }, [selectedPanelIdx, updateDialoguePos])
+
+  const selectBalloon = useCallback((balloon) => {
+    const charIdx = (panel?.characters || []).findIndex(c => c.characterId === balloon.characterId)
+    if (charIdx < 0) return
+    setSelectedCharIdx(charIdx)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedNarr(false)
+    setSelectedBalloon({ characterId: balloon.characterId, isExtra: balloon.isExtra, extraIdx: balloon.extraIdx })
+  }, [panel])
+
+  const removeDialogueBalloon = useCallback((balloon) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const characters = [...(panels[selectedPanelIdx].characters || [])]
+      const charIdx = characters.findIndex(c => c.characterId === balloon.characterId)
+      if (charIdx < 0) return prev
+      const char = characters[charIdx]
+      if (balloon.isExtra) {
+        characters[charIdx] = { ...char, extraDialogues: (char.extraDialogues || []).filter((_, i) => i !== balloon.extraIdx) }
+      } else {
+        characters[charIdx] = { ...char, dialogue: '', dialoguePos: null }
+      }
+      panels[selectedPanelIdx] = { ...panels[selectedPanelIdx], characters }
+      return { ...prev, panels }
+    })
+    setSelectedBalloon(null)
+    setSelectedCharIdx(null)
+  }, [selectedPanelIdx])
+
   // Connections
   const addConnection = useCallback((panelIdx, fromId, toId, toType = 'character') => {
     setData(prev => {
       const panels = [...prev.panels]
-      const connections = [...(panels[panelIdx].connections || [])]
-      const exists = connections.some(c => c.from === fromId && c.to === toId && (c.toType || 'character') === toType)
-      if (!exists) {
-        connections.push({ from: fromId, to: toId, toType })
-      }
+      let connections = [...(panels[panelIdx].connections || [])]
+      connections = connections.filter(c => c.from !== fromId)
+      connections.push({ from: fromId, to: toId, toType })
       panels[panelIdx] = { ...panels[panelIdx], connections }
       return { ...prev, panels }
     })
@@ -273,8 +335,8 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
         >
           {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
         </select>
-        <button className="btn btn-sm" onClick={() => setShowPrompts(!showPrompts)}>
-          {showPrompts ? 'editor' : 'prompts'}
+        <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters)}>
+          prompts
         </button>
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saveState === 'saving'}>
           {saveState === 'saving' ? 'guardando...' : saveState === 'saved' ? 'guardado ✓' : 'guardar'}
@@ -290,6 +352,12 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
           </div>
           <div className="desc-card-dots">···</div>
         </div>
+        {project && (project.styleNotes || project.drawingStyle || project.genre) && (
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            hereda del proyecto: {[project.drawingStyle, project.genre, project.styleNotes].filter(Boolean).join(' · ')}
+            {data.generalStyle?.trim() ? ' (la descripción de la tira agrega o reemplaza)' : ' (vacío = usar estilo del proyecto)'}
+          </div>
+        )}
       </div>
 
       {/* Modal overlay de descripción */}
@@ -315,9 +383,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
         </div>
       )}
 
-      {showPrompts ? (
-        <PromptExporter strip={data} characters={characters} />
-      ) : (
+      {/* Editor content */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
           {/* Panel tabs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 80, flexShrink: 0 }}>
@@ -350,7 +416,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
                 <div
                   className={`sidebar-item ${i === selectedPanelIdx ? 'active' : ''}`}
                   style={{ justifyContent: 'center', fontSize: 12 }}
-                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null) }}
+                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedNarr(false) }}
                 >
                   cuadro {i + 1}
                 </div>
@@ -359,8 +425,8 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
           </div>
 
           {/* Canvas + Sidebars */}
-          <div style={{ display: 'flex', gap: 12, flex: '1 1 0%', minHeight: 0 }}>
-            {/* Canvas */}
+          <div style={{ display: 'flex', gap: 12, flex: '1 1 0%', minHeight: 0, position: 'relative' }}>
+            {/* Canvas — fixed width, never shrinks */}
             <div style={{ position: 'relative', flex: '1 1 0%', minWidth: 0, overflow: 'hidden' }}>
               <PanelCanvas
                 key={data.aspectRatio || 'hd'}
@@ -375,11 +441,16 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
                 selectedCharIdx={selectedCharIdx}
                 selectedObjIdx={selectedObjIdx}
                 selectedSfxIdx={selectedSfxIdx}
-                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null) }}
-                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null) }}
-                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null) }}
+                selectedBalloon={selectedBalloon}
+                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
+                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
+                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null) }}
                 selectedNarr={selectedNarr}
-                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null) }}
+                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
+                onSelectBalloon={selectBalloon}
+                onMoveBalloon={moveBalloon}
+                onResizeBalloon={resizeBalloon}
+                onRemoveBalloon={removeDialogueBalloon}
                 onUpdateChar={(charIdx, updates) => updateCharacterInPanel(selectedPanelIdx, charIdx, updates)}
                 onUpdateObj={(objIdx, updates) => updateObjectInPanel(selectedPanelIdx, objIdx, updates)}
                 onUpdateSfx={(sfxIdx, updates) => updateSfxInPanel(selectedPanelIdx, sfxIdx, updates)}
@@ -398,82 +469,84 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
               />
             </div>
 
-            {/* Properties panels — between canvas and general sidebar */}
-            {selectedCharData && selectedCharDef && (
-              <div className="editor-sidebar" style={{ width: 320, flexShrink: 0, alignSelf: 'stretch', overflow: 'auto' }}>
-                <CharacterPropsPanel
-                  character={selectedCharDef}
-                  panelChar={selectedCharData}
-                  panelCharacters={panel?.characters || []}
-                  panelObjects={panel?.objects || []}
-                  panelNarration={panel?.narration}
-                  allCharacters={characters}
-                  allObjects={objects}
-                  onUpdate={(updates) => updateCharacterInPanel(selectedPanelIdx, selectedCharIdx, updates)}
-                  onRemove={() => removeCharacterFromPanel(selectedPanelIdx, selectedCharIdx)}
-                  onEdit={() => onEditCharacter(selectedCharDef)}
-                />
-              </div>
-            )}
-
-            {selectedObjData && selectedObjDef && (
-              <div className="editor-sidebar" style={{ width: 240, flexShrink: 0, alignSelf: 'stretch', overflow: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="color-dot" style={{ background: selectedObjDef.color }} />
-                  <span style={{ fontWeight: 500, fontSize: 14 }}>{selectedObjDef.name}</span>
-                  <div style={{ flex: 1 }} />
-                  <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setSelectedObjIdx(null)}>×</button>
-                </div>
-                <div>
-                  <label className="label">sobre el objeto</label>
-                  <AutoTextarea
-                    value={selectedObjData.note || ''}
-                    onChange={e => updateObjectInPanel(selectedPanelIdx, selectedObjIdx, { note: e.target.value })}
-                    placeholder="qué ocurre sobre este objeto, qué contiene o qué relación tiene con la escena..."
-                    minRows={4}
-                  />
-                </div>
-              </div>
-            )}
-
-            {selectedSfxData && selectedSfxIdx !== null && (
-              <div className="editor-sidebar" style={{ width: 200, flexShrink: 0, alignSelf: 'stretch', overflow: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 500, fontSize: 14 }}>onomatopeya</span>
-                  <div style={{ flex: 1 }} />
-                  <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeSfxFromPanel(selectedPanelIdx, selectedSfxIdx)}>×</button>
-                </div>
-                <div>
-                  <label className="label">texto</label>
-                  <input
-                    className="input"
-                    value={selectedSfxData.text}
-                    onChange={e => updateSfxInPanel(selectedPanelIdx, selectedSfxIdx, { text: e.target.value })}
-                    placeholder="BAM, WHOOSH..."
-                  />
-                </div>
-                <div>
-                  <label className="label">estilo</label>
-                  <div className="radio-group">
-                    {SFX_STYLES.map(s => (
-                      <div
-                        key={s.id}
-                        className={`radio-pill ${selectedSfxData.style === s.id ? 'active' : ''}`}
-                        onClick={() => updateSfxInPanel(selectedPanelIdx, selectedSfxIdx, { style: s.id })}
-                      >
-                        {s.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* General sidebar — rightmost column, always visible */}
+            {/* General sidebar — always fixed width, right side, relative container */}
             <div
-              className="editor-sidebar"
-              style={{ width: 260, flexShrink: 0, alignSelf: 'stretch', overflow: 'auto' }}
+              style={{ width: 360, flexShrink: 0, alignSelf: 'stretch', position: 'relative', overflow: 'hidden' }}
             >
+              {/* Properties overlay — absolute, covers sidebar when active */}
+              {(selectedCharData && selectedCharDef) || (selectedObjData && selectedObjDef) || (selectedSfxData && selectedSfxIdx !== null) ? (
+                <div className="editor-sidebar" style={{ position: 'absolute', inset: 0, overflow: 'auto', zIndex: 5, background: 'var(--color-bg)' }}>
+                  {selectedCharData && selectedCharDef && (
+                    <CharacterPropsPanel
+                      key={`char-${selectedCharIdx}`}
+                      character={selectedCharDef}
+                      panelChar={selectedCharData}
+                      panelCharacters={panel?.characters || []}
+                      panelObjects={panel?.objects || []}
+                      panelNarration={panel?.narration}
+                      allCharacters={characters}
+                      allObjects={objects}
+                      onUpdate={(updates) => updateCharacterInPanel(selectedPanelIdx, selectedCharIdx, updates)}
+                      onRemove={() => removeCharacterFromPanel(selectedPanelIdx, selectedCharIdx)}
+                      onEdit={() => onEditCharacter(selectedCharDef)}
+                    />
+                  )}
+                  {selectedObjData && selectedObjDef && (
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="color-dot" style={{ background: selectedObjDef.color }} />
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>{selectedObjDef.name}</span>
+                        <div style={{ flex: 1 }} />
+                        <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setSelectedObjIdx(null)}>×</button>
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        <label className="label">sobre el objeto</label>
+                        <AutoTextarea
+                          value={selectedObjData.note || ''}
+                          onChange={e => updateObjectInPanel(selectedPanelIdx, selectedObjIdx, { note: e.target.value })}
+                          placeholder="qué ocurre sobre este objeto, qué contiene o qué relación tiene con la escena..."
+                          minRows={4}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {selectedSfxData && selectedSfxIdx !== null && (
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>onomatopeya</span>
+                        <div style={{ flex: 1 }} />
+                        <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeSfxFromPanel(selectedPanelIdx, selectedSfxIdx)}>×</button>
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        <label className="label">texto</label>
+                        <input
+                          className="input"
+                          value={selectedSfxData.text}
+                          onChange={e => updateSfxInPanel(selectedPanelIdx, selectedSfxIdx, { text: e.target.value })}
+                          placeholder="BAM, WHOOSH..."
+                        />
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        <label className="label">estilo</label>
+                        <div className="radio-group">
+                          {SFX_STYLES.map(s => (
+                            <div
+                              key={s.id}
+                              className={`radio-pill ${selectedSfxData.style === s.id ? 'active' : ''}`}
+                              onClick={() => updateSfxInPanel(selectedPanelIdx, selectedSfxIdx, { style: s.id })}
+                            >
+                              {s.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* General sidebar content — always rendered underneath */}
+              <div className="editor-sidebar" style={{ height: '100%', overflow: 'auto' }}>
               {/* Composition guides */}
               <div className="editor-guide-tools">
                 <label className="label">guías</label>
@@ -530,51 +603,86 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
                 </div>
               </div>
 
-              {/* Elements: Characters + Background + Objects grouped */}
+              {/* Elements: Characters + Background + Objects as dropdowns */}
               <div>
                 <label className="label">elementos</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {characters.map(char => <button key={char.id} className="btn btn-sm btn-ghost" style={panel?.characters.some(item => item.characterId === char.id) ? { borderColor: char.color, color: char.color } : {}} onClick={() => addCharacterToPanel(selectedPanelIdx, char.id)}><span className="color-dot" style={{ background: char.color || '#999' }} />{char.name} +</button>)}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {backgrounds.length === 0 && (
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>sin fondos</span>
-                    )}
-                    {backgrounds.map(bg => {
-                      const isSelected = panel?.backgroundId === bg.id
-                      return (
-                        <button
-                          key={bg.id}
-                          className={`btn btn-sm ${isSelected ? '' : 'btn-ghost'}`}
-                          style={isSelected ? { borderColor: bg.color, color: bg.color } : {}}
-                          onClick={() => setBackgroundForPanel(selectedPanelIdx, isSelected ? null : bg.id)}
-                        >
-                          <span className="color-dot" style={{ background: bg.color || '#999' }} />
-                          {bg.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {objects.length === 0 && (
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>sin objetos</span>
-                    )}
-                    {objects.map(obj => {
-                      const objectCount = (panel?.objects || []).filter(o => o.objectId === obj.id).length
-                      return (
-                        <button
-                          key={obj.id}
-                          className="btn btn-sm btn-ghost"
-                          style={objectCount ? { borderColor: obj.color, color: obj.color } : {}}
-                          onClick={() => toggleObjectInPanel(selectedPanelIdx, obj.id)}
-                        >
-                          <span className="color-dot" style={{ background: obj.color || '#999' }} />
-                          {obj.name}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  {/* Characters */}
+                  <select
+                    className="input"
+                    value=""
+                    onChange={e => { if (e.target.value) { addCharacterToPanel(selectedPanelIdx, e.target.value); e.target.value = '' } }}
+                    style={{ fontSize: 12, cursor: 'pointer' }}
+                  >
+                    <option value="">+ personaje...</option>
+                    {characters.map(char => (
+                      <option key={char.id} value={char.id}>{char.name}</option>
+                    ))}
+                  </select>
+                  {panel?.characters?.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {panel.characters.map((item, idx) => {
+                        const char = characters.find(c => c.id === item.characterId)
+                        return char ? (
+                          <span
+                            key={idx}
+                            className="radio-pill"
+                            style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: char.color, color: char.color }}
+                            onClick={() => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedBalloon(null) }}
+                          >
+                            <span className="color-dot" style={{ background: char.color || '#999' }} />
+                            {char.name}
+                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeCharacterFromPanel(selectedPanelIdx, idx) }}>×</span>
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+
+                  {/* Background */}
+                  <select
+                    className="input"
+                    value={panel?.backgroundId || ''}
+                    onChange={e => setBackgroundForPanel(selectedPanelIdx, e.target.value || null)}
+                    style={{ fontSize: 12, cursor: 'pointer' }}
+                  >
+                    <option value="">fondo...</option>
+                    {backgrounds.map(bg => (
+                      <option key={bg.id} value={bg.id}>{bg.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Objects */}
+                  <select
+                    className="input"
+                    value=""
+                    onChange={e => { if (e.target.value) { toggleObjectInPanel(selectedPanelIdx, e.target.value); e.target.value = '' } }}
+                    style={{ fontSize: 12, cursor: 'pointer' }}
+                  >
+                    <option value="">+ objeto...</option>
+                    {objects.map(obj => (
+                      <option key={obj.id} value={obj.id}>{obj.name}</option>
+                    ))}
+                  </select>
+                  {panel?.objects?.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {panel.objects.map((item, idx) => {
+                        const obj = objects.find(o => o.id === item.objectId)
+                        return obj ? (
+                          <span
+                            key={idx}
+                            className="radio-pill"
+                            style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: obj.color, color: obj.color }}
+                            onClick={() => setSelectedObjIdx(idx)}
+                          >
+                            <span className="color-dot" style={{ background: obj.color || '#999' }} />
+                            {obj.name}
+                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeObjectFromPanel(selectedPanelIdx, idx) }}>×</span>
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -625,7 +733,7 @@ export default function StripEditor({ strip, onBack, onEditCharacter }) {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

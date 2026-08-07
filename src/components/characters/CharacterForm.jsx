@@ -3,7 +3,7 @@ import useCharacterStore from '../../store/characterStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 
-export default function CharacterForm({ character, onSaved, onCancel }) {
+export default function CharacterForm({ character, projectId, onSaved, onCancel }) {
   const save = useCharacterStore(s => s.save)
   const isNew = !character?.id
 
@@ -18,7 +18,7 @@ export default function CharacterForm({ character, onSaved, onCancel }) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    await save({ ...character, id: character?.id || crypto.randomUUID(), name, promptText, color, referenceImages })
+    await save({ ...character, id: character?.id || crypto.randomUUID(), projectId: character?.projectId || projectId, name, promptText, color, referenceImages })
     setSaving(false)
     onSaved()
   }

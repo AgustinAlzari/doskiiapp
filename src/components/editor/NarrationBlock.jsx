@@ -6,9 +6,11 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
+  const isResizingRef = useRef(false)
 
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
+    if (isResizingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -36,6 +38,7 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()
+    isResizingRef.current = true
     setResizing(true)
     resizeStart.current = { mx: e.clientX, my: e.clientY, x: panelNarr.x, y: panelNarr.y, w: panelNarr.width, h: panelNarr.height }
 
@@ -54,6 +57,7 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
       onResize({ x, y, width, height })
     }
     const handleUp = () => {
+      isResizingRef.current = false
       setResizing(false)
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)

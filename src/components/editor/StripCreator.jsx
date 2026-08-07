@@ -3,12 +3,12 @@ import useStripStore from '../../store/stripStore'
 import AutoTextarea from './AutoTextarea'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
 
-export default function StripCreator({ onCreated, onBack }) {
+export default function StripCreator({ project, onCreated, onBack }) {
   const save = useStripStore(s => s.save)
   const [title, setTitle] = useState('')
   const [generalStyle, setGeneralStyle] = useState('')
-  const [panelCount, setPanelCount] = useState(3)
-  const [aspectRatio, setAspectRatio] = useState('hd')
+  const [panelCount, setPanelCount] = useState(project?.defaultPanelCount || 3)
+  const [aspectRatio, setAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
 
   const handleCreate = async () => {
     if (!title.trim()) return
@@ -22,6 +22,7 @@ export default function StripCreator({ onCreated, onBack }) {
     }))
     const strip = {
       id: crypto.randomUUID(),
+      projectId: project?.id,
       title,
       generalStyle,
       panelCount,
@@ -60,6 +61,12 @@ export default function StripCreator({ onCreated, onBack }) {
             placeholder="describe el estilo visual: Estilo Sempé, línea fina B&N, humor nórdico..."
             minRows={3}
           />
+          {project && (project.styleNotes || project.drawingStyle || project.genre) && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              hereda del proyecto: {[project.drawingStyle, project.genre, project.styleNotes].filter(Boolean).join(' · ')}
+              {generalStyle.trim() ? ' (este campo agrega o reemplaza)' : ''}
+            </div>
+          )}
         </div>
 
         <div>

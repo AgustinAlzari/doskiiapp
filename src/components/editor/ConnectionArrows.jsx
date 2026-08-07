@@ -53,14 +53,14 @@ export default function ConnectionArrows({ connections, panelCharacters, charact
       <defs>
         <marker
           id="conn-arrowhead"
-          markerWidth="2.5"
-          markerHeight="2"
-          refX="2.2"
-          refY="1"
+          markerWidth="5"
+          markerHeight="4"
+          refX="4.4"
+          refY="2"
           orient="auto"
           markerUnits="userSpaceOnUse"
         >
-          <polygon points="0 0, 2.5 1, 0 2" fill="#777" />
+          <polygon points="0 0, 5 2, 0 4" fill="#777" />
         </marker>
       </defs>
 
@@ -77,9 +77,9 @@ export default function ConnectionArrows({ connections, panelCharacters, charact
             <path
               d={pathD}
               stroke="#777"
-              strokeWidth="0.22"
+              strokeWidth="1.5"
               fill="none"
-              strokeDasharray="0.7 0.7"
+              strokeDasharray="4 3"
               vectorEffect="non-scaling-stroke"
               markerEnd="url(#conn-arrowhead)"
             />

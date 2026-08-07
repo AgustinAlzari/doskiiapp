@@ -21,18 +21,27 @@ contextBridge.exposeInMainWorld('api', {
     save: (o) => ipcRenderer.invoke('objects:save', o),
     delete: (id) => ipcRenderer.invoke('objects:delete', id),
   },
+  projects: {
+    list: () => ipcRenderer.invoke('projects:list'),
+    save: (p) => ipcRenderer.invoke('projects:save', p),
+    delete: (id) => ipcRenderer.invoke('projects:delete', id),
+    deleteAll: (id) => ipcRenderer.invoke('projects:deleteAll', id),
+    duplicate: (id) => ipcRenderer.invoke('projects:duplicate', id),
+    export: (data) => ipcRenderer.invoke('projects:export', data),
+    import: (filePath) => ipcRenderer.invoke('projects:import', filePath),
+  },
   dialog: {
     save: (opts) => ipcRenderer.invoke('dialog:save', opts),
+    open: (opts) => ipcRenderer.invoke('dialog:open', opts),
   },
   references: {
     choose: () => ipcRenderer.invoke('references:choose'),
     import: (data) => ipcRenderer.invoke('references:import', data),
     read: (filePath) => ipcRenderer.invoke('references:read', filePath),
     openFolder: () => ipcRenderer.invoke('references:open-folder'),
+    openUsedFolder: (fileNames) => ipcRenderer.invoke('references:open-used-folder', fileNames),
     saveSvg: (data) => ipcRenderer.invoke('references:save-svg', data),
-  },
-  prompts: {
-    open: (data) => ipcRenderer.invoke('prompts:open', data),
-    getData: () => ipcRenderer.invoke('prompts:getData'),
+    saveFile: (data) => ipcRenderer.invoke('references:save-file', data),
+    startDrag: (filePath) => ipcRenderer.send('references:startDrag', filePath),
   },
 });

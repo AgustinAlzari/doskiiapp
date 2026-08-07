@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
-import { generatePanelPrompt, generateAllPanelsPrompt } from '../../services/promptGenerator'
+import { generatePanelPrompt, generateAllPanelsPrompt, usedBalloonTypes, orderedPanelDialogues, layoutFileNameFor } from '../../services/promptGenerator'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
 
 function generateCanvasSVG(panel, characters, backgrounds, objects, stripAspectRatio) {
@@ -33,7 +33,12 @@ function generateCanvasSVG(panel, characters, backgrounds, objects, stripAspectR
     rects.push({ x: n.x * svgW, y: n.y * svgH, w: n.width * svgW, h: n.height * svgH, stroke: '#007aff', fill: 'none', dash: n.framed ? 'none' : '4 3', label: 'narración' })
   }
 
-  ;(panel.sfx || []).forEach((s, i) => {
+  const balloons = orderedPanelDialogues(panel, characters || [])
+  balloons.forEach(b => {
+    rects.push({ x: b.x * svgW, y: b.y * svgH, w: b.width * svgW, h: b.height * svgH, stroke: b.type === 'thought' ? '#7d3cff' : '#e04040', fill: 'rgba(0,0,0,0.03)', dash: '4 3', label: `${b.number}. ${b.label}` })
+  })
+
+  ;(panel.sfx || []).forEach((s) => {
     if (s.text) rects.push({ x: s.x * svgW, y: s.y * svgH, w: s.width * svgW, h: s.height * svgH, stroke: '#e67e22', fill: 'none', label: s.text })
   })
 
@@ -48,62 +53,115 @@ function generateCanvasSVG(panel, characters, backgrounds, objects, stripAspectR
     svg += `<text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="10" fill="${r.stroke}">${r.label}</text>`
   })
 
+  const byInstance = {}
+  balloons.forEach(b => { (byInstance[b.name] = byInstance[b.name] || []).push(b) })
+  Object.values(byInstance).forEach(list => {
+    for (let i = 0; i < list.length - 1; i++) {
+      const a = list[i]
+      const b = list[i + 1]
+      const x1 = Math.round((a.x + a.width / 2) * svgW)
+      const y1 = Math.round((a.y + a.height / 2) * svgH)
+      const x2 = Math.round((b.x + b.width / 2) * svgW)
+      const y2 = Math.round((b.y + b.height / 2) * svgH)
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c0392b" stroke-width="0.35" stroke-dasharray="2 3"/>`
+    }
+  })
+  Object.values(byInstance).forEach(list => {
+    const last = list[list.length - 1]
+    const ch = (panel.characters || [])[last.charIdx]
+    if (!ch) return
+    const bx = Math.round((last.x + last.width / 2) * svgW)
+    const by = Math.round((last.y + last.height / 2) * svgH)
+    const cx = Math.round((ch.x + ch.width / 2) * svgW)
+    const cy = Math.round((ch.y + ch.height * 0.3) * svgH)
+    svg += `<line x1="${bx}" y1="${by}" x2="${cx}" y2="${cy}" stroke="#c0392b" stroke-width="0.35" stroke-dasharray="2 3"/>`
+  })
+
   svg += '</svg>'
   return svg
 }
 
-export default function PromptExporter({ strip, characters }) {
+export default function PromptExporter({ strip, characters, project }) {
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
   const [copied, setCopied] = useState(null)
-  const [layoutSVGs, setLayoutSVGs] = useState({})
+  const [svgPaths, setSvgPaths] = useState({})
   const [showVectors, setShowVectors] = useState(false)
-  const [error, setError] = useState(null)
+  const [generating, setGenerating] = useState(false)
 
-  const generateVectors = () => {
-    try {
-      const svgs = {}
-      for (let i = 0; i < (strip?.panels || []).length; i++) {
-        const panel = strip.panels[i]
-        try {
-          const svg = generateCanvasSVG(panel, characters || [], backgrounds || [], objects || [], strip.aspectRatio)
-          svgs[i] = svg
-        } catch (err) {
-          console.error(`Error generating SVG for panel ${i}:`, err)
-        }
-      }
-      setLayoutSVGs(svgs)
-      setShowVectors(true)
-    } catch (err) {
-      console.error('Error generating layout SVGs:', err)
-    }
-  }
+  const chars = characters || []
+  const bgs = backgrounds || []
+  const objs = objects || []
 
   if (!strip || !strip.panels) return <div style={{ padding: 16 }}>cargando prompts...</div>
 
+  const resolvedAspect = strip.aspectRatio || project?.defaultAspectRatio || 'hd'
+
   let allPrompts = ''
   try {
-    allPrompts = generateAllPanelsPrompt(strip, characters || [], backgrounds || [], objects || [])
-  } catch (err) {
-    setError(err.message)
+    allPrompts = generateAllPanelsPrompt(strip, chars, bgs, objs, project)
+  } catch {
+    allPrompts = 'Error generando prompts'
+  }
+
+  const generateVectors = async () => {
+    setGenerating(true)
+    setShowVectors(true)
+    for (let i = 0; i < (strip.panels || []).length; i++) {
+      try {
+        const svgContent = generateCanvasSVG(strip.panels[i], chars, bgs, objs, resolvedAspect)
+        const jpgPath = await svgToJPG(svgContent, layoutFileNameFor(strip, i))
+        if (jpgPath) {
+          setSvgPaths(prev => ({ ...prev, [i]: jpgPath }))
+        }
+      } catch (err) {
+        console.error(`Error generating layout panel ${i}:`, err)
+      }
+    }
+    setGenerating(false)
+  }
+
+  const svgToJPG = (svgString, fileName) => {
+    return new Promise((resolve) => {
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+      const img = new Image()
+      img.onload = async () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 800
+        canvas.height = 800
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, 800, 800)
+        ctx.drawImage(img, 0, 0, 800, 800)
+        URL.revokeObjectURL(url)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
+        const base64 = dataUrl.split(',')[1]
+        if (window.api?.references?.saveFile) {
+          const result = await window.api.references.saveFile({ fileName, data: base64 })
+          resolve(result?.path || null)
+        } else {
+          resolve(null)
+        }
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+      img.src = url
+    })
   }
 
   const copyToClipboard = async (text, label) => {
     try {
       await navigator.clipboard.writeText(text)
-      setCopied(label)
-      setTimeout(() => setCopied(null), 2000)
     } catch {
-      // Fallback
       const ta = document.createElement('textarea')
       ta.value = text
       document.body.appendChild(ta)
       ta.select()
       document.execCommand('copy')
       document.body.removeChild(ta)
-      setCopied(label)
-      setTimeout(() => setCopied(null), 2000)
     }
+    setCopied(label)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   const exportToFile = async (content, filename) => {
@@ -132,10 +190,24 @@ export default function PromptExporter({ strip, characters }) {
     }
   }
 
+  const balloonRefs = (() => {
+    const balloons = project?.balloons
+    if (!balloons) return []
+    const used = new Set()
+    ;(strip.panels || []).forEach(panel => usedBalloonTypes(panel).forEach(t => used.add(t)))
+    return [...used].filter(type => balloons[type]?.fileName).map(type => ({
+      fileName: balloons[type].fileName,
+      path: balloons[type].path,
+      entityName: 'globo',
+      balloonType: type,
+    }))
+  })()
+
   const references = [
-    ...characters.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
-    ...backgrounds.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
-    ...objects.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
+    ...chars.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
+    ...bgs.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
+    ...objs.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
+    ...balloonRefs,
   ]
 
   const usedIds = new Set([
@@ -144,29 +216,26 @@ export default function PromptExporter({ strip, characters }) {
     ...strip.panels.filter(p => p.backgroundId).map(p => p.backgroundId),
   ])
   const usedReferences = references.filter(ref => {
-    const entity = [...characters, ...backgrounds, ...objects].find(e => e.name === ref.entityName)
+    if (ref.balloonType) return true
+    const entity = [...chars, ...bgs, ...objs].find(e => e.name === ref.entityName)
     return entity && usedIds.has(entity.id)
   })
 
-  const panelReferences = panel => {
-    const ids = new Set([
-      ...(panel.characters || []).map(item => item.characterId),
-      ...(panel.objects || []).map(item => item.objectId),
-      ...(panel.backgroundId ? [panel.backgroundId] : []),
-    ])
-    return references.filter(reference => {
-      const entity = [...characters, ...backgrounds, ...objects].find(item => item.name === reference.entityName)
-      return entity && ids.has(entity.id)
-    })
+  const usedFileNames = [...new Set([
+    ...usedReferences.map(r => r.fileName),
+    ...Object.keys(svgPaths).map(key => layoutFileNameFor(strip, Number(key))),
+  ])]
+
+  const openUsedFolder = async () => {
+    if (!window.api?.references?.openUsedFolder) {
+      alert('reiniciá la app para activar "abrir carpeta"')
+      return
+    }
+    await window.api.references.openUsedFolder(usedFileNames)
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {error && (
-        <div className="card" style={{ padding: 12, borderColor: '#ff3b30', color: '#ff3b30' }}>
-          Error: {error}
-        </div>
-      )}
       {/* Export all */}
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-sm" onClick={() => copyToClipboard(allPrompts, 'all')}>
@@ -177,13 +246,19 @@ export default function PromptExporter({ strip, characters }) {
         </button>
       </div>
 
-      {usedReferences.length > 0 && (
+      {/* Referencias + vectores — todo arriba */}
+      {(usedReferences.length > 0 || showVectors) && (
         <div className="card" style={{ padding: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600 }}>referencias para arrastrar a la IA</span>
-            <button className="btn btn-sm" onClick={generateVectors}>
-              {showVectors ? 'vectores ocultos' : 'generar vectores'}
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
+                abrir carpeta
+              </button>
+              <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
+                {generating ? 'generando...' : showVectors ? 'ocultar vectores' : 'generar vectores'}
+              </button>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {usedReferences.map(reference => (
@@ -194,6 +269,17 @@ export default function PromptExporter({ strip, characters }) {
                 <div style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={reference.fileName}>{reference.fileName}</div>
               </div>
             ))}
+            {showVectors && Object.keys(svgPaths).map(key => {
+              const fileName = layoutFileNameFor(strip, Number(key))
+              return (
+                <div key={`layout-${key}`} style={{ width: 100, fontSize: 10, color: 'var(--color-text-muted)' }}>
+                  <div style={{ height: 78, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {window.api?.references?.read && <ReferenceThumbnail reference={{ path: svgPaths[key], fileName }} showName={false} />}
+                  </div>
+                  <div style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileName}>{fileName}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -202,38 +288,24 @@ export default function PromptExporter({ strip, characters }) {
       {strip.panels.map((panel, i) => {
         let prompt = ''
         try {
-          prompt = generatePanelPrompt(panel, characters, strip.generalStyle, backgrounds, objects, strip.aspectRatio)
+          prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project)
         } catch (err) {
+          console.error(`Error generando prompt cuadro ${i}:`, err)
           prompt = `Error generando prompt: ${err.message}`
         }
         return (
           <div key={panel.id} className="card" style={{ padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-2)' }}>cuadro {i + 1}</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  style={{ fontSize: 11 }}
-                  onClick={() => copyToClipboard(prompt, `panel-${i}`)}
-                >
-                  {copied === `panel-${i}` ? 'copiado ✓' : 'copiar'}
-                </button>
-              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11 }}
+                onClick={() => copyToClipboard(prompt, `panel-${i}`)}
+              >
+                {copied === `panel-${i}` ? 'copiado ✓' : 'copiar'}
+              </button>
             </div>
             <div className="prompt-output">{prompt}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              {showVectors && layoutSVGs[i] && (
-                <div style={{ width: 100, fontSize: 10, color: 'var(--color-text-muted)' }}>
-                  <div style={{ height: 78, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }}>
-                    <div dangerouslySetInnerHTML={{ __html: layoutSVGs[i] }} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
-                  </div>
-                  <div style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>layout-{i + 1}.svg</div>
-                </div>
-              )}
-              {panelReferences(panel).map(reference => (
-                <ReferenceThumbnail key={reference.path} reference={reference} showName />
-              ))}
-            </div>
           </div>
         )
       })}
@@ -241,21 +313,24 @@ export default function PromptExporter({ strip, characters }) {
   )
 }
 
-function ReferenceThumbnail({ reference, showName }) {
+function ReferenceThumbnail({ reference }) {
   const [src, setSrc] = useState(null)
   useEffect(() => { window.api.references.read(reference.path).then(setSrc) }, [reference.path])
-  const handleDragStart = event => {
-    event.dataTransfer.effectAllowed = 'copy'
-    event.dataTransfer.setData('text/uri-list', `file://${reference.path}`)
-    event.dataTransfer.setData('DownloadURL', `image/png:${reference.fileName}:file://${reference.path}`)
+
+  const handleMouseDown = (e) => {
+    e.preventDefault()
+    if (window.api?.references?.startDrag) {
+      window.api.references.startDrag(reference.path)
+    }
   }
+
   if (!src) return null
   return (
-    <div style={{ width: 92, fontSize: 10, color: 'var(--color-text-muted)' }}>
-      <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <img src={src} alt={reference.entityName} draggable onDragStart={handleDragStart} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'grab' }} />
-      </div>
-      {showName && <div style={{ marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={reference.fileName}>{reference.fileName}</div>}
-    </div>
+    <img
+      src={src}
+      alt={reference.entityName}
+      onMouseDown={handleMouseDown}
+      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'grab' }}
+    />
   )
 }

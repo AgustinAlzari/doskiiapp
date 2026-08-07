@@ -1,19 +1,20 @@
 import { useRef, useState, useCallback } from 'react'
 
-export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, onMove, onResize, onRemove, onConnInEnd, showInputPort = true, isBackground = false }) {
+export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, onResize, onRemove }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
-  const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
 
   const handleMouseDown = useCallback((e) => {
+    if (e.target.tagName === 'BUTTON') return
     if (isResizingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
-    dragStart.current = { mx: e.clientX, my: e.clientY, x: panelObj.x, y: panelObj.y }
+    dragStart.current = { mx: e.clientX, my: e.clientY, x: balloon.x, y: balloon.y }
 
     const handleMove = (ev) => {
       const canvas = blockRef.current?.parentElement
@@ -22,8 +23,8 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - panelObj.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - panelObj.height, dragStart.current.y + dy))
+        Math.max(0, Math.min(1 - balloon.width, dragStart.current.x + dx)),
+        Math.max(0, Math.min(1 - balloon.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -33,13 +34,13 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [panelObj, onSelect, onMove])
+  }, [balloon, onSelect, onMove])
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()
     isResizingRef.current = true
     setResizing(true)
-    resizeStart.current = { mx: e.clientX, my: e.clientY, x: panelObj.x, y: panelObj.y, w: panelObj.width, h: panelObj.height }
+    resizeStart.current = { mx: e.clientX, my: e.clientY, x: balloon.x, y: balloon.y, w: balloon.width, h: balloon.height }
 
     const handleMove = (ev) => {
       const canvas = blockRef.current?.parentElement
@@ -49,8 +50,8 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
       const dy = (ev.clientY - resizeStart.current.my) / rect.height
       const left = corner.includes('left')
       const top = corner.includes('top')
-      const width = Math.max(0.05, Math.min(1, resizeStart.current.w + (left ? -dx : dx)))
-      const height = Math.max(0.05, Math.min(1, resizeStart.current.h + (top ? -dy : dy)))
+      const width = Math.max(0.08, Math.min(1, resizeStart.current.w + (left ? -dx : dx)))
+      const height = Math.max(0.06, Math.min(1, resizeStart.current.h + (top ? -dy : dy)))
       const x = Math.max(0, Math.min(1 - width, resizeStart.current.x + (left ? dx : 0)))
       const y = Math.max(0, Math.min(1 - height, resizeStart.current.y + (top ? dy : 0)))
       onResize({ x, y, width, height })
@@ -63,7 +64,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [panelObj, onResize])
+  }, [balloon, onResize])
 
   const resizeHandle = (corner, style) => (
     <div onPointerDown={e => handleResizeDown(e, corner)} style={{ position: 'absolute', width: 12, height: 12, cursor: corner === 'top-left' || corner === 'bottom-right' ? 'nwse-resize' : 'nesw-resize', background: 'var(--color-border)', opacity: 0.65, zIndex: 21, ...style }} />
@@ -72,41 +73,30 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
   return (
     <div
       ref={blockRef}
-      className={`${isBackground ? 'background-block' : 'obj-block'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
+      className={`balloon-block ${balloon.type || 'speech'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
       style={{
-        left: `${panelObj.x * 100}%`,
-        top: `${panelObj.y * 100}%`,
-        width: `${panelObj.width * 100}%`,
-        height: `${panelObj.height * 100}%`,
-        borderColor: objDef.color || 'var(--color-border)',
+        left: `${balloon.x * 100}%`,
+        top: `${balloon.y * 100}%`,
+        width: `${balloon.width * 100}%`,
+        height: `${balloon.height * 100}%`,
       }}
       onMouseDown={handleMouseDown}
+      title={`${balloon.label} — globo ${balloon.number}`}
     >
-      {showInputPort && <div
-        className="conn-port obj-port-in"
-        data-label="IN"
-        onPointerUp={(e) => { e.stopPropagation(); onConnInEnd?.(panelObj.objectId) }}
-        title="soltar para recibir conexion"
-      />}
-      <div className="char-block-header" style={{ borderColor: objDef.color || 'var(--color-border-muted)' }}>
-        <span style={{ color: objDef.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>
-          {objDef.name}
-        </span>
-        <span style={{ fontSize: 9, color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          obj
-        </span>
+      <div className="balloon-shape">
+        <span className="balloon-label" title={`${balloon.label} — globo ${balloon.number}`}>{balloon.label}</span>
       </div>
 
-      <div className="char-block-body">
-        <span style={{ fontSize: 9, color: 'var(--color-text-muted)', opacity: 0.6 }}>{'\u25C6'}</span>
-      </div>
+      {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title="quitar globo">×</button>}
 
-      {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title={isBackground ? 'borrar fondo' : 'borrar objeto'}>{'\u00D7'}</button>}
-
-      {resizeHandle('top-left', { top: 0, left: 0 })}
-      {resizeHandle('top-right', { top: 0, right: 0 })}
-      {resizeHandle('bottom-left', { bottom: 0, left: 0 })}
-      {resizeHandle('bottom-right', { bottom: 0, right: 0 })}
+      {isSelected && (
+        <>
+          {resizeHandle('top-left', { top: 0, left: 0 })}
+          {resizeHandle('top-right', { top: 0, right: 0 })}
+          {resizeHandle('bottom-left', { bottom: 0, left: 0 })}
+          {resizeHandle('bottom-right', { bottom: 0, right: 0 })}
+        </>
+      )}
     </div>
   )
 }

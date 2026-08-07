@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import useCharacterStore from '../../store/characterStore'
+import useProjectStore from '../../store/projectStore'
 
 function CharacterThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -19,10 +20,22 @@ function CharacterThumb({ referenceImages }) {
   return <div className="entity-card-thumb entity-card-thumb-empty" />
 }
 
-export default function CharacterList({ onNew, onEdit }) {
+export default function CharacterList({ projectId, onNew, onEdit }) {
   const characters = useCharacterStore(s => s.characters)
   const loaded = useCharacterStore(s => s.loaded)
   const remove = useCharacterStore(s => s.remove)
+  const save = useCharacterStore(s => s.save)
+  const projects = useProjectStore(s => s.projects)
+  const scoped = characters.filter(c => c.projectId === projectId)
+
+  const copyToProject = async (char, targetId) => {
+    await save({
+      ...char,
+      id: crypto.randomUUID(),
+      projectId: targetId,
+      createdAt: new Date().toISOString(),
+    })
+  }
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
@@ -33,13 +46,13 @@ export default function CharacterList({ onNew, onEdit }) {
         <button className="btn btn-primary" onClick={onNew}>nuevo personaje</button>
       </div>
 
-      {characters.length === 0 ? (
+      {scoped.length === 0 ? (
         <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
           sin personajes aún. crea uno para empezar.
         </div>
       ) : (
         <div className="entity-grid">
-          {characters.map(char => (
+          {scoped.map(char => (
             <div
               key={char.id}
               className="entity-card"
@@ -53,7 +66,22 @@ export default function CharacterList({ onNew, onEdit }) {
                 {char.promptText || 'sin descripción'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-                <div className="color-dot" style={{ background: char.color || '#999' }} />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="color-dot" style={{ background: char.color || '#999' }} />
+                  {projects.length > 1 && (
+                    <select
+                      className="input"
+                      style={{ fontSize: 10, maxWidth: 88, cursor: 'pointer', padding: '1px 2px', height: 'auto' }}
+                      value=""
+                      onClick={e => e.stopPropagation()}
+                      onChange={async (e) => { if (e.target.value) { await copyToProject(char, e.target.value); e.target.value = '' } }}
+                      title="copiar a otro proyecto"
+                    >
+                      <option value="">copiar</option>
+                      {projects.filter(p => p.id !== projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+                </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
                   onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(char.id) }}

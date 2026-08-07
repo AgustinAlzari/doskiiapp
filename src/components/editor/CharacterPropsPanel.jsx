@@ -1,10 +1,32 @@
 import { useState } from 'react'
 import { ACTION_PRESETS, DIALOGUE_TYPES, DIRECTIONS } from '../../data/actionPresets'
+import { orderedPanelDialogues } from '../../services/promptGenerator'
 import AutoTextarea from './AutoTextarea'
 
 export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, allCharacters, allObjects, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
-  const [customAction, setCustomAction] = useState('')
+  const extraDialogues = panelChar.extraDialogues || []
+  const [editingExtra, setEditingExtra] = useState(null)
+
+  const dialogueNums = (() => {
+    const list = orderedPanelDialogues({ characters: panelCharacters || [] }, allCharacters || [])
+    const nums = { main: null, extras: {} }
+    let mainLabel = null
+    list.forEach(d => {
+      if (d.characterId !== panelChar.characterId) return
+      if (d.isExtra) nums.extras[d.extraIdx] = d.number
+      else { nums.main = d.number; mainLabel = d.label }
+    })
+    nums.mainLabel = mainLabel
+    return nums
+  })()
+
+  const setDialoguePreset = (pos) => {
+    const width = panelChar.dialoguePos?.width || 0.26
+    const height = panelChar.dialoguePos?.height || 0.1
+    const x = panelChar.dialoguePos?.x ?? (panelChar.x + panelChar.width / 2 - width / 2)
+    onUpdate({ dialoguePos: { x, y: pos === 'top' ? 0.02 : 0.88, width, height } })
+  }
 
   const toggleAction = (action) => {
     const next = actions.includes(action)
@@ -13,15 +35,25 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
     onUpdate({ actions: next })
   }
 
-  const addCustomAction = () => {
-    if (customAction.trim() && !actions.includes(customAction.trim())) {
-      onUpdate({ actions: [...actions, customAction.trim()] })
-      setCustomAction('')
-    }
-  }
-
   const removeAction = (action) => {
     onUpdate({ actions: actions.filter(a => a !== action) })
+  }
+
+  const addExtraDialogue = () => {
+    const newDialogues = [...extraDialogues, { text: '', type: 'speech' }]
+    onUpdate({ extraDialogues: newDialogues })
+    setEditingExtra(newDialogues.length - 1)
+  }
+
+  const updateExtraDialogue = (idx, updates) => {
+    const newDialogues = extraDialogues.map((d, i) => i === idx ? { ...d, ...updates } : d)
+    onUpdate({ extraDialogues: newDialogues })
+  }
+
+  const removeExtraDialogue = (idx) => {
+    const newDialogues = extraDialogues.filter((_, i) => i !== idx)
+    onUpdate({ extraDialogues: newDialogues })
+    setEditingExtra(null)
   }
 
   const otherPanelChars = (panelCharacters || []).filter(c => c.characterId !== panelChar.characterId)
@@ -133,16 +165,65 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
         </div>
       </div>
 
-      {/* Dialogue text */}
+      {/* Dialogue text + position */}
       <div>
-        <label className="label">diálogo / pensamiento</label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <label className="label" style={{ marginBottom: 0 }}>
+            diálogo / pensamiento {dialogueNums.main != null && <span style={{ color: 'var(--color-accent)' }}>· G{dialogueNums.main}</span>}
+          </label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              className={`btn btn-sm ${panelChar.dialoguePos?.y < 0.2 ? '' : 'btn-ghost'}`}
+              onClick={() => setDialoguePreset('top')}
+              style={{ fontSize: 10, padding: '2px 6px' }}
+            >
+              ↑ top
+            </button>
+            <button
+              className={`btn btn-sm ${panelChar.dialoguePos?.y > 0.8 ? '' : 'btn-ghost'}`}
+              onClick={() => setDialoguePreset('bottom')}
+              style={{ fontSize: 10, padding: '2px 6px' }}
+            >
+              ↓ bottom
+            </button>
+          </div>
+        </div>
         <AutoTextarea
           value={panelChar.dialogue || ''}
           onChange={e => onUpdate({ dialogue: e.target.value })}
           placeholder="qué dice o piensa..."
           minRows={2}
         />
+        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 4 }}>
+          el globo {dialogueNums.mainLabel || `${character.name} 1`} en el lienzo es solo indicación gráfica: movelo y redimensionálo para diseñar; el texto va al prompt.
+        </div>
       </div>
+
+      {/* Extra dialogues */}
+      {extraDialogues.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label className="label">diálogos extra</label>
+          {extraDialogues.map((extra, idx) => (
+            <div key={idx} style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  línea {idx + 2}{dialogueNums.extras[idx] != null && <span style={{ color: 'var(--color-accent)' }}> · G{dialogueNums.extras[idx]}</span>}
+                </span>
+                <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeExtraDialogue(idx)} style={{ fontSize: 10 }}>×</button>
+              </div>
+              <AutoTextarea
+                value={extra.text}
+                onChange={e => updateExtraDialogue(idx, { text: e.target.value })}
+                placeholder="siguiente línea de diálogo..."
+                minRows={2}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="btn btn-sm btn-ghost" onClick={addExtraDialogue} style={{ fontSize: 11 }}>
+        + agregar línea de diálogo
+      </button>
 
       {/* Actions */}
       <div>
@@ -157,7 +238,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             ))}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           {ACTION_PRESETS.map(action => (
             <label key={action} className="check-item">
               <div
@@ -167,18 +248,15 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
               <span>{action}</span>
             </label>
           ))}
-          <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
-            <input
-              className="input"
-              value={customAction}
-              onChange={e => setCustomAction(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomAction() } }}
-              placeholder="acción custom..."
-              style={{ fontSize: 12, padding: '4px 8px' }}
-            />
-            <button className="btn btn-sm" onClick={addCustomAction} disabled={!customAction.trim()}>+</button>
-          </div>
         </div>
+        <AutoTextarea
+          value={panelChar.actionNotes || ''}
+          onChange={e => onUpdate({ actionNotes: e.target.value })}
+          placeholder="descripción detallada de la acción..."
+          minRows={4}
+          maxRows={4}
+          style={{ width: '100%' }}
+        />
       </div>
     </div>
   )
