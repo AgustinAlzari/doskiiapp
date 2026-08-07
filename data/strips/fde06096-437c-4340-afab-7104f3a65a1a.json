@@ -1,0 +1,65 @@
+{
+  "id": "fde06096-437c-4340-afab-7104f3a65a1a",
+  "title": "camina en el bosque",
+  "generalStyle": "estilo sempé y cartoon de new york, bn, mucho blanco, humanizado",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "be72f776-6da0-4344-ba92-41f8eb210b2d",
+      "scene": "Carlos camina tranquilo por el bosque",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.10365853658536585,
+          "y": 0.43780487804878043,
+          "width": 0.27057259908536585,
+          "height": 0.39692263719512194,
+          "direction": "right",
+          "expression": "hosco, concentrado",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "actions": [
+            "caminando"
+          ],
+          "gazeTarget": null
+        }
+      ],
+      "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
+      "objects": [
+        {
+          "objectId": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "x": 0.6353658536585366,
+          "y": 0.6804878048780487,
+          "width": 0.15,
+          "height": 0.15
+        }
+      ],
+      "shotType": "wide",
+      "narration": {
+        "text": "Una tarde en el bosque cercano a Nueva Ansiedad. Carlos pasea como lo hace habitualmente. Con cara de culo...",
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.06,
+        "framed": true
+      },
+      "background": {
+        "x": 0.04390243902439024,
+        "y": 0.5279511242378049,
+        "width": 0.9440977515243902,
+        "height": 0.4720488757621951
+      },
+      "connections": [
+        {
+          "from": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "to": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-05T13:59:18.194Z",
+  "updatedAt": "2026-08-07T11:05:48.615Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

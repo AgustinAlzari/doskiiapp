@@ -1,0 +1,15 @@
+{
+  "id": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+  "name": "Carlos",
+  "promptText": "Full-body minimalist line art drawing of a short, bald elderly man standing facing forward, wispy hair on the sides, round glasses, large nose, and big ears. Wearing a long buttoned lab coat over a shirt, trousers, and shoes. fine sketchy ink lines, vintage French editorial illustration, classic New Yorker cartoon style, black and white line art ",
+  "color": "#007aff",
+  "referenceImages": [
+    {
+      "fileName": "carlos.png",
+      "path": "/Users/edicionesalz/Library/Application Support/ooki/data/references/carlos.png"
+    }
+  ],
+  "createdAt": "2026-08-05T13:29:11.592Z",
+  "updatedAt": "2026-08-07T11:05:48.547Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

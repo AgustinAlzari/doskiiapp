@@ -1,0 +1,15 @@
+{
+  "id": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
+  "name": "Paola",
+  "promptText": "Full-body B&W line art, no fill. Skeptical 80s woman, arms crossed. Features a headband, long hair, cropped sweatshirt, wrist cuffs, and full-length unfilled outline leggings. One slouchy sock, high-top sneakers. Pure outline drawing.",
+  "color": "#ff00ea",
+  "referenceImages": [
+    {
+      "fileName": "paola.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/paola.png"
+    }
+  ],
+  "createdAt": "2026-08-06T14:18:14.836Z",
+  "updatedAt": "2026-08-07T11:05:48.543Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

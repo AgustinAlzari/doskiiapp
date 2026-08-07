@@ -1,0 +1,15 @@
+{
+  "id": "58d61a22-d066-46de-804e-ae058fc26e4d",
+  "name": "microondas abandonado",
+  "promptText": "A detailed and clean black and white line-art illustration of a dilapidated and filthy countertop microwave oven, viewed from a three-quarter angle. The microwave exterior is heavily stained with dried spills and grime dripping down the front and sides. The control panel is cracked, featuring a keyboard of membrane buttons with cooking icons and time-control functions, and a blank digital display showing a stylized \"0:00\". The main power cord is visible on the floor, its end is stripped and frayed. The glass of the door is heavily cracked with a spider-web pattern. The inside of the microwave is filthy, with stains and grime all over the cavity walls. Small, actual cobwebs are visible in the inner corners. On the dirty turntable, there are gross, unidentifiable food remains. A dense swarm of small flies and buzzing insects surrounds the entire appliance, with some perched on the exterior and others trapped inside. Pure white background for isolation. Insanitary and neglected tone. Clean line work only, no shading.",
+  "color": "#231f1a",
+  "referenceImages": [
+    {
+      "fileName": "microondas_abandonado.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/microondas_abandonado.png"
+    }
+  ],
+  "createdAt": "2026-08-05T13:58:34.815Z",
+  "updatedAt": "2026-08-07T11:05:48.560Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

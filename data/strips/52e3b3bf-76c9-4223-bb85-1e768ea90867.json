@@ -1,0 +1,119 @@
+{
+  "id": "52e3b3bf-76c9-4223-bb85-1e768ea90867",
+  "title": "sigue su camino",
+  "generalStyle": "estilo sempé, linea fina, bn, humor nordico cartoon",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "e26fa4c4-95d4-4bb2-acfd-1e4dad1981b3",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.14756097560975606,
+          "y": 0.5670731707317074,
+          "width": 0.1286518673780488,
+          "height": 0.31421493902439024,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "Paolla... pe... pero si lo encontré en el bosque\n",
+          "dialogueType": "speech",
+          "actions": [],
+          "gazeTarget": null,
+          "dialoguePosition": "bottom",
+          "actionNotes": "sostiene el microondas con dificultad",
+          "dialoguePos": {
+            "x": 0.1608160207094479,
+            "y": 0.0929522172262359,
+            "width": 0.3417136908468244,
+            "height": 0.11361593244084683
+          },
+          "extraDialogues": [
+            {
+              "text": "no sabía...",
+              "type": "speech",
+              "pos": {
+                "x": 0.15465074703492948,
+                "y": 0.25078796366247236,
+                "width": 0.33340986924034866,
+                "height": 0.12563628580323785
+              }
+            }
+          ]
+        },
+        {
+          "characterId": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
+          "x": 0.7061233787929411,
+          "y": 0.5024390243902439,
+          "width": 0.1520750762195122,
+          "height": 0.3842130335365853,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "Ese microondas es mio, Carlos",
+          "dialogueType": "speech",
+          "actions": [
+            "standing"
+          ],
+          "gazeTarget": null,
+          "dialoguePosition": "top",
+          "extraDialogues": [
+            {
+              "text": "sí, lo dejé ahí hace dos años...",
+              "type": "speech",
+              "pos": {
+                "x": 0.461895158178763,
+                "y": 0.16792430564935198,
+                "width": 0.3558160803237858,
+                "height": 0.14814465286425904
+              }
+            }
+          ],
+          "actionNotes": "tiene las manos en la cintura como dos asas de pava",
+          "dialoguePos": {
+            "x": 0.46737990951020625,
+            "y": 0.04072815292419904
+          }
+        }
+      ],
+      "backgroundId": "98cb5d7f-256c-4dc1-b678-c3e298fe14d9",
+      "objects": [
+        {
+          "objectId": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "x": 0.21709898854903864,
+          "y": 0.6427087446465997,
+          "width": 0.15,
+          "height": 0.15,
+          "note": "chorrea un liquido... se asoma una lauchita"
+        }
+      ],
+      "narration": null,
+      "horizon": {
+        "y": 0.6315039305728518,
+        "description": ""
+      },
+      "connections": [
+        {
+          "from": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "to": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
+          "toType": "character"
+        },
+        {
+          "from": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
+          "to": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "toType": "object"
+        }
+      ],
+      "background": {
+        "x": 0.04509613340218085,
+        "y": 0.4365853658536586,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "shotType": "horizon-low"
+    }
+  ],
+  "createdAt": "2026-08-06T13:57:32.078Z",
+  "updatedAt": "2026-08-07T13:55:03.394Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

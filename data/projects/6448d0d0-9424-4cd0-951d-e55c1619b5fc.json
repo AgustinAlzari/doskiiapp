@@ -1,0 +1,26 @@
+{
+  "id": "6448d0d0-9424-4cd0-951d-e55c1619b5fc",
+  "name": "Ansiedad",
+  "synopsis": "Una ciudad donde todos se hacen cosas malas pero sin embargo hay algo muy humano y retorcidamente tierno.",
+  "genre": "absurdo nordico, adultos, irónico, extraño",
+  "drawingStyle": "sempé pero con lineas dudosas como de dibujante sin experiencia",
+  "world": "una ciudad mediana de argentina en la década de los 2020",
+  "styleNotes": "Clear line comic panel style, Ligne Claire inspired, naturalistic graphic novel illustration, B&W line work, uncluttered composition, detailed flora, white paper background.",
+  "defaultAspectRatio": "square",
+  "defaultPanelCount": 1,
+  "colorMode": "bw",
+  "palette": [],
+  "createdAt": "2026-08-07T11:05:48.384Z",
+  "updatedAt": "2026-08-07T11:51:53.238Z",
+  "balloons": {
+    "narration": {
+      "description": "Un recuadro rectangular clásico de bordes irregulares y temblorosos, con esa textura de tinta cruda y densa que caracteriza al cómic underground. El fondo tiene una textura de sombreado cruzado (\"cross-hatching\") muy apretada para darle ese aire sucio y \"hand-made\". La tipografía está escrita a mano, en mayúsculas comprimidas e inclinadas."
+    },
+    "speech": {
+      "description": "Un globo de forma orgánica y ligeramente irregular, no un óvalo perfecto. El contorno de tinta negra es grueso y vibrante. La cola del globo tiene esa ondulación característica de Crumb que parece temblar con la voz del personaje. La letra es manual, \"sucia\", y se vuelve más gruesa y \"gritada\" en las palabras clave."
+    },
+    "thought": {
+      "description": "La clásica \"nube\" de pensamiento, pero con el toque rústico de Crumb. En lugar de bordes suaves, son formas irregulares y peludas, como algodón sucio. La cola son círculos de distintos tamaños que se vuelven más caóticos. La tipografía es más pequeña y jittery, transmitiendo ansiedad y duda interna. Se añade un ligero tono grisáceo al fondo de la nube para diferenciarla del diálogo a viva voz."
+    }
+  }
+}

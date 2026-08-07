@@ -1,0 +1,15 @@
+{
+  "id": "98cb5d7f-256c-4dc1-b678-c3e298fe14d9",
+  "name": "camino rural",
+  "promptText": "A black and white line-art illustration, framed panel. Detailed bushes and weeds in foreground corners. Deep perspective looking down a wire fence with wooden posts receding into distant fields. Rolling plain with sparse distant trees. Clean B&W sketch style, hand-drawn look, no shading, textured paper.",
+  "color": "#34c759",
+  "referenceImages": [
+    {
+      "fileName": "camino_rural.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/camino_rural.png"
+    }
+  ],
+  "createdAt": "2026-08-06T14:39:16.389Z",
+  "updatedAt": "2026-08-07T11:05:48.555Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}
