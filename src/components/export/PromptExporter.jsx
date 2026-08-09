@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
-import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonTypes, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
+import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
 
 export default function PromptExporter({ strip, characters, project, balloons }) {
@@ -117,15 +117,16 @@ export default function PromptExporter({ strip, characters, project, balloons })
 
   const balloonRefs = (() => {
     const refs = []
+    const seen = new Set()
     ;(strip.panels || []).forEach(panel => {
-      usedBalloonEntityIds(panel, project).forEach(id => {
+      usedBalloonEntityIds(panel).forEach(id => {
         const entity = (balloons || []).find(b => b.id === id)
         if (!entity) return
-        ;(entity.referenceImages || []).forEach(r => refs.push({ ...r, entityName: entity.name, balloonType: entity.kind }))
-      })
-      usedBalloonTypes(panel).forEach(type => {
-        const cfg = project?.balloons?.[type]
-        if (cfg?.fileName && cfg?.path) refs.push({ fileName: cfg.fileName, path: cfg.path, entityName: `globo ${type}`, balloonType: 'legacy' })
+        ;(entity.referenceImages || []).forEach(r => {
+          if (seen.has(r.path || r.fileName)) return
+          seen.add(r.path || r.fileName)
+          refs.push({ ...r, entityName: entity.name, balloonType: entity.kind })
+        })
       })
     })
     return refs

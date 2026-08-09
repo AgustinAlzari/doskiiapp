@@ -240,12 +240,8 @@ export function usedBalloonTypes(panel) {
   return types
 }
 
-export function usedBalloonEntityIds(panel, project) {
+export function usedBalloonEntityIds(panel) {
   const ids = new Set()
-  usedBalloonTypes(panel).forEach(type => {
-    const eid = project?.balloons?.[type]?.entityId
-    if (eid) ids.add(eid)
-  })
   ;(panel?.characters || []).forEach(c => {
     if (c.balloonId) ids.add(c.balloonId)
     ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) ids.add(e.balloonId) })
@@ -260,15 +256,6 @@ const BALLOON_LETTERING_RULES = [
   'If a tail is present it must be wavy and trembling, with undulating edges (Crumb style) — never a straight line or a simple smooth curve.',
 ]
 
-function resolveBalloonEntity(kind, project, balloonDefs = []) {
-  const cfg = project?.balloons?.[kind]
-  if (cfg?.entityId) {
-    const entity = (balloonDefs || []).find(b => b.id === cfg.entityId)
-    if (entity) return entity
-  }
-  return null
-}
-
 function entityDescPieces(entity) {
   const pieces = []
   if (entity.promptText?.trim()) pieces.push(entity.promptText.trim().replace(/[.\s]+$/, ''))
@@ -277,51 +264,61 @@ function entityDescPieces(entity) {
   return pieces
 }
 
-function balloonGraphicsText(project, panel, balloonDefs = []) {
+function balloonGraphicsText(panel, balloonDefs = []) {
   const used = [...usedBalloonTypes(panel)]
   if (!used.length) return ''
 
   const defaultLaws = makeDefaultBalloonLaws()
-  const entries = []
-  const pushEntry = (label, pieces, entity) => entries.push({ label, pieces, entity })
+  const byId = Object.fromEntries((balloonDefs || []).map(b => [b.id, b]))
+  const usedEntities = []
+  const lines = ['BALLOON GRAPHICS:']
+
+  const addEntry = (label, entity) => {
+    if (entity) usedEntities.push(entity)
+    const pieces = entity ? entityDescPieces(entity) : []
+    let text = pieces.join('. ')
+    if (text && !/[.!?…]$/.test(text)) text += '.'
+    lines.push(`- ${label}: ${text || '(default comic balloon style)'}`)
+  }
 
   used.forEach(type => {
     const label = BALLOON_LABELS[type] || type
     if (type === 'other') {
       const ids = [...new Set((panel.globosX || []).map(g => g.balloonId).filter(Boolean))]
-      const entities = ids.map(id => (balloonDefs || []).find(b => b.id === id)).filter(Boolean)
-      if (entities.length) {
-        entities.forEach(entity => pushEntry(`${label.toUpperCase()} ("${entity.name}")`, entityDescPieces(entity), entity))
-        return
+      const entities = ids.map(id => byId[id]).filter(Boolean)
+      if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
+      else addEntry(label.toUpperCase(), null)
+      return
+    }
+    const kind = type
+    const ids = new Set()
+    ;(panel.characters || []).forEach(c => {
+      const check = (balloonId, dType) => {
+        if (!balloonId) return
+        const mapped = (dType || 'speech') === 'thought' ? 'thought' : 'speech'
+        if (mapped === kind) ids.add(balloonId)
       }
-    }
-    const entity = resolveBalloonEntity(type, project, balloonDefs)
-    const cfg = project?.balloons?.[type]
-    if (entity) {
-      pushEntry(label.toUpperCase(), entityDescPieces(entity), entity)
-    } else if (cfg?.description?.trim()) {
-      pushEntry(label.toUpperCase(), [cfg.description.trim().replace(/[.\s]+$/, ''), ...(cfg.fileName ? [`use the attached reference image "${cfg.fileName}" exactly as the balloon graphic`] : [])], null)
-    } else {
-      pushEntry(label.toUpperCase(), [], null)
-    }
-  })
-
-  const lines = ['BALLOON GRAPHICS:']
-  entries.forEach(e => {
-    let text = e.pieces.length ? e.pieces.join('. ') : ''
-    if (text && !/[.!?…]$/.test(text)) text += '.'
-    lines.push(`- ${e.label}: ${text || '(default comic balloon style)'}`)
+      check(c.balloonId, c.dialogueType)
+      ;(c.extraDialogues || []).forEach(e => check(e.balloonId, e.type))
+    })
+    if (kind === 'narration' && panel.narration?.balloonId) ids.add(panel.narration.balloonId)
+    const entities = [...ids].map(id => byId[id]).filter(Boolean)
+    if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
+    else addEntry(label.toUpperCase(), null)
   })
 
   lines.push('')
   lines.push('RULES:')
   lines.push(`- BASE (apply to every balloon): ${BALLOON_LETTERING_RULES.join(' ')}`)
   lines.push(`- DEFAULT STYLE (apply to every balloon unless an override below states otherwise): ${balloonLawsToPrompt(defaultLaws).join(' ')}`)
-  entries.forEach(e => {
-    if (!e.entity || lawsEqual(e.entity.laws, defaultLaws)) return
-    const diff = balloonLawDiffSentences(e.entity.laws)
+  const seen = new Set()
+  usedEntities.forEach(e => {
+    if (seen.has(e.id)) return
+    seen.add(e.id)
+    if (lawsEqual(e.laws, defaultLaws)) return
+    const diff = balloonLawDiffSentences(e.laws)
     if (!diff.additions.length && !diff.exemptions.length) return
-    lines.push(`- OVERRIDE "${e.entity.name}": ${[...diff.additions, ...diff.exemptions].join(' ')}`)
+    lines.push(`- OVERRIDE "${e.name}": ${[...diff.additions, ...diff.exemptions].join(' ')}`)
   })
   return lines.join('\n')
 }
@@ -493,7 +490,7 @@ function globoXAnchorText(gx, ctx) {
 
 function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
   const lines = []
-  const balloons = balloonGraphicsText(project, panel, balloonDefs)
+  const balloons = balloonGraphicsText(panel, balloonDefs)
   if (balloons) {
     lines.push(balloons)
     lines.push('')
@@ -508,11 +505,10 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
       const narr = panel.narration
       const { size } = describePosition(narr.x, narr.y, narr.width, narr.height)
       const style = narr.framed ? 'FRAMED' : 'FREEFORM'
-      const defNarr = resolveBalloonEntity('narration', project, balloonDefs)
       let narrStyle = ''
       if (narr.balloonId) {
         const override = (balloonDefs || []).find(b => b.id === narr.balloonId)
-        if (override && (!defNarr || defNarr.id !== override.id)) narrStyle = ` Balloon style entity: "${override.name}".`
+        if (override) narrStyle = ` Balloon style entity: "${override.name}".`
       }
       lines.push(`- Narration [${style}]: "${narr.text}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}${narrStyle}`)
     }
@@ -554,14 +550,10 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
         ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. Connect them with a thin DASHED line (the comic "air" connector); only the LAST balloon of the speaker carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon from another speaker.`
         : ''
       lastByChar[d.name] = d.number
-      const kindFor = d.type === 'thought' ? 'thought' : 'speech'
-      const defEntity = resolveBalloonEntity(kindFor, project, balloonDefs)
       let styleRef = ''
       if (d.balloonId) {
         const override = (balloonDefs || []).find(b => b.id === d.balloonId)
-        if (override && (!defEntity || defEntity.id !== override.id)) {
-          styleRef = ` Balloon style entity: "${override.name}".`
-        }
+        if (override) styleRef = ` Balloon style entity: "${override.name}".`
       }
       if (idx === 0) {
         lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${channelStyleText(d.type)}${styleRef}`)

@@ -14,20 +14,6 @@ export const PALETTE_ROLES = [
   { id: 'other', label: 'otro' },
 ]
 
-export const BALLOON_TYPES = [
-  { id: 'narration', label: 'narrador', fileBase: 'globo-narrador', prompt: 'NARRATION' },
-  { id: 'speech', label: 'diálogo', fileBase: 'globo-dialogo', prompt: 'DIALOGUE' },
-  { id: 'thought', label: 'pensar', fileBase: 'globo-pensar', prompt: 'THOUGHT' },
-  { id: 'other', label: 'globo x', fileBase: 'globo-x', prompt: 'OTHER' },
-]
-
-export const BALLOON_KIND_LABELS = {
-  narration: 'narración',
-  speech: 'diálogo',
-  thought: 'pensamiento',
-  other: 'globo x',
-}
-
 export const COLOR_MODES = [
   { id: 'bw', label: 'B&N' },
   { id: 'duotone', label: 'duotono' },
@@ -47,12 +33,6 @@ export const makeDefaultProject = () => ({
   defaultPanelCount: 3,
   colorMode: 'bw',
   palette: [],
-  balloons: {
-    narration: { entityId: null, description: '' },
-    speech: { entityId: null, description: '' },
-    thought: { entityId: null, description: '' },
-    other: { entityId: null, description: '' },
-  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 })
@@ -156,67 +136,14 @@ const useProjectStore = create((set, get) => ({
     await migrate(useObjectStore, 'objects')
     await migrate(useBalloonStore, 'balloons')
     await migrate(useStripStore, 'strips')
-    await migrateProjectBalloonEntities(useProjectStore, useBalloonStore, BALLOON_TYPES)
+    for (const project of get().projects) {
+      if (project.balloons) {
+        const { balloons, ...rest } = project
+        await get().save(rest)
+      }
+    }
     await ensureWildcards(get().projects)
   },
 }))
-
-async function migrateProjectBalloonEntities(projectStore, balloonStore, balloonTypes) {
-  const linkedIds = new Set()
-  const dropIds = new Set()
-  for (const project of projectStore.getState().projects) {
-    const balloons = project.balloons || {}
-    const allBalloons = balloonStore.getState().balloons || []
-    const projectBalloons = allBalloons.filter(b => b.projectId === project.id)
-    let changed = false
-    for (const kind of balloonTypes.map(t => t.id)) {
-      const cfg = balloons[kind] || {}
-      const isHeredado = (b) => !!(b && String(b.name).includes('(heredado)'))
-      const current = cfg.entityId ? allBalloons.find(b => b.id === cfg.entityId) : null
-      const preferred = projectBalloons.find(b => b.kind === kind && !b.comodin && !isHeredado(b))
-
-      if (preferred && (!current || isHeredado(current))) {
-        if (isHeredado(current)) dropIds.add(current.id)
-        cfg.entityId = preferred.id
-        linkedIds.add(preferred.id)
-        changed = true
-        continue
-      }
-      if (current) {
-        linkedIds.add(current.id)
-        continue
-      }
-      if (cfg.description?.trim()) {
-        const label = balloonTypes.find(t => t.id === kind)?.label || kind
-        const entity = await balloonStore.getState().save({
-          id: crypto.randomUUID(),
-          projectId: project.id,
-          name: `Globo ${label}`,
-          kind,
-          text: '',
-          promptText: cfg.description.trim(),
-          color: '#7a7a7a',
-          comodin: false,
-        })
-        cfg.entityId = entity.id
-        linkedIds.add(entity.id)
-        changed = true
-      }
-    }
-    if (changed) {
-      await projectStore.getState().save({ ...project, balloons })
-    }
-  }
-  const all = balloonStore.getState().balloons || []
-  for (const b of all) {
-    if (b.comodin || dropIds.has(b.id)) continue
-    if (String(b.name).includes('(heredado)') && !linkedIds.has(b.id)) {
-      await balloonStore.getState().remove(b.id)
-    }
-  }
-  for (const id of dropIds) {
-    await balloonStore.getState().remove(id)
-  }
-}
 
 export default useProjectStore

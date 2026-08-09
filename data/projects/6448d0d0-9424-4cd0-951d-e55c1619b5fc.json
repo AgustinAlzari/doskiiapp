@@ -11,19 +11,5 @@
   "colorMode": "bw",
   "palette": [],
   "createdAt": "2026-08-07T11:05:48.384Z",
-  "updatedAt": "2026-08-09T20:51:39.028Z",
-  "balloons": {
-    "narration": {
-      "description": "Un recuadro rectangular clásico de bordes irregulares y temblorosos, con esa textura de tinta cruda y densa que caracteriza al cómic underground. Thin.Typography: Text in 'Might Makes Right BB' style—clean, slightly slanted, hand-lettered comic book all-caps with uniform monoline stroke thickness.\n",
-      "entityId": "5fdbd561-81e5-486c-a2f1-320e4fe9190e"
-    },
-    "speech": {
-      "description": "**\"A high-resolution comic book layout element on a pure white background, pure black inked lines. Thin line.\n\nBalloon: Clean, smooth, rounded ovular speech balloon.\nTypography: Text in 'Might Makes Right BB' style—clean, slightly slanted, hand-lettered comic book all-caps with uniform monoline stroke thickness.\n",
-      "entityId": "fc8d6f98-fbfd-46b7-9118-7a1c273156c7"
-    },
-    "thought": {
-      "description": "**\"A high-resolution comic book layout element on a pure white background, pure black inked lines. Thin line.\n\nBalloon: Soft, puffy cloud-shaped thought balloon with scalloped edges and a trail of small cloud-bubbles.\nTypography: Text in 'Might Makes Right BB' style—expressive, hand-lettered comic book all-caps.",
-      "entityId": "c147f584-fb74-43d0-a265-a6f0db06bccb"
-    }
-  }
+  "updatedAt": "2026-08-09T20:57:05.429Z"
 }

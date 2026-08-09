@@ -5,7 +5,7 @@ const ANCHOR_DIRECTIONS = ['bottom', 'left', 'right', 'top']
 
 export default function BalloonPropsPanel({
   kind, label, characterName,
-  text, channel, balloonId, balloons, defaultBalloonName,
+  text, channel, balloonId, balloons,
   anchor, panelCharacters, panelObjects, characters, objects,
   onText, onChannel, onBalloonId, onAnchor, onRemove, onClose,
 }) {
@@ -61,7 +61,7 @@ export default function BalloonPropsPanel({
       <div>
         <label className="label">estilo (entidad-globo)</label>
         <select className="input" value={balloonId || ''} onChange={e => onBalloonId(e.target.value || null)} style={{ fontSize: 12, cursor: 'pointer' }}>
-          <option value="">(default del tipo{defaultBalloonName ? `: ${defaultBalloonName}` : ''})</option>
+          <option value="">(sin estilo — globo del cómic por defecto)</option>
           {balloons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       </div>

@@ -102,24 +102,8 @@ function fixRefPaths(entity) {
 }
 
 function fixProjectBalloonPaths(project) {
-  const balloons = project.balloons || {};
-  return {
-    ...project,
-    balloons: Object.fromEntries(Object.entries(balloons).map(([type, balloon]) => {
-      if (!balloon) return [type, { description: '' }];
-      const withDescription = { ...balloon };
-      if (!withDescription.description) withDescription.description = '';
-      if (balloon.fileName) {
-        const fileName = safeRefName(project, balloon);
-        withDescription.fileName = fileName;
-        withDescription.path = path.join(DATA_DIR, 'references', fileName);
-      } else {
-        delete withDescription.fileName;
-        delete withDescription.path;
-      }
-      return [type, withDescription];
-    })),
-  };
+  const { balloons, ...rest } = project;
+  return rest;
 }
 
 ipcMain.handle('references:choose', async () => {
@@ -383,9 +367,6 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
     const name = safeRefName(e, r);
     if (name) refNames.add(name);
   }));
-  Object.values(project.balloons || {}).forEach(balloon => {
-    if (balloon && balloon.fileName) refNames.add(safeRefName(project, balloon));
-  });
 
   const references = {};
   refNames.forEach(name => {
