@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import useStripStore from '../../store/stripStore'
 import useCharacterStore from '../../store/characterStore'
 import useBackgroundStore from '../../store/backgroundStore'
@@ -17,7 +17,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
   const balloons = useBalloonStore(s => s.balloons)
-  const [data, setData] = useState(strip)
+  const [data, setDataState] = useState(strip)
   const [selectedPanelIdx, setSelectedPanelIdx] = useState(0)
   const [selectedCharIdx, setSelectedCharIdx] = useState(null)
   const [selectedObjIdx, setSelectedObjIdx] = useState(null)
@@ -34,6 +34,26 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const projectBalloons = balloons.filter(b => b.projectId === project?.id)
   const wildcardBalloon = projectBalloons.find(b => b.comodin) || null
 
+  const dataRef = useRef(strip)
+  const historyRef = useRef([])
+  const lastEditRef = useRef({ time: 0 })
+  const [undoSteps, setUndoSteps] = useState(0)
+
+  const setData = useCallback((updaterOrValue) => {
+    const now = Date.now()
+    const prev = dataRef.current
+    if (now - lastEditRef.current.time > 400) {
+      historyRef.current = [...historyRef.current, prev].slice(-5)
+      setUndoSteps(historyRef.current.length)
+    }
+    lastEditRef.current.time = now
+    setDataState(p => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(p) : updaterOrValue
+      dataRef.current = next
+      return next
+    })
+  }, [])
+
   const deselectAll = useCallback(() => {
     setSelectedCharIdx(null)
     setSelectedObjIdx(null)
@@ -42,6 +62,31 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
   }, [])
+
+  const undo = useCallback(() => {
+    const h = historyRef.current
+    if (!h.length) return
+    const prev = h[h.length - 1]
+    historyRef.current = h.slice(0, -1)
+    lastEditRef.current.time = 0
+    setUndoSteps(historyRef.current.length)
+    dataRef.current = prev
+    setDataState(prev)
+    deselectAll()
+  }, [deselectAll])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        const t = e.target
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+        e.preventDefault()
+        undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo])
 
   const panel = data.panels[selectedPanelIdx]
 
@@ -443,6 +488,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         >
           {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
         </select>
+        <button className="btn btn-sm" onClick={undo} disabled={undoSteps === 0} title="Ctrl+Z · deshacer">
+          deshacer ({undoSteps})
+        </button>
         <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters, balloons)}>
           prompts
         </button>
