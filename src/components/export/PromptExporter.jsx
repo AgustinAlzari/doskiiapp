@@ -1,20 +1,33 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
+import useStripStore from '../../store/stripStore'
 import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
+import AutoTextarea from '../editor/AutoTextarea'
 
 export default function PromptExporter({ strip, characters, project, balloons }) {
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
+  const saveStrip = useStripStore(s => s.save)
+  const liveStrip = useStripStore(s => s.strips.find(st => st.id === strip?.id)) || strip
   const [copied, setCopied] = useState(null)
   const [svgPaths, setSvgPaths] = useState({})
-  const [showVectors, setShowVectors] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [results, setResults] = useState([])
+  const [coverIndex, setCoverIndex] = useState(-1)
 
   const chars = characters || []
   const bgs = backgrounds || []
   const objs = objects || []
+
+  useEffect(() => {
+    setResults(strip?.results || [])
+    setCoverIndex(strip?.resultCoverIndex ?? -1)
+    setSvgPaths({})
+    generateVectors()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strip?.id])
 
   if (!strip || !strip.panels) return <div style={{ padding: 16 }}>cargando prompts...</div>
 
@@ -29,7 +42,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
 
   const generateVectors = async () => {
     setGenerating(true)
-    setShowVectors(true)
     for (let i = 0; i < (strip.panels || []).length; i++) {
       try {
         const panel = strip.panels[i]
@@ -115,43 +127,74 @@ export default function PromptExporter({ strip, characters, project, balloons })
     }
   }
 
-  const balloonRefs = (() => {
+  // ---- resultados de generación ----
+  const persistResults = (nextResults, nextCover) => {
+    setResults(nextResults)
+    setCoverIndex(nextCover)
+    saveStrip({ ...liveStrip, results: nextResults, resultCoverIndex: nextCover })
+  }
+  const addResult = async () => {
+    if ((results || []).length >= 3) return
+    if (!window.api?.references?.choose || !window.api?.references?.import) return
+    const source = await window.api.references.choose()
+    if (!source) return
+    const imported = await window.api.references.import({
+      sourcePath: source,
+      entityId: `${liveStrip?.id || 'strip'}-result`,
+      entityName: `${(liveStrip?.id || 'strip').slice(0, 8)}-result${(results || []).length + 1}`,
+    })
+    if (!imported) return
+    const next = [...(results || []), { id: crypto.randomUUID(), fileName: imported.fileName, path: imported.path, observations: '' }]
+    persistResults(next, coverIndex < 0 ? 0 : coverIndex)
+  }
+  const updateObservation = (id, observations) => {
+    const next = (results || []).map(r => r.id === id ? { ...r, observations } : r)
+    setResults(next)
+    saveStrip({ ...liveStrip, results: next, resultCoverIndex: coverIndex })
+  }
+  const removeResult = (id) => {
+    const next = (results || []).filter(r => r.id !== id)
+    let nextCover = coverIndex
+    if (next.length === 0) nextCover = -1
+    else if (nextCover >= next.length) nextCover = next.length - 1
+    persistResults(next, nextCover)
+  }
+  const selectCover = (idx) => {
+    setCoverIndex(idx)
+    saveStrip({ ...liveStrip, results: results || [], resultCoverIndex: idx })
+  }
+
+  // ---- referencias por panel ----
+  const panelSceneRefs = (panel) => {
+    const refs = []
+    const usedCharIds = new Set((panel.characters || []).map(c => c.characterId))
+    const usedObjIds = new Set((panel.objects || []).map(o => o.objectId))
+    const bgId = panel.backgroundId
+    const add = (list) => list.forEach(e => (e.referenceImages || []).forEach(r => refs.push({ ...r, entityName: e.name })))
+    add(chars.filter(c => usedCharIds.has(c.id)))
+    add(objs.filter(o => usedObjIds.has(o.id)))
+    if (bgId) add(bgs.filter(b => b.id === bgId))
+    return refs
+  }
+  const panelBalloonRefs = (panel) => {
     const refs = []
     const seen = new Set()
-    ;(strip.panels || []).forEach(panel => {
-      usedBalloonEntityIds(panel).forEach(id => {
-        const entity = (balloons || []).find(b => b.id === id)
-        if (!entity) return
-        ;(entity.referenceImages || []).forEach(r => {
-          if (seen.has(r.path || r.fileName)) return
-          seen.add(r.path || r.fileName)
-          refs.push({ ...r, entityName: entity.name, balloonType: entity.kind })
-        })
+    usedBalloonEntityIds(panel, project, balloons).forEach(id => {
+      const entity = balloons.find(b => b.id === id)
+      if (!entity) return
+      ;(entity.referenceImages || []).forEach(r => {
+        if (seen.has(r.path || r.fileName)) return
+        seen.add(r.path || r.fileName)
+        refs.push({ ...r, entityName: entity.name })
       })
     })
     return refs
-  })()
-
-  const references = [
-    ...chars.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
-    ...bgs.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
-    ...objs.flatMap(item => (item.referenceImages || []).map(image => ({ ...image, entityName: item.name }))),
-    ...balloonRefs,
-  ]
-
-  const usedIds = new Set([
-    ...strip.panels.flatMap(p => (p.characters || []).map(c => c.characterId)),
-    ...strip.panels.flatMap(p => (p.objects || []).map(o => o.objectId)),
-    ...strip.panels.filter(p => p.backgroundId).map(p => p.backgroundId),
-  ])
-  const usedReferences = references.filter(ref => {
-    if (ref.balloonType) return true
-    const entity = [...chars, ...bgs, ...objs].find(e => e.name === ref.entityName)
-    return entity && usedIds.has(entity.id)
-  })
+  }
 
   const usedFileNames = [...new Set([
-    ...usedReferences.map(r => r.fileName),
+    ...strip.panels.flatMap(p => panelSceneRefs(p).map(r => r.fileName)),
+    ...strip.panels.flatMap(p => panelBalloonRefs(p).map(r => r.fileName)),
+    ...(results || []).map(r => r.fileName),
     ...Object.keys(svgPaths).map(key => {
       const [idx, mode] = key.split(':')
       return mode === 'scene' ? sceneLayoutFileNameFor(strip, Number(idx)) : letteringLayoutFileNameFor(strip, Number(idx))
@@ -168,56 +211,69 @@ export default function PromptExporter({ strip, characters, project, balloons })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Export all */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn btn-sm" onClick={() => copyToClipboard(allPrompts, 'all')}>
           {copied === 'all' ? 'copiado ✓' : 'copiar todos'}
         </button>
-        <button className="btn btn-sm" onClick={() => exportToFile(allPrompts, `${strip.title || 'tira'}-prompts.txt`)}>
+        <button className="btn btn-sm" onClick={() => exportToFile(allPrompts, `${strip.title || 'viñeta'}-prompts.txt`)}>
           exportar .txt
+        </button>
+        <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
+          abrir carpeta
+        </button>
+        <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
+          {generating ? 'generando vectores...' : 'regenerar vectores'}
         </button>
       </div>
 
-      {/* Referencias + vectores — todo arriba */}
-      {(usedReferences.length > 0 || showVectors) && (
-        <div className="card" style={{ padding: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>referencias para arrastrar a la IA</span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
-                abrir carpeta
-              </button>
-              <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
-                {generating ? 'generando...' : showVectors ? 'ocultar vectores' : 'generar vectores'}
-              </button>
-            </div>
+      {/* Resultados de generación */}
+      <div className="card" style={{ padding: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>resultados de generación (máx. 3)</span>
+          <button className="btn btn-sm" onClick={addResult} disabled={(results || []).length >= 3}>
+            + cargar resultado
+          </button>
+        </div>
+        {(results || []).length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            todavía no cargaste resultados: la imagen que generó la IA con estos prompts.
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {usedReferences.map(reference => (
-              <div key={reference.path} style={{ width: 100, fontSize: 10, color: 'var(--color-text-muted)' }}>
-                <div style={{ height: 78, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {window.api?.references?.read && <ReferenceThumbnail reference={reference} />}
+        ) : (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {(results || []).map((r, idx) => (
+              <div key={r.id} style={{ width: 230, border: '1px solid var(--color-border)', borderRadius: 6, padding: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>resultado {idx + 1}</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      className={`btn btn-sm ${coverIndex === idx ? '' : 'btn-ghost'}`}
+                      style={{ fontSize: 10, padding: '2px 6px' }}
+                      onClick={() => selectCover(idx)}
+                    >
+                      {coverIndex === idx ? 'portada ✓' : 'usar como portada'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeResult(r.id)} style={{ fontSize: 10 }}>×</button>
+                  </div>
                 </div>
-                <div style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={reference.fileName}>{reference.fileName}</div>
+                <div style={{ height: 120, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                  {window.api?.references?.read && <ReferenceThumbnail reference={{ path: r.path, fileName: r.fileName }} />}
+                </div>
+                <label className="label" style={{ marginBottom: 2 }}>observaciones</label>
+                <AutoTextarea
+                  value={r.observations || ''}
+                  onChange={e => updateObservation(r.id, e.target.value)}
+                  placeholder="qué corregir o tener en cuenta..."
+                  minRows={1}
+                  maxRows={4}
+                />
               </div>
             ))}
-            {showVectors && Object.keys(svgPaths).map(key => {
-              const [idx, mode] = key.split(':')
-              const fileName = mode === 'scene' ? sceneLayoutFileNameFor(strip, Number(idx)) : letteringLayoutFileNameFor(strip, Number(idx))
-              return (
-                <div key={`layout-${key}`} style={{ width: 100, fontSize: 10, color: 'var(--color-text-muted)' }}>
-                  <div style={{ height: 78, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {window.api?.references?.read && <ReferenceThumbnail reference={{ path: svgPaths[key], fileName }} showName={false} />}
-                  </div>
-                  <div style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fileName}>{mode === 'scene' ? `escena ${Number(idx) + 1}` : `diálogos ${Number(idx) + 1}`}</div>
-                </div>
-              )
-            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Per-panel prompts */}
+      {/* Tarjetones por panel: escena | diálogos */}
       {strip.panels.map((panel, i) => {
         let scenePrompt = ''
         let letteringPrompt = ''
@@ -229,33 +285,89 @@ export default function PromptExporter({ strip, characters, project, balloons })
           scenePrompt = `Error generando prompt: ${err.message}`
           letteringPrompt = `Error generando prompt: ${err.message}`
         }
+        const scenePath = svgPaths[`${i}:scene`]
+        const letteringPath = svgPaths[`${i}:lettering`]
+        const sceneRefs = panelSceneRefs(panel)
+        const balloonRefsPanel = panelBalloonRefs(panel)
         return (
           <div key={panel.id} className="card" style={{ padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-2)' }}>cuadro {i + 1}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>escena</span>
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 11 }}
-                onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}
-              >
-                {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
-              </button>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+              {/* Columna escena */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>escena</span>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 11 }}
+                    onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}
+                  >
+                    {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
+                  </button>
+                </div>
+                <div className="prompt-output">{scenePrompt}</div>
+                {scenePath && (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout escena</div>
+                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 6, display: 'inline-block', background: 'white' }}>
+                      {window.api?.references?.read && <ReferenceThumbnail reference={{ path: scenePath, fileName: sceneLayoutFileNameFor(strip, i) }} />}
+                    </div>
+                  </div>
+                )}
+                {sceneRefs.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>referencias de escena (arrastrar)</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {sceneRefs.map(ref => (
+                        <div key={ref.path} style={{ width: 72 }}>
+                          <div style={{ height: 64, border: '1px solid var(--color-border)', borderRadius: 5, padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ref.fileName}>{ref.fileName}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna diálogos */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>diálogos</span>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 11 }}
+                    onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}
+                  >
+                    {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
+                  </button>
+                </div>
+                <div className="prompt-output">{letteringPrompt}</div>
+                {(letteringPath || balloonRefsPanel.length > 0) && (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar)</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      {letteringPath && (
+                        <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 6, background: 'white' }}>
+                          {window.api?.references?.read && <ReferenceThumbnail reference={{ path: letteringPath, fileName: letteringLayoutFileNameFor(strip, i) }} />}
+                        </div>
+                      )}
+                      {balloonRefsPanel.map(ref => (
+                        <div key={ref.path} style={{ width: 72 }}>
+                          <div style={{ height: 64, border: '1px solid var(--color-border)', borderRadius: 5, padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
+                          </div>
+                          <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ref.fileName}>{ref.fileName}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="prompt-output">{scenePrompt}</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, marginTop: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>diálogos</span>
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 11 }}
-                onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}
-              >
-                {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
-              </button>
-            </div>
-            <div className="prompt-output">{letteringPrompt}</div>
           </div>
         )
       })}

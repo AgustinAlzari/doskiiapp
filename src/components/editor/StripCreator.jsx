@@ -37,7 +37,7 @@ export default function StripCreator({ project, onCreated, onBack }) {
   return (
     <div style={{ maxWidth: 480 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>nueva tira</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>nueva viñeta</h1>
         <button className="btn btn-ghost" onClick={onBack}>cancelar</button>
       </div>
 
@@ -128,7 +128,7 @@ export default function StripCreator({ project, onCreated, onBack }) {
         </div>
 
         <button className="btn btn-primary" onClick={handleCreate} disabled={!title.trim()}>
-          crear tira
+          crear viñeta
         </button>
       </div>
     </div>

@@ -77,7 +77,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                  {c.strips} tiras · {c.chars} personajes · {c.bgs} fondos · {c.objs} objetos
+                  {c.strips} viñetas · {c.chars} personajes · {c.bgs} fondos · {c.objs} objetos
                   {project.updatedAt && <> · modif. {formatDate(project.updatedAt)}</>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 8 }}>

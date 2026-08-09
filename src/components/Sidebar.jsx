@@ -1,6 +1,6 @@
 export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject }) {
   const navItems = [
-    { id: 'strips', label: 'tiras', active: ['strips', 'new-strip', 'editor', 'prompts'] },
+    { id: 'strips', label: 'viñetas', active: ['strips', 'new-strip', 'editor', 'prompts'] },
     { id: 'characters', label: 'personajes', active: ['characters', 'new-character', 'edit-character'] },
     { id: 'backgrounds', label: 'fondos', active: ['backgrounds', 'new-background', 'edit-background'] },
     { id: 'objects', label: 'objetos', active: ['objects', 'new-object', 'edit-object'] },

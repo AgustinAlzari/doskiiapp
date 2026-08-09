@@ -240,15 +240,33 @@ export function usedBalloonTypes(panel) {
   return types
 }
 
-export function usedBalloonEntityIds(panel) {
+export function usedBalloonEntityIds(panel, project = null, balloonDefs = []) {
   const ids = new Set()
+  let needsDefault = false
   ;(panel?.characters || []).forEach(c => {
     if (c.balloonId) ids.add(c.balloonId)
-    ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) ids.add(e.balloonId) })
+    else if (c.dialogue) needsDefault = true
+    ;(c.extraDialogues || []).forEach(e => {
+      if (e.balloonId) ids.add(e.balloonId)
+      else if (e.text) needsDefault = true
+    })
   })
   if (panel?.narration?.balloonId) ids.add(panel.narration.balloonId)
-  ;(panel?.globosX || []).forEach(g => { if (g.balloonId) ids.add(g.balloonId) })
+  else if (panel?.narration?.text) needsDefault = true
+  ;(panel?.globosX || []).forEach(g => {
+    if (g.balloonId) ids.add(g.balloonId)
+    else if (g.text) needsDefault = true
+  })
+  if (needsDefault) {
+    const def = resolveDefaultBalloon(project, balloonDefs)
+    if (def) ids.add(def.id)
+  }
   return [...ids]
+}
+
+function resolveDefaultBalloon(project, balloonDefs = []) {
+  const pid = project?.id
+  return (balloonDefs || []).find(b => b.projectId === pid && b.comodin && b.kind === 'other') || null
 }
 
 const BALLOON_LETTERING_RULES = [
@@ -264,12 +282,13 @@ function entityDescPieces(entity) {
   return pieces
 }
 
-function balloonGraphicsText(panel, balloonDefs = []) {
+function balloonGraphicsText(panel, project, balloonDefs = []) {
   const used = [...usedBalloonTypes(panel)]
   if (!used.length) return ''
 
   const defaultLaws = makeDefaultBalloonLaws()
   const byId = Object.fromEntries((balloonDefs || []).map(b => [b.id, b]))
+  const defaultBalloon = resolveDefaultBalloon(project, balloonDefs)
   const usedEntities = []
   const lines = ['BALLOON GRAPHICS:']
 
@@ -281,29 +300,40 @@ function balloonGraphicsText(panel, balloonDefs = []) {
     lines.push(`- ${label}: ${text || '(default comic balloon style)'}`)
   }
 
+  const fallback = (label) => {
+    if (defaultBalloon) addEntry(`${label.toUpperCase()} ("${defaultBalloon.name}")`, defaultBalloon)
+    else addEntry(label.toUpperCase(), null)
+  }
+
   used.forEach(type => {
     const label = BALLOON_LABELS[type] || type
     if (type === 'other') {
       const ids = [...new Set((panel.globosX || []).map(g => g.balloonId).filter(Boolean))]
       const entities = ids.map(id => byId[id]).filter(Boolean)
       if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
-      else addEntry(label.toUpperCase(), null)
+      else fallback(label)
       return
     }
     const kind = type
     const ids = new Set()
+    let needsDefault = false
     ;(panel.characters || []).forEach(c => {
       const check = (balloonId, dType) => {
-        if (!balloonId) return
         const mapped = (dType || 'speech') === 'thought' ? 'thought' : 'speech'
-        if (mapped === kind) ids.add(balloonId)
+        if (mapped !== kind) return
+        if (balloonId) ids.add(balloonId)
+        else needsDefault = true
       }
       check(c.balloonId, c.dialogueType)
       ;(c.extraDialogues || []).forEach(e => check(e.balloonId, e.type))
     })
-    if (kind === 'narration' && panel.narration?.balloonId) ids.add(panel.narration.balloonId)
+    if (kind === 'narration') {
+      if (panel.narration?.balloonId) ids.add(panel.narration.balloonId)
+      else if (panel.narration?.text) needsDefault = true
+    }
     const entities = [...ids].map(id => byId[id]).filter(Boolean)
     if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
+    else if (needsDefault) fallback(label)
     else addEntry(label.toUpperCase(), null)
   })
 
@@ -490,7 +520,7 @@ function globoXAnchorText(gx, ctx) {
 
 function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
   const lines = []
-  const balloons = balloonGraphicsText(panel, balloonDefs)
+  const balloons = balloonGraphicsText(panel, project, balloonDefs)
   if (balloons) {
     lines.push(balloons)
     lines.push('')

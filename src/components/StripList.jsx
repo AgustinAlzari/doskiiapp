@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import useStripStore from '../store/stripStore'
 
 function formatDate(iso) {
@@ -12,6 +13,25 @@ function formatDate(iso) {
   return `${day} ${month} ${year}, ${h}:${m}`
 }
 
+function StripCover({ strip }) {
+  const [src, setSrc] = useState(null)
+  const result = strip.results?.[strip.resultCoverIndex]
+  useEffect(() => {
+    let active = true
+    if (result?.path && window.api?.references) {
+      window.api.references.read(result.path).then(url => { if (active) setSrc(url) })
+    } else setSrc(null)
+    return () => { active = false }
+  }, [result?.path])
+
+  if (!src) return null
+  return (
+    <div style={{ height: 120, border: '1px solid var(--color-border)', borderRadius: 6, overflow: 'hidden', marginBottom: 8, background: 'white' }}>
+      <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    </div>
+  )
+}
+
 export default function StripList({ projectId, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
   const loaded = useStripStore(s => s.loaded)
@@ -23,8 +43,8 @@ export default function StripList({ projectId, onNew, onEdit }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>tiras</h1>
-        <button className="btn btn-primary" onClick={onNew}>nueva tira</button>
+        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>viñetas</h1>
+        <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
       </div>
 
       {scopedStrips.length === 0 ? (
@@ -37,9 +57,9 @@ export default function StripList({ projectId, onNew, onEdit }) {
           gap: 16,
         }}>
           <div style={{ color: 'var(--color-text-muted)', fontSize: 14, textAlign: 'center' }}>
-            sin tiras aún. creá una para empezar.
+            sin viñetas aún. creá una para empezar.
           </div>
-          <button className="btn btn-primary" onClick={onNew}>nueva tira</button>
+          <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
         </div>
       ) : (
         <div className="strip-grid">
@@ -49,6 +69,7 @@ export default function StripList({ projectId, onNew, onEdit }) {
               className="strip-card"
               onClick={() => onEdit(strip)}
             >
+              <StripCover strip={strip} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>
                   {strip.title || 'sin título'}

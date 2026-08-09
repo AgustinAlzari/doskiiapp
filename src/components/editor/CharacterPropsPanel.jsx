@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { ACTION_PRESETS, DIALOGUE_TYPES, DIRECTIONS } from '../../data/actionPresets'
+import { ACTION_PRESETS, DIRECTIONS } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 import AutoTextarea from './AutoTextarea'
 
-export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, allCharacters, allObjects, onUpdate, onRemove, onEdit }) {
+export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, allCharacters, allObjects, defaultBalloonId, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
   const extraDialogues = panelChar.extraDialogues || []
   const [editingExtra, setEditingExtra] = useState(null)
@@ -40,7 +40,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
   }
 
   const addExtraDialogue = () => {
-    const newDialogues = [...extraDialogues, { text: '', type: 'speech' }]
+    const newDialogues = [...extraDialogues, { text: '', type: 'speech', balloonId: defaultBalloonId || null }]
     onUpdate({ extraDialogues: newDialogues })
     setEditingExtra(newDialogues.length - 1)
   }
@@ -161,23 +161,6 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
               narración
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Dialogue type */}
-      <div>
-        <label className="label">tipo de globo</label>
-        <div className="radio-group">
-          {DIALOGUE_TYPES.map(t => (
-            <div
-              key={t.id}
-              className={`radio-pill ${panelChar.dialogueType === t.id ? 'active' : ''}`}
-              onClick={() => onUpdate({ dialogueType: t.id })}
-              title={t.label}
-            >
-              {t.icon}
-            </div>
-          ))}
         </div>
       </div>
 

@@ -124,7 +124,7 @@ export default function App() {
           <>
             <div className="editor-header" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--color-border-muted)' }}>
               <button className="btn btn-ghost btn-sm" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
-              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-title)' }}>prompts — {promptData.strip?.title || 'tira'}</span>
+              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-title)' }}>prompts — {promptData.strip?.title || 'viñeta'}</span>
             </div>
             <PromptExporter strip={promptData.strip} characters={promptData.characters} project={activeProject} balloons={promptData.balloons || []} />
           </>

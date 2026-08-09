@@ -69,7 +69,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
   const handleDelete = async () => {
     if (!project?.id) return
-    if (!confirm(`¿Eliminar el proyecto "${name}" y TODO su contenido (tiras, personajes, fondos, objetos)?`)) return
+    if (!confirm(`¿Eliminar el proyecto "${name}" y TODO su contenido (viñetas, personajes, fondos, objetos)?`)) return
     await removeAll(project.id)
     onDeleted()
   }

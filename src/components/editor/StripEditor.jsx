@@ -79,6 +79,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         expression: '',
         dialogue: '',
         dialogueType: 'speech',
+        balloonId: wildcardBalloon?.id || null,
         dialoguePosition: null,
         extraDialogues: [],
         actions: [],
@@ -88,7 +89,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       panels[panelIdx] = { ...panels[panelIdx], characters }
       return { ...prev, panels }
     })
-  }, [])
+  }, [wildcardBalloon])
 
   const removeCharacterFromPanel = useCallback((panelIdx, charIdx) => {
     setData(prev => {
@@ -292,13 +293,14 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   // Globo X (free balloons)
   const addGloboXToPanel = useCallback((panelIdx, balloonId) => {
     const idx = (data.panels[panelIdx]?.globosX || []).length
+    const ent = balloons.find(b => b.id === balloonId)
     setData(prev => {
       const panels = [...prev.panels]
       const globosX = [...(panels[panelIdx].globosX || [])]
       globosX.push({
         id: crypto.randomUUID(),
         text: '',
-        channel: 'speech',
+        channel: ent?.kind === 'thought' ? 'thought' : 'speech',
         balloonId,
         x: 0.4,
         y: 0.05,
@@ -315,7 +317,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
     setSelectedBalloon(null)
-  }, [data.panels])
+  }, [data.panels, balloons])
 
   const updateGloboXInPanel = useCallback((panelIdx, gIdx, updates) => {
     setData(prev => {
@@ -395,6 +397,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const selectedObjDef = selectedObjData && objects.find(item => item.id === selectedObjData.objectId)
 
   const projectBalloons = balloons.filter(b => b.projectId === project?.id)
+  const wildcardBalloon = projectBalloons.find(b => b.comodin) || null
 
   const orderedForPanel = (() => { try { return orderedPanelDialogues(panel || { characters: [] }, characters) } catch { return [] } })()
 
@@ -453,14 +456,14 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         <label className="label">descripción</label>
         <div className="desc-card" onClick={() => { setDescDraft(data.generalStyle || ''); setShowDescModal(true) }}>
           <div className="desc-card-text">
-            {data.generalStyle || 'describe el estilo visual de la tira...'}
+            {data.generalStyle || 'describe el estilo visual de la viñeta...'}
           </div>
           <div className="desc-card-dots">···</div>
         </div>
         {project && (project.styleNotes || project.drawingStyle || project.genre) && (
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
             hereda del proyecto: {[project.drawingStyle, project.genre, project.styleNotes].filter(Boolean).join(' · ')}
-            {data.generalStyle?.trim() ? ' (la descripción de la tira agrega o reemplaza)' : ' (vacío = usar estilo del proyecto)'}
+            {data.generalStyle?.trim() ? ' (la descripción de la viñeta agrega o reemplaza)' : ' (vacío = usar estilo del proyecto)'}
           </div>
         )}
       </div>
@@ -470,7 +473,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         <div className="desc-overlay" onClick={() => setShowDescModal(false)}>
           <div className="desc-modal" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>descripción de la tira</span>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>descripción de la viñeta</span>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowDescModal(false)} style={{ fontSize: 16, padding: '2px 8px' }}>×</button>
             </div>
             <AutoTextarea
@@ -592,12 +595,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       label={selectedDialogueBalloon.label}
                       characterName={selectedDialogueBalloon.characterName}
                       text={selectedDialogueBalloon.text}
-                      channel={selectedDialogueBalloon.channel}
                       balloonId={selectedDialogueBalloon.balloonId}
                       balloons={projectBalloons}
+                      defaultBalloon={wildcardBalloon}
                       onText={(text) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { text } : { dialogue: text })}
-                      onChannel={(channel) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { type: channel } : { dialogueType: channel })}
-                      onBalloonId={(balloonId) => applyDialogueBalloonUpdate({ balloonId })}
+                      onType={(id, kind) => applyDialogueBalloonUpdate(selectedBalloon.isExtra
+                        ? { balloonId: id, type: kind === 'thought' ? 'thought' : 'speech' }
+                        : { balloonId: id, dialogueType: kind === 'thought' ? 'thought' : 'speech' })}
                       onRemove={() => removeDialogueBalloon(selectedBalloon)}
                       onClose={() => setSelectedBalloon(null)}
                     />
@@ -607,17 +611,16 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       kind="globox"
                       label={selectedGloboXLabel}
                       text={selectedGloboXData.text || ''}
-                      channel={selectedGloboXData.channel || 'speech'}
                       balloonId={selectedGloboXData.balloonId || null}
                       balloons={projectBalloons}
+                      defaultBalloon={wildcardBalloon}
                       anchor={selectedGloboXData.anchor || { type: 'none' }}
                       panelCharacters={panel?.characters || []}
                       panelObjects={panel?.objects || []}
                       characters={characters}
                       objects={objects}
                       onText={(text) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { text })}
-                      onChannel={(channel) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { channel })}
-                      onBalloonId={(balloonId) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { balloonId })}
+                      onType={(id, kind) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { balloonId: id, channel: kind === 'thought' ? 'thought' : 'speech' })}
                       onAnchor={(anchor) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { anchor })}
                       onRemove={() => removeGloboXFromPanel(selectedPanelIdx, selectedGloboXIdx)}
                       onClose={() => setSelectedGloboXIdx(null)}
@@ -633,6 +636,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       panelNarration={panel?.narration}
                       allCharacters={characters}
                       allObjects={objects}
+                      defaultBalloonId={wildcardBalloon?.id || null}
                       onUpdate={(updates) => updateCharacterInPanel(selectedPanelIdx, selectedCharIdx, updates)}
                       onRemove={() => removeCharacterFromPanel(selectedPanelIdx, selectedCharIdx)}
                       onEdit={() => onEditCharacter(selectedCharDef)}

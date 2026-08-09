@@ -1,15 +1,16 @@
-import { DIALOGUE_TYPES } from '../../data/actionPresets'
 import AutoTextarea from './AutoTextarea'
 
 const ANCHOR_DIRECTIONS = ['bottom', 'left', 'right', 'top']
 
 export default function BalloonPropsPanel({
   kind, label, characterName,
-  text, channel, balloonId, balloons,
+  text, balloonId, balloons, defaultBalloon,
   anchor, panelCharacters, panelObjects, characters, objects,
-  onText, onChannel, onBalloonId, onAnchor, onRemove, onClose,
+  onText, onType, onAnchor, onRemove, onClose,
 }) {
   const anchorType = anchor?.type || 'none'
+  const effectiveId = balloonId || defaultBalloon?.id || ''
+  const effective = balloons.find(b => b.id === effectiveId)
 
   const charName = (id) => {
     const pc = (panelCharacters || []).find(c => c.characterId === id)
@@ -43,27 +44,22 @@ export default function BalloonPropsPanel({
       </div>
 
       <div>
-        <label className="label">canal</label>
-        <div className="radio-group">
-          {DIALOGUE_TYPES.map(t => (
-            <div
-              key={t.id}
-              className={`radio-pill ${channel === t.id ? 'active' : ''}`}
-              onClick={() => onChannel(t.id)}
-              title={t.label}
-            >
-              {t.icon}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="label">estilo (entidad-globo)</label>
-        <select className="input" value={balloonId || ''} onChange={e => onBalloonId(e.target.value || null)} style={{ fontSize: 12, cursor: 'pointer' }}>
-          <option value="">(sin estilo — globo del cómic por defecto)</option>
+        <label className="label">tipo de globo</label>
+        <select
+          className="input"
+          value={effectiveId}
+          onChange={e => {
+            const ent = balloons.find(b => b.id === e.target.value)
+            onType(e.target.value, ent?.kind || 'speech')
+          }}
+          style={{ fontSize: 12, cursor: 'pointer' }}
+        >
+          {balloons.length === 0 && <option value="">(sin globos cargados)</option>}
           {balloons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+          {effective ? `define el globo: ${effective.name}. Si es de pensamiento, se dibuja como nube.` : 'elegí un globo de la sección "globos".'}
+        </div>
       </div>
 
       {kind === 'globox' && (
