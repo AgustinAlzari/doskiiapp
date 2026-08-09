@@ -31,6 +31,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [gridVisible, setGridVisible] = useState(true)
   const canvasRef = useRef(null)
 
+  const projectBalloons = balloons.filter(b => b.projectId === project?.id)
+  const wildcardBalloon = projectBalloons.find(b => b.comodin) || null
+
   const deselectAll = useCallback(() => {
     setSelectedCharIdx(null)
     setSelectedObjIdx(null)
@@ -395,9 +398,6 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const selectedSfxData = panel?.sfx?.[selectedSfxIdx]
   const selectedObjData = panel?.objects?.[selectedObjIdx]
   const selectedObjDef = selectedObjData && objects.find(item => item.id === selectedObjData.objectId)
-
-  const projectBalloons = balloons.filter(b => b.projectId === project?.id)
-  const wildcardBalloon = projectBalloons.find(b => b.comodin) || null
 
   const orderedForPanel = (() => { try { return orderedPanelDialogues(panel || { characters: [] }, characters) } catch { return [] } })()
 
