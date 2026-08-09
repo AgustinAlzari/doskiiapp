@@ -219,9 +219,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
         <button className="btn btn-sm" onClick={() => exportToFile(allPrompts, `${strip.title || 'viñeta'}-prompts.txt`)}>
           exportar .txt
         </button>
-        <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
-          abrir carpeta
-        </button>
         <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
           {generating ? 'generando vectores...' : 'regenerar vectores'}
         </button>
@@ -231,9 +228,14 @@ export default function PromptExporter({ strip, characters, project, balloons })
       <div className="card" style={{ padding: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 600 }}>resultados de generación (máx. 3)</span>
-          <button className="btn btn-sm" onClick={addResult} disabled={(results || []).length >= 3}>
-            + cargar resultado
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
+              abrir carpeta
+            </button>
+            <button className="btn btn-sm" onClick={addResult} disabled={(results || []).length >= 3}>
+              + cargar resultado
+            </button>
+          </div>
         </div>
         {(results || []).length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
@@ -291,10 +293,10 @@ export default function PromptExporter({ strip, characters, project, balloons })
         const balloonRefsPanel = panelBalloonRefs(panel)
         return (
           <div key={panel.id} className="card" style={{ padding: 12 }}>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-2)' }}>cuadro {i + 1}</span>
             </div>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'stretch' }}>
               {/* Columna escena */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -307,7 +309,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
                     {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
                   </button>
                 </div>
-                <div className="prompt-output">{scenePrompt}</div>
+                {/* Visual arriba */}
                 {scenePath && (
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout escena</div>
@@ -331,7 +333,12 @@ export default function PromptExporter({ strip, characters, project, balloons })
                     </div>
                   </div>
                 )}
+                {/* Texto debajo */}
+                <div className="prompt-output">{scenePrompt}</div>
               </div>
+
+              {/* Divisor entre columnas */}
+              <div style={{ width: 1, background: 'var(--color-border)', flexShrink: 0 }} />
 
               {/* Columna diálogos */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -345,7 +352,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
                     {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
                   </button>
                 </div>
-                <div className="prompt-output">{letteringPrompt}</div>
+                {/* Visual arriba */}
                 {(letteringPath || balloonRefsPanel.length > 0) && (
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar)</div>
@@ -366,6 +373,8 @@ export default function PromptExporter({ strip, characters, project, balloons })
                     </div>
                   </div>
                 )}
+                {/* Texto debajo */}
+                <div className="prompt-output">{letteringPrompt}</div>
               </div>
             </div>
           </div>
