@@ -1,7 +1,7 @@
 {
   "id": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
   "name": "bosque",
-  "promptText": "A deep, linear perspective composition where a dirt path snakes from the immediate foreground deep into the background, narrowing towards a distant point. On both sides of the path, there are multiple rows of deciduous trees with clean, smooth trunks and complex, detailed, layered canopies of leaves forming a dense overhead arch. The foreground underbrush is rich and clearly defined with prominent, detailed illustrations of ferns, various leafy bushes, small plants, grasses, and stones along the path edges. The trees and foliage fill the composition, creating a sense of a dense, old-growth forest. The entire piece is rendered in clean, consistent black ink line work on a slightly textured, natural white paper background, with no color or heavy shading, only cross-hatching and line density to create texture. The composition is balanced and inviting, with the path acting as the primary leading line. The style is that of a hand-drawn illustration from a botanical book or a detailed comic panel background.",
+  "promptText": "Deep forest interior viewed from a centered, eye-level camera, with a winding dirt path receding in precise perspective to a distant central vanishing point. Multiple receding planes of tree trunks and varied undergrowth define the space, starting with large foreground trees flanking the path. The canopy is a balanced, leafy ceiling. Daytime, high-key monochrome light provides a clean range of grays, defining textures of bark and foliage without harsh shadows. The central path and upper canopy are large, balanced free zones for subsequent content layers.",
   "color": "#fff585",
   "referenceImages": [
     {
@@ -10,6 +10,6 @@
     }
   ],
   "createdAt": "2026-08-05T13:38:38.149Z",
-  "updatedAt": "2026-08-07T11:05:48.551Z",
+  "updatedAt": "2026-08-08T03:01:49.531Z",
   "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
 }

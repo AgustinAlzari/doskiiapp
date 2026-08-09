@@ -1,0 +1,60 @@
+{
+  "id": "e91ecd8a-e3a4-4912-b5f4-8ff38103ac13",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc",
+  "title": "1 Carlos se encuentra con el horno",
+  "generalStyle": "",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "8728123c-a879-4a29-a26e-577f597b610f",
+      "scene": "Carlos encuentra el microondas abandonado en el bosque",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.11070983810709839,
+          "y": 0.4665006226650062,
+          "width": 0.29172458748443336,
+          "height": 0.36118364726027397,
+          "direction": "front",
+          "expression": "serio y hasta un poco triste",
+          "dialogue": "...un microondas... me puede venir bien",
+          "dialogueType": "thought",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "se rasca la cabeza como pensando",
+          "gazeTarget": null
+        }
+      ],
+      "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
+      "objects": [
+        {
+          "objectId": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "x": 0.6501245330012453,
+          "y": 0.6723536737235367,
+          "width": 0.16267220579078456,
+          "height": 0.15682012764632627,
+          "note": "rodeado de moscas, se asoma una lauchita"
+        }
+      ],
+      "narration": null,
+      "shotType": "horizon-low",
+      "background": {
+        "x": 0,
+        "y": 0.5,
+        "width": 1,
+        "height": 0.5
+      },
+      "connections": [
+        {
+          "from": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "to": "58d61a22-d066-46de-804e-ae058fc26e4d",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-09T20:40:18.608Z",
+  "updatedAt": "2026-08-09T20:45:46.225Z"
+}

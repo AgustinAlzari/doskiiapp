@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
-import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonTypes, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
+import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonTypes, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
 
 export default function PromptExporter({ strip, characters, project, balloons }) {
@@ -116,29 +116,16 @@ export default function PromptExporter({ strip, characters, project, balloons })
   }
 
   const balloonRefs = (() => {
-    const usedEntityIds = new Set()
-    ;(strip.panels || []).forEach(panel => {
-      usedBalloonTypes(panel).forEach(type => {
-        const eid = project?.balloons?.[type]?.entityId
-        if (eid) usedEntityIds.add(eid)
-      })
-      ;(panel.characters || []).forEach(c => {
-        if (c.balloonId) usedEntityIds.add(c.balloonId)
-        ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) usedEntityIds.add(e.balloonId) })
-      })
-      if (panel.narration?.balloonId) usedEntityIds.add(panel.narration.balloonId)
-      ;(panel.globosX || []).forEach(g => { if (g.balloonId) usedEntityIds.add(g.balloonId) })
-    })
     const refs = []
-    usedEntityIds.forEach(id => {
-      const entity = (balloons || []).find(b => b.id === id)
-      if (!entity) return
-      ;(entity.referenceImages || []).forEach(r => refs.push({ ...r, entityName: entity.name, balloonType: entity.kind }))
-    })
     ;(strip.panels || []).forEach(panel => {
+      usedBalloonEntityIds(panel, project).forEach(id => {
+        const entity = (balloons || []).find(b => b.id === id)
+        if (!entity) return
+        ;(entity.referenceImages || []).forEach(r => refs.push({ ...r, entityName: entity.name, balloonType: entity.kind }))
+      })
       usedBalloonTypes(panel).forEach(type => {
         const cfg = project?.balloons?.[type]
-        if (cfg?.fileName && cfg?.path) refs.push({ fileName: cfg.fileName, path: cfg.path, entityName: `globo ${type}`, balloonType: type })
+        if (cfg?.fileName && cfg?.path) refs.push({ fileName: cfg.fileName, path: cfg.path, entityName: `globo ${type}`, balloonType: 'legacy' })
       })
     })
     return refs

@@ -1,7 +1,7 @@
 {
   "id": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
   "name": "Paola",
-  "promptText": "Full-body B&W line art, no fill. Skeptical 80s woman, arms crossed. Features a headband, long hair, cropped sweatshirt, wrist cuffs, and full-length unfilled outline leggings. One slouchy sock, high-top sneakers. Pure outline drawing.",
+  "promptText": "A full-body, front-facing depiction of a fit adult woman with an athletic build and average height, standing with arms crossed in a neutral stance. She has medium-light skin, bored, droopy eyes, and exceptionally voluminous grey 80s-style hair with a grey headband. She wears a crewneck sweatshirt with matching wrist cuffs and tight black athletic leggings. Over the leggings are bunched grey leg warmers and light grey high-top sneakers. The expression is neutral and unamused.",
   "color": "#ff00ea",
   "referenceImages": [
     {
@@ -10,6 +10,6 @@
     }
   ],
   "createdAt": "2026-08-06T14:18:14.836Z",
-  "updatedAt": "2026-08-07T11:05:48.543Z",
+  "updatedAt": "2026-08-08T03:11:07.702Z",
   "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
 }

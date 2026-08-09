@@ -11,14 +11,17 @@ export default function Layout({ children, currentView, onNavigate, activeProjec
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      await useProjectStore.getState().load()
+      const step = async (label, fn) => {
+        try { await fn() } catch (e) { console.error(`[doski init] ${label}:`, e) }
+      }
+      await step('projects.load', () => useProjectStore.getState().load())
       if (cancelled) return
-      await useCharacterStore.getState().load()
-      await useBackgroundStore.getState().load()
-      await useObjectStore.getState().load()
-      await useBalloonStore.getState().load()
-      await useStripStore.getState().load()
-      await useProjectStore.getState().migrate()
+      await step('characters.load', () => useCharacterStore.getState().load())
+      await step('backgrounds.load', () => useBackgroundStore.getState().load())
+      await step('objects.load', () => useObjectStore.getState().load())
+      await step('balloons.load', () => useBalloonStore.getState().load())
+      await step('strips.load', () => useStripStore.getState().load())
+      await step('migrate', () => useProjectStore.getState().migrate())
     })()
     return () => { cancelled = true }
   }, [])

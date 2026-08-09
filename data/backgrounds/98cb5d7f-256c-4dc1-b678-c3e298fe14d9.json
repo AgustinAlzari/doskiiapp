@@ -1,7 +1,7 @@
 {
   "id": "98cb5d7f-256c-4dc1-b678-c3e298fe14d9",
   "name": "camino rural",
-  "promptText": "A black and white line-art illustration, framed panel. Detailed bushes and weeds in foreground corners. Deep perspective looking down a wire fence with wooden posts receding into distant fields. Rolling plain with sparse distant trees. Clean B&W sketch style, hand-drawn look, no shading, textured paper.",
+  "promptText": "Wide-angle rural landscape under bright direct midday light, establishing a high-key monochromatic palette of greys and whites. Camera height is eye-level, slightly elevated looking across. Foreground planes feature detailed dry, coarse grasses interspersed with small rocks and varying wild plants like ferns and low shrubs. A prominent weathered wooden post and barbed-wire fence recedes precisely in perspective across the midground. Behind it, a vast empty field recedes into a flat, distant horizon line featuring a few sparse, small trees. Above the horizon, a large expanse of clear, open sky fills the upper frame. Materialien reflect dry earth, rustic metal, aged wood, and natural foliage textures. Edge-to-edge, immersive, borderless framing with ample clear ground and sky zones for character and text overlays.",
   "color": "#34c759",
   "referenceImages": [
     {
@@ -10,6 +10,6 @@
     }
   ],
   "createdAt": "2026-08-06T14:39:16.389Z",
-  "updatedAt": "2026-08-07T11:05:48.555Z",
+  "updatedAt": "2026-08-08T03:00:22.398Z",
   "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
 }

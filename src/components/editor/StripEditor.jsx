@@ -395,6 +395,10 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const selectedObjDef = selectedObjData && objects.find(item => item.id === selectedObjData.objectId)
 
   const projectBalloons = balloons.filter(b => b.projectId === project?.id)
+  const defaultBalloonName = (kind) => {
+    const id = project?.balloons?.[kind]?.entityId
+    return id ? (projectBalloons.find(b => b.id === id)?.name || null) : null
+  }
 
   const orderedForPanel = (() => { try { return orderedPanelDialogues(panel || { characters: [] }, characters) } catch { return [] } })()
 
@@ -595,6 +599,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       channel={selectedDialogueBalloon.channel}
                       balloonId={selectedDialogueBalloon.balloonId}
                       balloons={projectBalloons}
+                      defaultBalloonName={defaultBalloonName(selectedDialogueBalloon.channel === 'thought' ? 'thought' : 'speech')}
                       onText={(text) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { text } : { dialogue: text })}
                       onChannel={(channel) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { type: channel } : { dialogueType: channel })}
                       onBalloonId={(balloonId) => applyDialogueBalloonUpdate({ balloonId })}
@@ -610,6 +615,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       channel={selectedGloboXData.channel || 'speech'}
                       balloonId={selectedGloboXData.balloonId || null}
                       balloons={projectBalloons}
+                      defaultBalloonName={defaultBalloonName('other')}
                       anchor={selectedGloboXData.anchor || { type: 'none' }}
                       panelCharacters={panel?.characters || []}
                       panelObjects={panel?.objects || []}

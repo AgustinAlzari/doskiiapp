@@ -240,6 +240,21 @@ export function usedBalloonTypes(panel) {
   return types
 }
 
+export function usedBalloonEntityIds(panel, project) {
+  const ids = new Set()
+  usedBalloonTypes(panel).forEach(type => {
+    const eid = project?.balloons?.[type]?.entityId
+    if (eid) ids.add(eid)
+  })
+  ;(panel?.characters || []).forEach(c => {
+    if (c.balloonId) ids.add(c.balloonId)
+    ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) ids.add(e.balloonId) })
+  })
+  if (panel?.narration?.balloonId) ids.add(panel.narration.balloonId)
+  ;(panel?.globosX || []).forEach(g => { if (g.balloonId) ids.add(g.balloonId) })
+  return [...ids]
+}
+
 const BALLOON_LETTERING_RULES = [
   'Typography MUST be hand-lettered, drawn with a brush pen: irregular, slightly wobbly, with varying stroke weight. NEVER a computer, digital, or sans-serif typeface.',
   'If a tail is present it must be wavy and trembling, with undulating edges (Crumb style) — never a straight line or a simple smooth curve.',
