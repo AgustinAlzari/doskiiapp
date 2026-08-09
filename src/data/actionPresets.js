@@ -73,6 +73,10 @@ export const DIRECTIONS = [
   { id: 'right', label: '→', name: 'right' },
   { id: 'front', label: '↓', name: 'front' },
   { id: 'back', label: '↑', name: 'back' },
+  { id: 'up-left', label: '↖', name: 'upper left' },
+  { id: 'up-right', label: '↗', name: 'upper right' },
+  { id: 'down-left', label: '↙', name: 'lower left' },
+  { id: 'down-right', label: '↘', name: 'lower right' },
 ]
 
 export const SHOT_TYPES = [

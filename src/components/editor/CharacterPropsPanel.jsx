@@ -108,7 +108,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
       {/* Direction */}
       <div>
         <label className="label">dirección</label>
-        <div className="radio-group">
+        <div className="radio-group" style={{ flexWrap: 'wrap' }}>
           {DIRECTIONS.map(d => (
             <div
               key={d.id}
