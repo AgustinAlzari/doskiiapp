@@ -2,6 +2,8 @@ import { useState } from 'react'
 import useObjectStore from '../../store/objectStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import { OBJECT_EXTRACTOR_PROMPT } from '../../data/objectExtractorPrompt'
+import { copyToClipboard } from '../../utils/clipboard'
 
 export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
   const save = useObjectStore(s => s.save)
@@ -11,8 +13,15 @@ export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
   const [promptText, setPromptText] = useState(object?.promptText || '')
   const [color, setColor] = useState(object?.color || '#ff9500')
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [referenceImages, setReferenceImages] = useState(object?.referenceImages || [])
   const draftId = object?.id || 'draft-object'
+
+  const copyExtractor = async () => {
+    await copyToClipboard(OBJECT_EXTRACTOR_PROMPT)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -47,13 +56,26 @@ export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
         <ReferenceImagePicker entityId={draftId} entityName={name} value={referenceImages} onChange={setReferenceImages} />
 
         <div>
-          <label className="label">prompt del objeto</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label className="label" style={{ marginBottom: 0 }}>prompt del objeto</label>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11 }}
+              onClick={copyExtractor}
+            >
+              {copied ? 'copiado ✓' : 'copiar extractor'}
+            </button>
+          </div>
           <AutoTextarea
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describe el objeto: apariencia, material, tamaño, estilo..."
             minRows={4}
           />
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            pegá el "copiar extractor" en una IA multimodal junto con la imagen del objeto, y pegá su respuesta acá.
+          </div>
         </div>
 
         <div>

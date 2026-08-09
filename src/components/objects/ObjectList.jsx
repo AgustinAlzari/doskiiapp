@@ -26,7 +26,7 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
   const remove = useObjectStore(s => s.remove)
   const save = useObjectStore(s => s.save)
   const projects = useProjectStore(s => s.projects)
-  const scoped = objects.filter(o => o.projectId === projectId)
+  const scoped = objects.filter(o => o.projectId === projectId && !o.comodin)
 
   const copyToProject = async (obj, targetId) => {
     await save({

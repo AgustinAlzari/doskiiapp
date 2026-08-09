@@ -500,6 +500,17 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                         <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setSelectedObjIdx(null)}>×</button>
                       </div>
                       <div style={{ marginTop: 12 }}>
+                        {selectedObjDef.comodin && (
+                          <div style={{ marginBottom: 12 }}>
+                            <label className="label">qué es este objeto</label>
+                            <AutoTextarea
+                              value={selectedObjData.comodinDesc || ''}
+                              onChange={e => updateObjectInPanel(selectedPanelIdx, selectedObjIdx, { comodinDesc: e.target.value })}
+                              placeholder="ej. 'un microondas abandonado lleno de moscas'..."
+                              minRows={3}
+                            />
+                          </div>
+                        )}
                         <label className="label">sobre el objeto</label>
                         <AutoTextarea
                           value={selectedObjData.note || ''}
@@ -632,7 +643,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                           >
                             <span className="color-dot" style={{ background: char.color || '#999' }} />
                             {char.name}
-                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeCharacterFromPanel(selectedPanelIdx, idx) }}>×</span>
+                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeCharacterFromPanel(selectedPanelIdx, idx) }}>x</span>
                           </span>
                         ) : null
                       })}
@@ -651,6 +662,18 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       <option key={bg.id} value={bg.id}>{bg.name}</option>
                     ))}
                   </select>
+                  {(() => {
+                    const bgDef = panel?.backgroundId ? backgrounds.find(b => b.id === panel.backgroundId) : null
+                    if (!bgDef?.comodin) return null
+                    return (
+                      <AutoTextarea
+                        value={panel?.comodinDesc || ''}
+                        onChange={e => updatePanel(selectedPanelIdx, { comodinDesc: e.target.value })}
+                        placeholder="qué es este fondo: ej. 'un baldío detrás de un supermercado'..."
+                        minRows={3}
+                      />
+                    )
+                  })()}
 
                   {/* Objects */}
                   <select
@@ -677,7 +700,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                           >
                             <span className="color-dot" style={{ background: obj.color || '#999' }} />
                             {obj.name}
-                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeObjectFromPanel(selectedPanelIdx, idx) }}>×</span>
+                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeObjectFromPanel(selectedPanelIdx, idx) }}>x</span>
                           </span>
                         ) : null
                       })}

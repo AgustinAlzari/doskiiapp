@@ -2,6 +2,8 @@ import { useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import { LANDSCAPE_EXTRACTOR_PROMPT } from '../../data/landscapeExtractorPrompt'
+import { copyToClipboard } from '../../utils/clipboard'
 
 export default function BackgroundForm({ background, projectId, onSaved, onCancel }) {
   const save = useBackgroundStore(s => s.save)
@@ -11,8 +13,15 @@ export default function BackgroundForm({ background, projectId, onSaved, onCance
   const [promptText, setPromptText] = useState(background?.promptText || '')
   const [color, setColor] = useState(background?.color || '#34c759')
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [referenceImages, setReferenceImages] = useState(background?.referenceImages || [])
   const draftId = background?.id || 'draft-background'
+
+  const copyExtractor = async () => {
+    await copyToClipboard(LANDSCAPE_EXTRACTOR_PROMPT)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -47,13 +56,26 @@ export default function BackgroundForm({ background, projectId, onSaved, onCance
         <ReferenceImagePicker entityId={draftId} entityName={name} value={referenceImages} onChange={setReferenceImages} />
 
         <div>
-          <label className="label">prompt del fondo</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label className="label" style={{ marginBottom: 0 }}>prompt del fondo</label>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11 }}
+              onClick={copyExtractor}
+            >
+              {copied ? 'copiado ✓' : 'copiar extractor'}
+            </button>
+          </div>
           <AutoTextarea
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describe el fondo: ambiente, iluminación, época, estilo..."
             minRows={4}
           />
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            pegá el "copiar extractor" en una IA multimodal junto con la imagen del paisaje, y pegá su respuesta acá.
+          </div>
         </div>
 
         <div>

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import useCharacterStore from '../../store/characterStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import { CHARACTER_EXTRACTOR_PROMPT } from '../../data/characterExtractorPrompt'
+import { copyToClipboard } from '../../utils/clipboard'
 
 export default function CharacterForm({ character, projectId, onSaved, onCancel }) {
   const save = useCharacterStore(s => s.save)
@@ -11,8 +13,15 @@ export default function CharacterForm({ character, projectId, onSaved, onCancel 
   const [promptText, setPromptText] = useState(character?.promptText || '')
   const [color, setColor] = useState(character?.color || '#007aff')
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [referenceImages, setReferenceImages] = useState(character?.referenceImages || [])
   const draftId = character?.id || 'draft-character'
+
+  const copyExtractor = async () => {
+    await copyToClipboard(CHARACTER_EXTRACTOR_PROMPT)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -47,13 +56,26 @@ export default function CharacterForm({ character, projectId, onSaved, onCancel 
         <ReferenceImagePicker entityId={draftId} entityName={name} value={referenceImages} onChange={setReferenceImages} />
 
         <div>
-          <label className="label">prompt del personaje</label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label className="label" style={{ marginBottom: 0 }}>prompt del personaje</label>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11 }}
+              onClick={copyExtractor}
+            >
+              {copied ? 'copiado ✓' : 'copiar extractor'}
+            </button>
+          </div>
           <AutoTextarea
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describe al personaje: apariencia, ropa, rasgos distintivos..."
             minRows={4}
           />
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            pegá el "copiar extractor" en una IA multimodal junto con la imagen del personaje, y pegá su respuesta acá.
+          </div>
         </div>
 
         <div>

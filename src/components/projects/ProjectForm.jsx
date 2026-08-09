@@ -167,7 +167,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
                   />
                   <ReferenceImagePicker
                     entityId={`balloon-${project?.id || 'new'}-${type.id}`}
-                    entityName={type.fileBase}
+                    entityName={`${type.fileBase}-${(project?.id || 'nuevo').slice(0, 8)}`}
                     value={balloon.fileName && balloon.path ? [balloon] : []}
                     onChange={arr => updateBalloon({ fileName: arr[0]?.fileName, path: arr[0]?.path })}
                     label="imagen (opcional)"

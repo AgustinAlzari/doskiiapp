@@ -3,6 +3,7 @@ import useCharacterStore from './characterStore'
 import useStripStore from './stripStore'
 import useBackgroundStore from './backgroundStore'
 import useObjectStore from './objectStore'
+import { ensureWildcards } from '../data/wildcards'
 
 export const PALETTE_ROLES = [
   { id: 'line', label: 'línea / tinta' },
@@ -86,6 +87,7 @@ const useProjectStore = create((set, get) => ({
     }
     if (window.api?.projects) await window.api.projects.save(updated)
     set(state => ({ projects: upsert(state.projects, updated) }))
+    await ensureWildcards([updated])
     return updated
   },
 
@@ -111,6 +113,7 @@ const useProjectStore = create((set, get) => ({
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
     await useStripStore.getState().load()
+    await ensureWildcards(get().projects)
     return newProject
   },
 
@@ -121,6 +124,7 @@ const useProjectStore = create((set, get) => ({
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
     await useStripStore.getState().load()
+    await ensureWildcards([newProject])
     set(state => ({ projects: upsert(state.projects, newProject) }))
     return newProject
   },
@@ -138,6 +142,7 @@ const useProjectStore = create((set, get) => ({
     await migrate(useBackgroundStore, 'backgrounds')
     await migrate(useObjectStore, 'objects')
     await migrate(useStripStore, 'strips')
+    await ensureWildcards(get().projects)
   },
 }))
 

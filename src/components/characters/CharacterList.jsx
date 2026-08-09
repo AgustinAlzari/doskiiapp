@@ -26,7 +26,7 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
   const remove = useCharacterStore(s => s.remove)
   const save = useCharacterStore(s => s.save)
   const projects = useProjectStore(s => s.projects)
-  const scoped = characters.filter(c => c.projectId === projectId)
+  const scoped = characters.filter(c => c.projectId === projectId && !c.comodin)
 
   const copyToProject = async (char, targetId) => {
     await save({

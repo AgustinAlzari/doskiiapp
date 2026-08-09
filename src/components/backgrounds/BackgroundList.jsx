@@ -26,7 +26,7 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
   const remove = useBackgroundStore(s => s.remove)
   const save = useBackgroundStore(s => s.save)
   const projects = useProjectStore(s => s.projects)
-  const scoped = backgrounds.filter(b => b.projectId === projectId)
+  const scoped = backgrounds.filter(b => b.projectId === projectId && !b.comodin)
 
   const copyToProject = async (bg, targetId) => {
     await save({

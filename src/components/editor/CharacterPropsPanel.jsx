@@ -75,8 +75,24 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
         <span style={{ fontWeight: 500, fontSize: 14 }}>{character.name}</span>
         <div style={{ flex: 1 }} />
         <button className="btn btn-ghost btn-sm" onClick={onEdit} style={{ fontSize: 11 }}>editar</button>
-        <button className="btn btn-ghost btn-sm btn-danger" onClick={onRemove}>×</button>
+        <button className="btn btn-ghost btn-sm btn-danger" onClick={onRemove}>x</button>
       </div>
+
+      {/* Comodín */}
+      {character.comodin && (
+        <div style={{ border: '1px dashed var(--color-border)', borderRadius: 8, padding: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span className="color-dot" style={{ background: character.color }} />
+            <span style={{ fontSize: 12, fontWeight: 600 }}>comodín — aparición única</span>
+          </div>
+          <AutoTextarea
+            value={panelChar.comodinDesc || ''}
+            onChange={e => onUpdate({ comodinDesc: e.target.value })}
+            placeholder="qué es este personaje en este cuadro: ej. 'una laucha que habla'..."
+            minRows={3}
+          />
+        </div>
+      )}
 
       {/* Expression */}
       <div>

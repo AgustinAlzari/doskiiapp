@@ -62,7 +62,7 @@ export function projectStyleText(project) {
 
 export function paletteText(project) {
   if (!project) return ''
-  if (project.colorMode === 'bw') return 'COLOR PALETTE: black-and-white line art. Grayscale only, no color.'
+  if (project.colorMode === 'bw') return 'COLOR PALETTE: pure black ink on white paper — black-and-white line art. Draw with solid black strokes and solid black ink accents only. NO gray midtones, NO gray fills, NO flat gray areas, NO shading with gray tones, NO color.'
   const colors = (project.palette || []).filter(c => c.hex)
   if (!colors.length) return ''
   const parts = colors.map(c => `${c.label || c.role}: ${c.hex}`)
@@ -94,7 +94,7 @@ const DIALOGUE_TYPE_LABELS = {
 function dialoguePlacementText(d) {
   const cx = Math.round((d.x + d.width / 2) * 100)
   const cy = Math.round((d.y + d.height / 2) * 100)
-  const zone = cy < 0.33 ? 'in the upper area' : cy > 0.66 ? 'in the lower area' : 'in the middle area'
+  const zone = cy < 33 ? 'in the upper area' : cy > 66 ? 'in the lower area' : 'in the middle area'
   return `${zone} (balloon center at x ${cx}%, y ${cy}%)`
 }
 
@@ -192,6 +192,16 @@ export function layoutFileNameFor(strip, panelIndex) {
   return `${base}-layout-${panelIndex + 1}.jpg`
 }
 
+export function sceneLayoutFileNameFor(strip, panelIndex) {
+  const base = (strip?.id || 'strip').slice(0, 8)
+  return `${base}-scene-${panelIndex + 1}.jpg`
+}
+
+export function letteringLayoutFileNameFor(strip, panelIndex) {
+  const base = (strip?.id || 'strip').slice(0, 8)
+  return `${base}-dialogos-${panelIndex + 1}.jpg`
+}
+
 export function usedBalloonTypes(panel) {
   const types = new Set()
   if (panel?.narration?.text) types.add('narration')
@@ -235,58 +245,55 @@ function balloonGraphicsText(project, panel) {
   return lines.join('\n')
 }
 
-export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null) {
-  const lines = []
+function computeContext(panel, characters = [], backgrounds = [], objects = [], stripAspectRatio = null, project = null) {
   const chars = Array.isArray(characters) ? characters : []
   const bgs = Array.isArray(backgrounds) ? backgrounds : []
   const objs = Array.isArray(objects) ? objects : []
   const panelCharacters = panel.characters || []
   const panelConnections = panel.connections || []
-  const outgoing = new Map()
   const connectedCharacters = new Set()
-  const resolvedAspect = resolveAspectRatio(stripAspectRatio, project)
-  const ar = ASPECT_RATIOS.find(item => item.id === resolvedAspect)
-  const ratioLabel = ar ? ar.ratio : 'defined'
-
   panelConnections.forEach(connection => {
     const targetName = connectionTargetName(connection, chars, objs, bgs)
     const source = chars.find(item => item.id === connection.from)
     if (source && targetName) {
-      outgoing.set(source.id, targetName)
       connectedCharacters.add(source.id)
       if ((connection.toType || 'character') === 'character') connectedCharacters.add(connection.to)
     }
   })
+  const resolvedAspect = resolveAspectRatio(stripAspectRatio, project)
+  const ar = ASPECT_RATIOS.find(item => item.id === resolvedAspect)
+  const ratioLabel = ar ? ar.ratio : 'defined'
+  return { chars, bgs, objs, panelCharacters, panelConnections, connectedCharacters, resolvedAspect, ratioLabel }
+}
 
-  // --- HEADER ---
-  const layoutFileName = layoutFileNameFor(strip, panelIndex)
-  lines.push(`IMAGE FORMAT: ${ratioLabel}. The final canvas must have exactly a ${ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this rectangle.`)
-  lines.push(`POSITIONAL LAYOUT: The file "${layoutFileName}" is a layout reference image showing exact element sizes, positions, and spatial relationships. Use it as a precise compositional guide.`)
-  lines.push('')
+function headerLines(ctx, layoutFileName) {
+  return [
+    `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this rectangle.`,
+    `POSITIONAL LAYOUT: The file "${layoutFileName}" is a layout reference image showing exact element sizes, positions, and spatial relationships. Use it as a precise compositional guide.`,
+    '',
+  ]
+}
 
+function stylePaletteLines(project, generalStyle) {
+  const lines = []
   const projectStyle = projectStyleText(project)
   const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
   if (styleText) {
     lines.push(`GLOBAL STYLE: ${styleText}`)
     lines.push('')
   }
-
   const palette = paletteText(project)
   if (palette) {
     lines.push(palette)
     lines.push('')
   }
-
-  const balloons = balloonGraphicsText(project, panel)
-  if (balloons) {
-    lines.push(balloons)
-    lines.push('')
-  }
-
   lines.push('ATTACHED REFERENCES: for any element with an attached reference image, preserve its identity, form, materials, and distinctive features exactly, in the same line-art style as the rest of the panel.')
   lines.push('')
+  return lines
+}
 
-  // --- SCENE ---
+function sceneBodyLines(ctx, panel, styleText = '') {
+  const lines = []
   if (panel.timeTransition) {
     const transition = TIME_TRANSITIONS.find(item => item.id === panel.timeTransition)
     if (transition) lines.push(`TIME TRANSITION: ${transition.label}.`)
@@ -303,45 +310,51 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
     if (hatch) lines.push(`GRAPHIC TREATMENT: ${hatch.name}; ${hatch.desc}.`)
   }
 
-  // --- LAYERS ---
   lines.push('')
   lines.push('LAYERS AND DEPTH (back to front): landscape, then objects, then characters.')
   if (panel.backgroundId) {
-    const backgroundDef = bgs.find(item => item.id === panel.backgroundId)
+    const backgroundDef = ctx.bgs.find(item => item.id === panel.backgroundId)
     if (backgroundDef) {
       const background = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
       const placement = describeLandscapePlacement(background)
-      lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${backgroundDef.promptText}.${referenceText(backgroundDef)} ${placement}`)
+      const prompt = backgroundDef.comodin
+        ? `ONE-OFF BACKGROUND — ${panel.comodinDesc?.trim() ? panel.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
+        : `${backgroundDef.promptText}.${referenceText(backgroundDef)}`
+      lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${prompt} ${placement}`)
     }
   } else {
     lines.push('- No landscape defined: do not invent a dominant background.')
   }
 
-  // --- OBJECTS ---
   const panelObjects = panel.objects || []
   if (panelObjects.length > 0) {
     lines.push('')
     lines.push('OBJECTS IN SCENE:')
     panelObjects.forEach(item => {
-      const definition = objs.find(object => object.id === item.objectId)
+      const definition = ctx.objs.find(object => object.id === item.objectId)
       if (!definition) return
       const { size } = describePosition(item.x, item.y, item.width, item.height)
-      lines.push(`- "${definition.name}": ${definition.promptText}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
+      const prompt = definition.comodin
+        ? `ONE-OFF OBJECT — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
+        : `${definition.promptText}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''}`
+      lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     })
   }
 
-  // --- CHARACTERS ---
   lines.push('')
   lines.push('CHARACTERS AND ACTIONS:')
   const characterOccurrences = new Map()
-  panelCharacters.forEach(item => {
-    const definition = chars.find(character => character.id === item.characterId)
+  ctx.panelCharacters.forEach(item => {
+    const definition = ctx.chars.find(character => character.id === item.characterId)
     if (!definition) return
     const occurrence = (characterOccurrences.get(item.characterId) || 0) + 1
     characterOccurrences.set(item.characterId, occurrence)
     const instanceName = `${definition.name} ${occurrence}`
     const { size } = describePosition(item.x, item.y, item.width, item.height)
-    lines.push(`- CHARACTER "${instanceName}": ${definition.promptText}.${referenceText(definition)} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
+    const prompt = definition.comodin
+      ? `ONE-OFF CHARACTER — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
+      : `${definition.promptText}.${referenceText(definition)}`
+    lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     if (item.expression) lines.push(`  Expression: ${item.expression}.`)
     if (item.actions?.length > 0) {
       lines.push(`  Action: ${item.actions.join(', ')}.`)
@@ -355,27 +368,33 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
       lines.push(`  Action description: ${item.actionNotes}.`)
     }
 
-    if (!connectedCharacters.has(item.characterId)) {
+    if (!ctx.connectedCharacters.has(item.characterId)) {
       const direction = DIRECTIONS.find(value => value.id === item.direction)
       if (direction) lines.push(`  Body orientation: ${direction.name}.`)
     }
   })
 
-  // --- DIALOGUES ---
-  const orderedDialogues = orderedPanelDialogues(panel, chars)
-
-  // --- VISUAL RELATIONSHIPS ---
-  if (panelConnections.length > 0) {
+  if (ctx.panelConnections.length > 0) {
     lines.push('')
     lines.push('VISUAL RELATIONSHIPS:')
-    panelConnections.forEach(connection => {
-      const source = chars.find(item => item.id === connection.from)
-      const target = connectionTargetName(connection, chars, objs, bgs)
+    ctx.panelConnections.forEach(connection => {
+      const source = ctx.chars.find(item => item.id === connection.from)
+      const target = connectionTargetName(connection, ctx.chars, ctx.objs, ctx.bgs)
       if (source && target) lines.push(`- ${source.name} looks at ${target}. Gaze and visual attention must be directed toward that target.`)
     })
   }
 
-  // --- TEXT ELEMENTS ---
+  return lines
+}
+
+function letteringLines(ctx, panel, project, layoutFileName) {
+  const lines = []
+  const balloons = balloonGraphicsText(project, panel)
+  if (balloons) {
+    lines.push(balloons)
+    lines.push('')
+  }
+
   const panelSfx = panel.sfx || []
   const hasNarration = panel.narration && panel.narration.text
   if (hasNarration || panelSfx.some(item => item.text)) {
@@ -394,11 +413,15 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
     })
   }
 
-  // Narration gaze
   if (hasNarration) {
-    panelCharacters.forEach(item => {
+    const characterOccurrences = new Map()
+    ctx.panelCharacters.forEach(item => {
+      const occurrence = (characterOccurrences.get(item.characterId) || 0) + 1
+      characterOccurrences.set(item.characterId, occurrence)
+    })
+    ctx.panelCharacters.forEach(item => {
       if (item.gazeTarget?.type === 'narration') {
-        const definition = chars.find(character => character.id === item.characterId)
+        const definition = ctx.chars.find(character => character.id === item.characterId)
         if (definition) {
           const occurrence = characterOccurrences.get(item.characterId) || 1
           lines.push(`  GAZE: ${definition.name} ${occurrence} looks at the narration box.`)
@@ -407,7 +430,7 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
     })
   }
 
-  // --- DIALOGUE SEQUENCE (reinforcement) ---
+  const orderedDialogues = orderedPanelDialogues(panel, ctx.chars)
   if (orderedDialogues.length > 0) {
     lines.push('')
     lines.push('DIALOGUE SEQUENCE — STRICT, MUST BE REPRODUCED EXACTLY (verbatim, in this logical order):')
@@ -418,23 +441,70 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
       const typeLabel = DIALOGUE_TYPE_LABELS[d.type] || d.type
       const prev = lastByChar[d.name]
       const linked = prev != null
-        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. If you wish to show the connection, draw only a thin dashed line between them. Keep a clear visible gap between these balloons and any balloon from another speaker.`
+        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. To show the connection, draw only a thin SOLID line between them (the comic "air" connector), never dashed or dotted. Keep a clear visible gap between these balloons and any balloon from another speaker.`
         : ''
       lastByChar[d.name] = d.number
       if (idx === 0) {
-        lines.push(`${d.number}. "${d.label}" speaks FIRST: his balloon is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.`)
+        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.`)
       } else {
-        lines.push(`${d.number}. "${d.label}" responds: his balloon is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${linked}`)
+        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${linked}`)
       }
     })
 
     lines.push('BALLOON STYLE AND LETTERING: strictly follow the balloon style defined in BALLOON GRAPHICS above; do not alter the wording, the lettering, or the balloon shape.')
   }
 
-  // --- FOOTER ---
-  lines.push('')
-  lines.push(`FINAL REMINDER: Generate a single comic panel in ${ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutFileName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`)
-  lines.push(`FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from the character it belongs to, and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`)
+  return lines
+}
+
+export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null) {
+  const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
+  const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
+  const projectStyle = projectStyleText(project)
+  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  const lines = [
+    ...headerLines(ctx, layoutName),
+    ...stylePaletteLines(project, generalStyle),
+    'LETTERING LOCK: This prompt describes the SCENE layer only, WITHOUT any dialogue or lettering. Do NOT draw any speech balloons, thought bubbles, narration boxes, captions, or sound-effect words. Do not write any text, letters, or typography anywhere in the image. Do not leave blank outlines, circles, or box placeholders hinting at future balloons. The scene must stand alone as a text-free panel; lettering is added later in a separate step.',
+    '',
+    ...sceneBodyLines(ctx, panel, styleText),
+    '',
+    `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved, and with NO text, lettering, or balloons of any kind. Use "${layoutName}" strictly as a spatial guide for where each scene element sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
+  ]
+  return lines.join('\n')
+}
+
+export function generateLetteringPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null) {
+  const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
+  const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
+  const lines = [
+    `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate.`,
+    `POSITIONAL LAYOUT: The file "${layoutName}" is a layout reference image showing the exact positions, sizes, and order of the lettering elements (balloons, narration, sound effects) on the canvas. Use it as a precise guide.`,
+    '',
+    'SCENE LOCK: You are given the finished scene image generated in the previous step (attach it as the input image). Keep EVERYTHING in that scene EXACTLY as it is — do NOT redraw, recolor, move, resize, or alter any character, object, background, lighting, expression, line style, or detail. Do NOT change the composition or the aspect ratio. ONLY add the lettering elements described below, placed precisely where indicated.',
+    '',
+    ...letteringLines(ctx, panel, project, layoutName),
+    '',
+    `FINAL REMINDER — LETTERING ONLY: Keep the scene image unchanged and add ONLY the lettering specified above (balloons, narration, sound effects), at the exact coordinates given and following "${layoutName}" for placement. Do not modify anything else. DO NOT CHANGE THE ASPECT RATIO.`,
+    `FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from the character it belongs to, and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`,
+  ]
+  return lines.join('\n')
+}
+
+export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null) {
+  const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
+  const layoutName = layoutFileNameFor(strip, panelIndex)
+  const projectStyle = projectStyleText(project)
+  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  const lines = [
+    ...headerLines(ctx, layoutName),
+    ...stylePaletteLines(project, generalStyle),
+    ...sceneBodyLines(ctx, panel, styleText),
+    ...letteringLines(ctx, panel, project, layoutName),
+    '',
+    `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
+    `FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from the character it belongs to, and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`,
+  ]
   return lines.join('\n')
 }
 
