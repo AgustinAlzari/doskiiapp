@@ -1,92 +1,10 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
-import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonTypes, orderedPanelDialogues, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
-import { ASPECT_RATIOS } from '../../data/actionPresets'
+import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonTypes, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
+import { generateLayoutSVG } from '../../services/layoutSvg'
 
-function generateCanvasSVG(panel, characters, backgrounds, objects, stripAspectRatio, mode = 'scene') {
-  const ar = ASPECT_RATIOS.find(a => a.id === stripAspectRatio)
-  const ratioParts = ar ? ar.ratio.split(':').map(Number) : [16, 9]
-  const svgW = 400
-  const svgH = Math.round(svgW * (ratioParts[1] / ratioParts[0]))
-
-  const rects = []
-
-  if (mode === 'scene') {
-    if (panel.backgroundId) {
-      const bg = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
-      const def = backgrounds.find(b => b.id === panel.backgroundId)
-      rects.push({ x: bg.x * svgW, y: bg.y * svgH, w: bg.width * svgW, h: bg.height * svgH, stroke: '#999', fill: 'rgba(0,0,0,0.04)', label: def?.name || 'fondo' })
-    }
-
-    ;(panel.characters || []).forEach((ch, i) => {
-      const def = characters.find(c => c.id === ch.characterId)
-      rects.push({ x: ch.x * svgW, y: ch.y * svgH, w: ch.width * svgW, h: ch.height * svgH, stroke: def?.color || '#333', fill: 'none', label: def?.name || `P${i + 1}` })
-    })
-
-    ;(panel.objects || []).forEach((obj, i) => {
-      const def = objects.find(o => o.id === obj.objectId)
-      rects.push({ x: obj.x * svgW, y: obj.y * svgH, w: obj.width * svgW, h: obj.height * svgH, stroke: def?.color || '#666', fill: 'none', label: def?.name || `O${i + 1}` })
-    })
-  } else {
-    if (panel.narration && panel.narration.text) {
-      const n = panel.narration
-      rects.push({ x: n.x * svgW, y: n.y * svgH, w: n.width * svgW, h: n.height * svgH, stroke: '#007aff', fill: 'none', dash: n.framed ? 'none' : '4 3', label: 'narración' })
-    }
-
-    const balloons = orderedPanelDialogues(panel, characters || [])
-    balloons.forEach(b => {
-      rects.push({ x: b.x * svgW, y: b.y * svgH, w: b.width * svgW, h: b.height * svgH, stroke: b.type === 'thought' ? '#7d3cff' : '#e04040', fill: 'rgba(0,0,0,0.03)', dash: '4 3', label: `${b.number}. ${b.label}` })
-    })
-
-    ;(panel.sfx || []).forEach((s) => {
-      if (s.text) rects.push({ x: s.x * svgW, y: s.y * svgH, w: s.width * svgW, h: s.height * svgH, stroke: '#e67e22', fill: 'none', label: s.text })
-    })
-  }
-
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}">`
-  svg += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="white" stroke="#000" stroke-width="1"/>`
-
-  rects.forEach(r => {
-    const dash = r.dash ? ` stroke-dasharray="${r.dash}"` : ''
-    svg += `<rect x="${Math.round(r.x)}" y="${Math.round(r.y)}" width="${Math.round(r.w)}" height="${Math.round(r.h)}" fill="${r.fill}" stroke="${r.stroke}" stroke-width="1.5"${dash}/>`
-    const labelX = Math.round(r.x + r.w / 2)
-    const labelY = Math.round(r.y + r.h / 2)
-    svg += `<text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="10" fill="${r.stroke}">${r.label}</text>`
-  })
-
-  if (mode === 'lettering') {
-    const balloons = orderedPanelDialogues(panel, characters || [])
-    const byInstance = {}
-    balloons.forEach(b => { (byInstance[b.name] = byInstance[b.name] || []).push(b) })
-    Object.values(byInstance).forEach(list => {
-      for (let i = 0; i < list.length - 1; i++) {
-        const a = list[i]
-        const b = list[i + 1]
-        const x1 = Math.round((a.x + a.width / 2) * svgW)
-        const y1 = Math.round((a.y + a.height / 2) * svgH)
-        const x2 = Math.round((b.x + b.width / 2) * svgW)
-        const y2 = Math.round((b.y + b.height / 2) * svgH)
-        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c0392b" stroke-width="0.5"/>`
-      }
-    })
-    Object.values(byInstance).forEach(list => {
-      const last = list[list.length - 1]
-      const ch = (panel.characters || [])[last.charIdx]
-      if (!ch) return
-      const bx = Math.round((last.x + last.width / 2) * svgW)
-      const by = Math.round((last.y + last.height / 2) * svgH)
-      const cx = Math.round((ch.x + ch.width / 2) * svgW)
-      const cy = Math.round((ch.y + ch.height * 0.3) * svgH)
-      svg += `<line x1="${bx}" y1="${by}" x2="${cx}" y2="${cy}" stroke="#c0392b" stroke-width="0.5"/>`
-    })
-  }
-
-  svg += '</svg>'
-  return svg
-}
-
-export default function PromptExporter({ strip, characters, project }) {
+export default function PromptExporter({ strip, characters, project, balloons }) {
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
   const [copied, setCopied] = useState(null)
@@ -104,7 +22,7 @@ export default function PromptExporter({ strip, characters, project }) {
 
   let allPrompts = ''
   try {
-    allPrompts = generateAllPanelsPrompt(strip, chars, bgs, objs, project)
+    allPrompts = generateAllPanelsPrompt(strip, chars, bgs, objs, project, balloons)
   } catch {
     allPrompts = 'Error generando prompts'
   }
@@ -115,8 +33,8 @@ export default function PromptExporter({ strip, characters, project }) {
     for (let i = 0; i < (strip.panels || []).length; i++) {
       try {
         const panel = strip.panels[i]
-        const sceneSvg = generateCanvasSVG(panel, chars, bgs, objs, resolvedAspect, 'scene')
-        const letteringSvg = generateCanvasSVG(panel, chars, bgs, objs, resolvedAspect, 'lettering')
+        const sceneSvg = generateLayoutSVG(panel, chars, bgs, objs, resolvedAspect, 'scene')
+        const letteringSvg = generateLayoutSVG(panel, chars, bgs, objs, resolvedAspect, 'lettering')
         const scenePath = await svgToJPG(sceneSvg, sceneLayoutFileNameFor(strip, i))
         const letteringPath = await svgToJPG(letteringSvg, letteringLayoutFileNameFor(strip, i))
         if (scenePath) setSvgPaths(prev => ({ ...prev, [`${i}:scene`]: scenePath }))
@@ -198,17 +116,32 @@ export default function PromptExporter({ strip, characters, project }) {
   }
 
   const balloonRefs = (() => {
-    const balloons = project?.balloons
-    if (!balloons) return []
-    const used = new Set()
-    ;(strip.panels || []).forEach(panel => usedBalloonTypes(panel).forEach(t => used.add(t)))
-    const label = { narration: 'globo narrador', speech: 'globo diálogo', thought: 'globo pensamiento' }
-    return [...used].filter(type => balloons[type]?.fileName).map(type => ({
-      fileName: balloons[type].fileName,
-      path: balloons[type].path,
-      entityName: label[type] || 'globo',
-      balloonType: type,
-    }))
+    const usedEntityIds = new Set()
+    ;(strip.panels || []).forEach(panel => {
+      usedBalloonTypes(panel).forEach(type => {
+        const eid = project?.balloons?.[type]?.entityId
+        if (eid) usedEntityIds.add(eid)
+      })
+      ;(panel.characters || []).forEach(c => {
+        if (c.balloonId) usedEntityIds.add(c.balloonId)
+        ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) usedEntityIds.add(e.balloonId) })
+      })
+      if (panel.narration?.balloonId) usedEntityIds.add(panel.narration.balloonId)
+      ;(panel.globosX || []).forEach(g => { if (g.balloonId) usedEntityIds.add(g.balloonId) })
+    })
+    const refs = []
+    usedEntityIds.forEach(id => {
+      const entity = (balloons || []).find(b => b.id === id)
+      if (!entity) return
+      ;(entity.referenceImages || []).forEach(r => refs.push({ ...r, entityName: entity.name, balloonType: entity.kind }))
+    })
+    ;(strip.panels || []).forEach(panel => {
+      usedBalloonTypes(panel).forEach(type => {
+        const cfg = project?.balloons?.[type]
+        if (cfg?.fileName && cfg?.path) refs.push({ fileName: cfg.fileName, path: cfg.path, entityName: `globo ${type}`, balloonType: type })
+      })
+    })
+    return refs
   })()
 
   const references = [
@@ -302,7 +235,7 @@ export default function PromptExporter({ strip, characters, project }) {
         let letteringPrompt = ''
         try {
           scenePrompt = generateScenePrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, sceneLayoutFileNameFor(strip, i))
-          letteringPrompt = generateLetteringPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, letteringLayoutFileNameFor(strip, i))
+          letteringPrompt = generateLetteringPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, letteringLayoutFileNameFor(strip, i), balloons)
         } catch (err) {
           console.error(`Error generando prompt cuadro ${i}:`, err)
           scenePrompt = `Error generando prompt: ${err.message}`

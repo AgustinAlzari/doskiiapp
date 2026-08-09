@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld('api', {
     save: (o) => ipcRenderer.invoke('objects:save', o),
     delete: (id) => ipcRenderer.invoke('objects:delete', id),
   },
+  balloons: {
+    list: () => ipcRenderer.invoke('balloons:list'),
+    save: (b) => ipcRenderer.invoke('balloons:save', b),
+    delete: (id) => ipcRenderer.invoke('balloons:delete', id),
+  },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
     save: (p) => ipcRenderer.invoke('projects:save', p),

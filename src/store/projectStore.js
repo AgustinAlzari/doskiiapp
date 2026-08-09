@@ -3,6 +3,7 @@ import useCharacterStore from './characterStore'
 import useStripStore from './stripStore'
 import useBackgroundStore from './backgroundStore'
 import useObjectStore from './objectStore'
+import useBalloonStore from './balloonStore'
 import { ensureWildcards } from '../data/wildcards'
 
 export const PALETTE_ROLES = [
@@ -17,7 +18,15 @@ export const BALLOON_TYPES = [
   { id: 'narration', label: 'narrador', fileBase: 'globo-narrador', prompt: 'NARRATION' },
   { id: 'speech', label: 'diálogo', fileBase: 'globo-dialogo', prompt: 'DIALOGUE' },
   { id: 'thought', label: 'pensar', fileBase: 'globo-pensar', prompt: 'THOUGHT' },
+  { id: 'other', label: 'globo x', fileBase: 'globo-x', prompt: 'OTHER' },
 ]
+
+export const BALLOON_KIND_LABELS = {
+  narration: 'narración',
+  speech: 'diálogo',
+  thought: 'pensamiento',
+  other: 'globo x',
+}
 
 export const COLOR_MODES = [
   { id: 'bw', label: 'B&N' },
@@ -39,9 +48,10 @@ export const makeDefaultProject = () => ({
   colorMode: 'bw',
   palette: [],
   balloons: {
-    narration: { description: '' },
-    speech: { description: '' },
-    thought: { description: '' },
+    narration: { entityId: null, description: '' },
+    speech: { entityId: null, description: '' },
+    thought: { entityId: null, description: '' },
+    other: { entityId: null, description: '' },
   },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -102,6 +112,7 @@ const useProjectStore = create((set, get) => ({
     await useCharacterStore.getState().load()
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
+    await useBalloonStore.getState().load()
     await useStripStore.getState().load()
   },
 
@@ -112,6 +123,7 @@ const useProjectStore = create((set, get) => ({
     await useCharacterStore.getState().load()
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
+    await useBalloonStore.getState().load()
     await useStripStore.getState().load()
     await ensureWildcards(get().projects)
     return newProject
@@ -123,6 +135,7 @@ const useProjectStore = create((set, get) => ({
     await useCharacterStore.getState().load()
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
+    await useBalloonStore.getState().load()
     await useStripStore.getState().load()
     await ensureWildcards([newProject])
     set(state => ({ projects: upsert(state.projects, newProject) }))
@@ -141,9 +154,39 @@ const useProjectStore = create((set, get) => ({
     await migrate(useCharacterStore, 'characters')
     await migrate(useBackgroundStore, 'backgrounds')
     await migrate(useObjectStore, 'objects')
+    await migrate(useBalloonStore, 'balloons')
     await migrate(useStripStore, 'strips')
+    await migrateProjectBalloonEntities(get(), useBalloonStore, BALLOON_TYPES)
     await ensureWildcards(get().projects)
   },
 }))
+
+async function migrateProjectBalloonEntities(store, balloonStore, balloonTypes) {
+  for (const project of store.get().projects) {
+    const balloons = project.balloons || {}
+    let changed = false
+    for (const kind of balloonTypes.map(t => t.id)) {
+      const cfg = balloons[kind] || {}
+      if (!cfg.entityId && cfg.description?.trim()) {
+        const label = balloonTypes.find(t => t.id === kind)?.label || kind
+        const entity = await balloonStore.getState().save({
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          name: `Globo ${label} (heredado)`,
+          kind,
+          text: '',
+          promptText: cfg.description.trim(),
+          color: '#7a7a7a',
+          comodin: false,
+        })
+        cfg.entityId = entity.id
+        changed = true
+      }
+    }
+    if (changed) {
+      await store.getState().save({ ...project, balloons })
+    }
+  }
+}
 
 export default useProjectStore

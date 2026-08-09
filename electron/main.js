@@ -45,6 +45,7 @@ function ensureDataDirs() {
   ensureDir(path.join(DATA_DIR, 'strips'));
   ensureDir(path.join(DATA_DIR, 'backgrounds'));
   ensureDir(path.join(DATA_DIR, 'objects'));
+  ensureDir(path.join(DATA_DIR, 'balloons'));
   ensureDir(path.join(DATA_DIR, 'references'));
 }
 
@@ -265,6 +266,27 @@ ipcMain.handle('objects:delete', async (_, id) => {
   return true;
 });
 
+// --- IPC: Balloons ---
+ipcMain.handle('balloons:list', async () => {
+  ensureDataDirs();
+  const dir = path.join(DATA_DIR, 'balloons');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+});
+
+ipcMain.handle('balloons:save', async (_, balloon) => {
+  ensureDataDirs();
+  const filePath = path.join(DATA_DIR, 'balloons', `${balloon.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(balloon, null, 2), 'utf-8');
+  return balloon;
+});
+
+ipcMain.handle('balloons:delete', async (_, id) => {
+  const filePath = path.join(DATA_DIR, 'balloons', `${id}.json`);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  return true;
+});
+
 // --- IPC: Projects ---
 ipcMain.handle('projects:list', async () => {
   ensureDataDirs();
@@ -293,6 +315,7 @@ ipcMain.handle('projects:deleteAll', async (_, projectId) => {
   deleteOwned(path.join(DATA_DIR, 'characters'));
   deleteOwned(path.join(DATA_DIR, 'backgrounds'));
   deleteOwned(path.join(DATA_DIR, 'objects'));
+  deleteOwned(path.join(DATA_DIR, 'balloons'));
   deleteOwned(path.join(DATA_DIR, 'strips'));
   const p = path.join(DATA_DIR, 'projects', `${projectId}.json`);
   if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -330,6 +353,7 @@ ipcMain.handle('projects:duplicate', async (_, projectId) => {
   cloneEntities(path.join(DATA_DIR, 'characters'));
   cloneEntities(path.join(DATA_DIR, 'backgrounds'));
   cloneEntities(path.join(DATA_DIR, 'objects'));
+  cloneEntities(path.join(DATA_DIR, 'balloons'));
 
   readJsonDir(path.join(DATA_DIR, 'strips')).filter(s => s.projectId === projectId).forEach(strip => {
     const newId = crypto.randomUUID();
@@ -352,9 +376,10 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
   const characters = readJsonDir(path.join(DATA_DIR, 'characters')).filter(c => c.projectId === projectId);
   const backgrounds = readJsonDir(path.join(DATA_DIR, 'backgrounds')).filter(b => b.projectId === projectId);
   const objects = readJsonDir(path.join(DATA_DIR, 'objects')).filter(o => o.projectId === projectId);
+  const balloons = readJsonDir(path.join(DATA_DIR, 'balloons')).filter(b => b.projectId === projectId);
 
   const refNames = new Set();
-  [...characters, ...backgrounds, ...objects].forEach(e => (e.referenceImages || []).forEach(r => {
+  [...characters, ...backgrounds, ...objects, ...balloons].forEach(e => (e.referenceImages || []).forEach(r => {
     const name = safeRefName(e, r);
     if (name) refNames.add(name);
   }));
@@ -377,6 +402,7 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
     characters,
     backgrounds,
     objects,
+    balloons,
     references,
   };
   fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');
@@ -409,6 +435,7 @@ ipcMain.handle('projects:import', async (_, filePath) => {
   importEntities(path.join(DATA_DIR, 'characters'), bundle.characters);
   importEntities(path.join(DATA_DIR, 'backgrounds'), bundle.backgrounds);
   importEntities(path.join(DATA_DIR, 'objects'), bundle.objects);
+  importEntities(path.join(DATA_DIR, 'balloons'), bundle.balloons);
 
   (bundle.strips || []).forEach(s => {
     const newId = crypto.randomUUID();

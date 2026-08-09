@@ -1,0 +1,39 @@
+{
+  "id": "bbbb0000-0000-4000-8000-000000000006",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc",
+  "name": "Globo susurro",
+  "kind": "speech",
+  "text": "",
+  "promptText": "Globo de susurro: más chico, contorno medio, texto en cursiva y de menor tamaño.",
+  "referenceImages": [],
+  "color": "#7a7a7a",
+  "laws": {
+    "A1": true,
+    "A2": true,
+    "A3": "constante",
+    "A4": "gradual",
+    "A5": "economica",
+    "B1": "organica-sutil",
+    "B2": "medio",
+    "B3": true,
+    "B4": true,
+    "B5": true,
+    "B6": false,
+    "C1": true,
+    "C2": true,
+    "C3": "normal",
+    "C4": true,
+    "C5": true,
+    "C6": [
+      "whisper"
+    ],
+    "C7": true,
+    "C8": true,
+    "D1": true,
+    "D2": true,
+    "D3": true
+  },
+  "comodin": false,
+  "createdAt": "2026-08-09T15:37:12.380Z",
+  "updatedAt": "2026-08-09T15:37:12.380Z"
+}

@@ -4,6 +4,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     { id: 'characters', label: 'personajes', active: ['characters', 'new-character', 'edit-character'] },
     { id: 'backgrounds', label: 'fondos', active: ['backgrounds', 'new-background', 'edit-background'] },
     { id: 'objects', label: 'objetos', active: ['objects', 'new-object', 'edit-object'] },
+    { id: 'balloons', label: 'globos', active: ['balloons', 'new-balloon', 'edit-balloon'] },
     { id: 'edit-project', label: 'proyecto', active: ['edit-project'] },
   ]
 

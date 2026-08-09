@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import useProjectStore, { BALLOON_TYPES } from '../../store/projectStore'
+import useProjectStore, { BALLOON_TYPES, BALLOON_KIND_LABELS } from '../../store/projectStore'
+import useBalloonStore from '../../store/balloonStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import PaletteEditor from './PaletteEditor'
 import ReferenceImagePicker from '../ReferenceImagePicker'
@@ -9,6 +10,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const save = useProjectStore(s => s.save)
   const duplicate = useProjectStore(s => s.duplicate)
   const removeAll = useProjectStore(s => s.removeAll)
+  const projectBalloons = useBalloonStore(s => s.balloons)
   const isNew = !project?.id
 
   const [name, setName] = useState(project?.name || '')
@@ -22,9 +24,10 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [colorMode, setColorMode] = useState(project?.colorMode || 'bw')
   const [palette, setPalette] = useState(project?.palette || [])
   const [balloons, setBalloons] = useState(project?.balloons || {
-    narration: { description: '' },
-    speech: { description: '' },
-    thought: { description: '' },
+    narration: { entityId: null, description: '' },
+    speech: { entityId: null, description: '' },
+    thought: { entityId: null, description: '' },
+    other: { entityId: null, description: '' },
   })
   const [saving, setSaving] = useState(false)
 
@@ -152,29 +155,61 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
           <label className="label" style={{ marginBottom: 8 }}>globos por tipo</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {BALLOON_TYPES.map(type => {
-              const balloon = balloons[type.id] || { description: '' }
+              const balloon = balloons[type.id] || { entityId: null, description: '' }
+              const entity = projectBalloons.find(b => b.id === balloon.entityId)
               const updateBalloon = (updates) => {
                 setBalloons(prev => ({ ...prev, [type.id]: { ...balloon, ...updates } }))
               }
               return (
                 <div key={type.id} style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>globo de {type.label}</span>
-                  <AutoTextarea
-                    value={balloon.description || ''}
-                    onChange={e => updateBalloon({ description: e.target.value })}
-                    placeholder={`descripción del globo de ${type.label}... (se incorpora siempre al prompt)`}
-                    minRows={2}
-                  />
-                  <ReferenceImagePicker
-                    entityId={`balloon-${project?.id || 'new'}-${type.id}`}
-                    entityName={`${type.fileBase}-${(project?.id || 'nuevo').slice(0, 8)}`}
-                    value={balloon.fileName && balloon.path ? [balloon] : []}
-                    onChange={arr => updateBalloon({ fileName: arr[0]?.fileName, path: arr[0]?.path })}
-                    label="imagen (opcional)"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600 }}>globo de {type.label}</span>
+                    {entity && (
+                      <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>usando: {entity.name}</span>
+                    )}
+                  </div>
+                  <select
+                    className="input"
+                    value={balloon.entityId || ''}
+                    onChange={e => updateBalloon({ entityId: e.target.value || null })}
+                    style={{ fontSize: 12, cursor: 'pointer' }}
+                  >
+                    <option value="">(descripción manual)</option>
+                    {projectBalloons
+                      .filter(b => b.projectId === project?.id)
+                      .map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}{b.kind && b.kind !== type.id ? ` · ${BALLOON_KIND_LABELS[b.kind] || b.kind}` : ''}
+                        </option>
+                      ))}
+                  </select>
+                  {entity ? (
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                      {entity.promptText || 'sin descripción'} {entity.text ? ` · texto default: "${entity.text}"` : ''}
+                    </div>
+                  ) : (
+                    <>
+                      <AutoTextarea
+                        value={balloon.description || ''}
+                        onChange={e => updateBalloon({ description: e.target.value })}
+                        placeholder={`descripción del globo de ${type.label}... (se usa solo si no hay entidad)`}
+                        minRows={2}
+                      />
+                      <ReferenceImagePicker
+                        entityId={`balloon-${project?.id || 'new'}-${type.id}`}
+                        entityName={`${type.fileBase}-${(project?.id || 'nuevo').slice(0, 8)}`}
+                        value={balloon.fileName && balloon.path ? [balloon] : []}
+                        onChange={arr => updateBalloon({ fileName: arr[0]?.fileName, path: arr[0]?.path })}
+                        label="imagen (opcional)"
+                      />
+                    </>
+                  )}
                 </div>
               )
             })}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+            definí globos en la sección "globos" del menú para darles estilo y restricciones; acá elegís cuál se usa por tipo.
           </div>
         </div>
 

@@ -10,6 +10,8 @@ import BackgroundList from './components/backgrounds/BackgroundList'
 import BackgroundForm from './components/backgrounds/BackgroundForm'
 import ObjectList from './components/objects/ObjectList'
 import ObjectForm from './components/objects/ObjectForm'
+import BalloonList from './components/balloons/BalloonList'
+import BalloonForm from './components/balloons/BalloonForm'
 import ProjectList from './components/projects/ProjectList'
 import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
@@ -21,6 +23,7 @@ const SCOPED_VIEWS = [
   'characters', 'new-character', 'edit-character',
   'backgrounds', 'new-background', 'edit-background',
   'objects', 'new-object', 'edit-object',
+  'balloons', 'new-balloon', 'edit-balloon',
 ]
 
 export default function App() {
@@ -30,6 +33,7 @@ export default function App() {
   const [editingCharacter, setEditingCharacter] = useState(null)
   const [editingBackground, setEditingBackground] = useState(null)
   const [editingObject, setEditingObject] = useState(null)
+  const [editingBalloon, setEditingBalloon] = useState(null)
   const [promptData, setPromptData] = useState(null)
 
   const projects = useProjectStore(s => s.projects)
@@ -111,7 +115,7 @@ export default function App() {
             project={activeProject}
             onBack={() => setView('strips')}
             onEditCharacter={(char) => { setEditingCharacter(char); setView('edit-character') }}
-            onShowPrompts={(strip, characters) => { setPromptData({ strip, characters }); setView('prompts') }}
+            onShowPrompts={(strip, characters, balloons) => { setPromptData({ strip, characters, balloons }); setView('prompts') }}
           />
         )
 
@@ -122,7 +126,7 @@ export default function App() {
               <button className="btn btn-ghost btn-sm" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
               <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-title)' }}>prompts — {promptData.strip?.title || 'tira'}</span>
             </div>
-            <PromptExporter strip={promptData.strip} characters={promptData.characters} project={activeProject} />
+            <PromptExporter strip={promptData.strip} characters={promptData.characters} project={activeProject} balloons={promptData.balloons || []} />
           </>
         )
 
@@ -183,6 +187,26 @@ export default function App() {
             projectId={activeProjectId}
             onSaved={() => { setEditingObject(null); setView('objects') }}
             onCancel={() => { setEditingObject(null); setView('objects') }}
+          />
+        )
+
+      case 'balloons':
+        return (
+          <BalloonList
+            projectId={activeProjectId}
+            onNew={() => { setEditingBalloon(null); setView('edit-balloon') }}
+            onEdit={(balloon) => { setEditingBalloon(balloon); setView('edit-balloon') }}
+          />
+        )
+
+      case 'edit-balloon':
+      case 'new-balloon':
+        return (
+          <BalloonForm
+            balloon={editingBalloon}
+            projectId={activeProjectId}
+            onSaved={() => { setEditingBalloon(null); setView('balloons') }}
+            onCancel={() => { setEditingBalloon(null); setView('balloons') }}
           />
         )
 

@@ -1,0 +1,74 @@
+{
+  "id": "bbbb0000-0000-4000-8000-000000000101",
+  "title": "ej01 dialogo simple",
+  "generalStyle": "estilo sempé, linea fina, bn, humor nordico cartoon",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "bbbb0000-0000-4000-8000-000000000201",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.1,
+          "y": 0.4,
+          "width": 0.18,
+          "height": 0.5,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "¿Otra vez acá?",
+          "dialogueType": "speech",
+          "dialoguePosition": "top",
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.06,
+            "y": 0.08,
+            "width": 0.32,
+            "height": 0.12
+          }
+        },
+        {
+          "characterId": "a232735b-fadc-4bd4-9f5d-df780f0f022b",
+          "x": 0.72,
+          "y": 0.4,
+          "width": 0.18,
+          "height": 0.5,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "No me sigas.",
+          "dialogueType": "speech",
+          "dialoguePosition": "top",
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.62,
+            "y": 0.12,
+            "width": 0.32,
+            "height": 0.12
+          }
+        }
+      ],
+      "objects": [],
+      "narration": null,
+      "globosX": [],
+      "backgroundId": "98cb5d7f-256c-4dc1-b678-c3e298fe14d9",
+      "background": {
+        "x": 0.05,
+        "y": 0.1,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "horizon": null,
+      "connections": []
+    }
+  ],
+  "createdAt": "2026-08-09T15:37:12.380Z",
+  "updatedAt": "2026-08-09T15:37:12.380Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

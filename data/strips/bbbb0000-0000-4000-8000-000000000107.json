@@ -1,0 +1,59 @@
+{
+  "id": "bbbb0000-0000-4000-8000-000000000107",
+  "title": "ej07 narracion + dialogo",
+  "generalStyle": "estilo sempé, linea fina, bn, humor nordico cartoon",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "bbbb0000-0000-4000-8000-000000000207",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.1,
+          "y": 0.4,
+          "width": 0.18,
+          "height": 0.5,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "¿Un microondas?",
+          "dialogueType": "speech",
+          "dialoguePosition": "top",
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.15,
+            "y": 0.32,
+            "width": 0.34,
+            "height": 0.12
+          }
+        }
+      ],
+      "objects": [],
+      "narration": {
+        "text": "El bosque guardaba un secreto.",
+        "x": 0.1,
+        "y": 0.03,
+        "width": 0.8,
+        "height": 0.12,
+        "framed": true
+      },
+      "globosX": [],
+      "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
+      "background": {
+        "x": 0.05,
+        "y": 0.1,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "horizon": null,
+      "connections": []
+    }
+  ],
+  "createdAt": "2026-08-09T15:37:12.380Z",
+  "updatedAt": "2026-08-09T15:37:12.380Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}

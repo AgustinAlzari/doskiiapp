@@ -14,13 +14,20 @@
   "updatedAt": "2026-08-07T11:51:53.238Z",
   "balloons": {
     "narration": {
+      "entityId": "bbbb0000-0000-4000-8000-000000000002",
       "description": "Un recuadro rectangular clásico de bordes irregulares y temblorosos, con esa textura de tinta cruda y densa que caracteriza al cómic underground. El fondo tiene una textura de sombreado cruzado (\"cross-hatching\") muy apretada para darle ese aire sucio y \"hand-made\". La tipografía está escrita a mano, en mayúsculas comprimidas e inclinadas."
     },
     "speech": {
+      "entityId": "bbbb0000-0000-4000-8000-000000000004",
       "description": "Un globo de forma orgánica y ligeramente irregular, no un óvalo perfecto. El contorno de tinta negra es grueso y vibrante. La cola del globo tiene esa ondulación característica de Crumb que parece temblar con la voz del personaje. La letra es manual, \"sucia\", y se vuelve más gruesa y \"gritada\" en las palabras clave."
     },
     "thought": {
+      "entityId": "bbbb0000-0000-4000-8000-000000000003",
       "description": "La clásica \"nube\" de pensamiento, pero con el toque rústico de Crumb. En lugar de bordes suaves, son formas irregulares y peludas, como algodón sucio. La cola son círculos de distintos tamaños que se vuelven más caóticos. La tipografía es más pequeña y jittery, transmitiendo ansiedad y duda interna. Se añade un ligero tono grisáceo al fondo de la nube para diferenciarla del diálogo a viva voz."
+    },
+    "other": {
+      "entityId": "bbbb0000-0000-4000-8000-000000000001",
+      "description": ""
     }
   }
 }

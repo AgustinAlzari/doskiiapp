@@ -277,3 +277,12 @@ balloonLaws: {
 - **Prompt**: en `promptGenerator.js`, `BALLOON_LETTERING_RULES` pasaría a construirse filtrando `balloonLaws.enabled` y aplicando los overrides.
 
 Las leyes A1–D3 son las que hoy reemplazarían/ampliarían las reglas fijas actuales del bloque `COMMON RULES` y los refuerzos de `DIALOGUE SEQUENCE`.
+
+---
+
+## Implementación (código)
+
+Las leyes están implementadas como configuración en `src/data/balloonLaws.js` (`BALLOON_LAWS`, `BALLOON_LAW_GROUPS`, `makeDefaultBalloonLaws`, `balloonLawsToPrompt`). Cada globo es una **entidad** (`data/balloons/*.json`, gestionada en la sección "globos") con un objeto `laws` donde cada ley guarda su valor (check/select/multi). El generador de prompts (`src/services/promptGenerator.js`) traduce esas opciones a restricciones en inglés dentro de `BALLOON GRAPHICS`, y los globos sueltos ("globo x", con ancla a personaje/objeto/narración/fuera de campo/sin cola) se describen en el bloque aparte `CAPTIONS AND FREE BALLOONS (GLOBO X)`.
+
+- El layout (`src/services/layoutSvg.js`) dibuja las colas como línea **sólida** y el conector entre globos del mismo hablante como **punteada** (coherente con CORRECCIONES 14–15).
+- La selección de entidad por tipo vive en `project.balloons.*.entityId` (con fallback a la descripción libre si la entidad se borra).

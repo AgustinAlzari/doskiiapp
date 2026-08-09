@@ -3,9 +3,12 @@ import useStripStore from '../../store/stripStore'
 import useCharacterStore from '../../store/characterStore'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
+import useBalloonStore from '../../store/balloonStore'
 import { SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, SFX_STYLES, ASPECT_RATIOS } from '../../data/actionPresets'
+import { orderedPanelDialogues } from '../../services/promptGenerator'
 import PanelCanvas from './PanelCanvas'
 import CharacterPropsPanel from './CharacterPropsPanel'
+import BalloonPropsPanel from './BalloonPropsPanel'
 import AutoTextarea from './AutoTextarea'
 
 export default function StripEditor({ strip, project, onBack, onEditCharacter, onShowPrompts }) {
@@ -13,6 +16,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const characters = useCharacterStore(s => s.characters)
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
+  const balloons = useBalloonStore(s => s.balloons)
   const [data, setData] = useState(strip)
   const [selectedPanelIdx, setSelectedPanelIdx] = useState(0)
   const [selectedCharIdx, setSelectedCharIdx] = useState(null)
@@ -20,6 +24,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [selectedSfxIdx, setSelectedSfxIdx] = useState(null)
   const [selectedNarr, setSelectedNarr] = useState(false)
   const [selectedBalloon, setSelectedBalloon] = useState(null)
+  const [selectedGloboXIdx, setSelectedGloboXIdx] = useState(null)
   const [saveState, setSaveState] = useState(null)
   const [showDescModal, setShowDescModal] = useState(false)
   const [descDraft, setDescDraft] = useState('')
@@ -32,6 +37,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
     setSelectedBalloon(null)
+    setSelectedGloboXIdx(null)
   }, [])
 
   const panel = data.panels[selectedPanelIdx]
@@ -252,14 +258,88 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   }, [selectedPanelIdx, updateDialoguePos])
 
   const selectBalloon = useCallback((balloon) => {
-    const charIdx = (panel?.characters || []).findIndex(c => c.characterId === balloon.characterId)
-    if (charIdx < 0) return
-    setSelectedCharIdx(charIdx)
+    setSelectedCharIdx(null)
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedGloboXIdx(null)
     setSelectedBalloon({ characterId: balloon.characterId, isExtra: balloon.isExtra, extraIdx: balloon.extraIdx })
-  }, [panel])
+  }, [])
+
+  const selectGloboX = useCallback((idx) => {
+    setSelectedGloboXIdx(idx)
+    setSelectedCharIdx(null)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedNarr(false)
+    setSelectedBalloon(null)
+  }, [])
+
+  const applyDialogueBalloonUpdate = useCallback((updates) => {
+    if (!selectedBalloon) return
+    const charIdx = (data.panels[selectedPanelIdx]?.characters || []).findIndex(c => c.characterId === selectedBalloon.characterId)
+    if (charIdx < 0) return
+    if (selectedBalloon.isExtra) {
+      const char = data.panels[selectedPanelIdx].characters[charIdx]
+      const extras = [...(char.extraDialogues || [])]
+      extras[selectedBalloon.extraIdx] = { ...(extras[selectedBalloon.extraIdx] || {}), ...updates }
+      updateCharacterInPanel(selectedPanelIdx, charIdx, { extraDialogues: extras })
+    } else {
+      updateCharacterInPanel(selectedPanelIdx, charIdx, updates)
+    }
+  }, [selectedBalloon, selectedPanelIdx, data.panels, updateCharacterInPanel])
+
+  // Globo X (free balloons)
+  const addGloboXToPanel = useCallback((panelIdx, balloonId) => {
+    const idx = (data.panels[panelIdx]?.globosX || []).length
+    setData(prev => {
+      const panels = [...prev.panels]
+      const globosX = [...(panels[panelIdx].globosX || [])]
+      globosX.push({
+        id: crypto.randomUUID(),
+        text: '',
+        channel: 'speech',
+        balloonId,
+        x: 0.4,
+        y: 0.05,
+        width: 0.3,
+        height: 0.1,
+        anchor: { type: 'none' },
+      })
+      panels[panelIdx] = { ...panels[panelIdx], globosX }
+      return { ...prev, panels }
+    })
+    setSelectedGloboXIdx(idx)
+    setSelectedCharIdx(null)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedNarr(false)
+    setSelectedBalloon(null)
+  }, [data.panels])
+
+  const updateGloboXInPanel = useCallback((panelIdx, gIdx, updates) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      if (!panels[panelIdx]?.globosX?.[gIdx]) return prev
+      const globosX = [...panels[panelIdx].globosX]
+      globosX[gIdx] = { ...globosX[gIdx], ...updates }
+      panels[panelIdx] = { ...panels[panelIdx], globosX }
+      return { ...prev, panels }
+    })
+  }, [])
+
+  const removeGloboXFromPanel = useCallback((panelIdx, gIdx) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const globosX = (panels[panelIdx]?.globosX || []).filter((_, i) => i !== gIdx)
+      panels[panelIdx] = { ...panels[panelIdx], globosX }
+      return { ...prev, panels }
+    })
+    setSelectedGloboXIdx(null)
+  }, [])
+
+  const moveGloboX = useCallback((idx, { x, y }) => updateGloboXInPanel(selectedPanelIdx, idx, { x, y }), [selectedPanelIdx, updateGloboXInPanel])
+  const resizeGloboX = useCallback((idx, updates) => updateGloboXInPanel(selectedPanelIdx, idx, updates), [selectedPanelIdx, updateGloboXInPanel])
 
   const removeDialogueBalloon = useCallback((balloon) => {
     setData(prev => {
@@ -314,6 +394,31 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const selectedObjData = panel?.objects?.[selectedObjIdx]
   const selectedObjDef = selectedObjData && objects.find(item => item.id === selectedObjData.objectId)
 
+  const projectBalloons = balloons.filter(b => b.projectId === project?.id)
+
+  const orderedForPanel = (() => { try { return orderedPanelDialogues(panel || { characters: [] }, characters) } catch { return [] } })()
+
+  const selectedGloboXData = selectedGloboXIdx != null ? panel?.globosX?.[selectedGloboXIdx] : null
+
+  const selectedDialogueBalloon = (() => {
+    if (!selectedBalloon) return null
+    const char = (panel?.characters || []).find(c => c.characterId === selectedBalloon.characterId)
+    if (!char) return null
+    const def = characters.find(c => c.id === char.characterId)
+    if (selectedBalloon.isExtra) {
+      const extra = (char.extraDialogues || [])[selectedBalloon.extraIdx]
+      if (!extra) return null
+      const found = orderedForPanel.find(d => d.characterId === char.characterId && d.isExtra && d.extraIdx === selectedBalloon.extraIdx)
+      return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: extra.text || '', channel: extra.type || 'speech', balloonId: extra.balloonId || null }
+    }
+    const found = orderedForPanel.find(d => d.characterId === char.characterId && !d.isExtra)
+    return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: char.dialogue || '', channel: char.dialogueType || 'speech', balloonId: char.balloonId || null }
+  })()
+
+  const selectedGloboXLabel = selectedGloboXIdx != null
+    ? `X${((panel?.globosX || []).slice(0, selectedGloboXIdx + 1).filter(x => x.text).length) || selectedGloboXIdx + 1}`
+    : 'X'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
@@ -335,7 +440,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         >
           {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
         </select>
-        <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters)}>
+        <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters, balloons)}>
           prompts
         </button>
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saveState === 'saving'}>
@@ -416,7 +521,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 <div
                   className={`sidebar-item ${i === selectedPanelIdx ? 'active' : ''}`}
                   style={{ justifyContent: 'center', fontSize: 12 }}
-                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedNarr(false) }}
+                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedNarr(false) }}
                 >
                   cuadro {i + 1}
                 </div>
@@ -442,15 +547,20 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 selectedObjIdx={selectedObjIdx}
                 selectedSfxIdx={selectedSfxIdx}
                 selectedBalloon={selectedBalloon}
-                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
-                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
-                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null) }}
+                selectedGloboXIdx={selectedGloboXIdx}
+                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
+                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
+                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
                 selectedNarr={selectedNarr}
-                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null) }}
+                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
                 onSelectBalloon={selectBalloon}
+                onSelectGloboX={selectGloboX}
                 onMoveBalloon={moveBalloon}
                 onResizeBalloon={resizeBalloon}
                 onRemoveBalloon={removeDialogueBalloon}
+                onMoveGloboX={moveGloboX}
+                onResizeGloboX={resizeGloboX}
+                onRemoveGloboX={(idx) => removeGloboXFromPanel(selectedPanelIdx, idx)}
                 onUpdateChar={(charIdx, updates) => updateCharacterInPanel(selectedPanelIdx, charIdx, updates)}
                 onUpdateObj={(objIdx, updates) => updateObjectInPanel(selectedPanelIdx, objIdx, updates)}
                 onUpdateSfx={(sfxIdx, updates) => updateSfxInPanel(selectedPanelIdx, sfxIdx, updates)}
@@ -474,8 +584,45 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               style={{ width: 360, flexShrink: 0, alignSelf: 'stretch', position: 'relative', overflow: 'hidden' }}
             >
               {/* Properties overlay — absolute, covers sidebar when active */}
-              {(selectedCharData && selectedCharDef) || (selectedObjData && selectedObjDef) || (selectedSfxData && selectedSfxIdx !== null) ? (
+              {(selectedDialogueBalloon) || (selectedGloboXData) || (selectedCharData && selectedCharDef) || (selectedObjData && selectedObjDef) || (selectedSfxData && selectedSfxIdx !== null) ? (
                 <div className="editor-sidebar" style={{ position: 'absolute', inset: 0, overflow: 'auto', zIndex: 5, background: 'var(--color-bg)' }}>
+                  {selectedDialogueBalloon && (
+                    <BalloonPropsPanel
+                      kind="dialogue"
+                      label={selectedDialogueBalloon.label}
+                      characterName={selectedDialogueBalloon.characterName}
+                      text={selectedDialogueBalloon.text}
+                      channel={selectedDialogueBalloon.channel}
+                      balloonId={selectedDialogueBalloon.balloonId}
+                      balloons={projectBalloons}
+                      onText={(text) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { text } : { dialogue: text })}
+                      onChannel={(channel) => applyDialogueBalloonUpdate(selectedBalloon.isExtra ? { type: channel } : { dialogueType: channel })}
+                      onBalloonId={(balloonId) => applyDialogueBalloonUpdate({ balloonId })}
+                      onRemove={() => removeDialogueBalloon(selectedBalloon)}
+                      onClose={() => setSelectedBalloon(null)}
+                    />
+                  )}
+                  {selectedGloboXData && (
+                    <BalloonPropsPanel
+                      kind="globox"
+                      label={selectedGloboXLabel}
+                      text={selectedGloboXData.text || ''}
+                      channel={selectedGloboXData.channel || 'speech'}
+                      balloonId={selectedGloboXData.balloonId || null}
+                      balloons={projectBalloons}
+                      anchor={selectedGloboXData.anchor || { type: 'none' }}
+                      panelCharacters={panel?.characters || []}
+                      panelObjects={panel?.objects || []}
+                      characters={characters}
+                      objects={objects}
+                      onText={(text) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { text })}
+                      onChannel={(channel) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { channel })}
+                      onBalloonId={(balloonId) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { balloonId })}
+                      onAnchor={(anchor) => updateGloboXInPanel(selectedPanelIdx, selectedGloboXIdx, { anchor })}
+                      onRemove={() => removeGloboXFromPanel(selectedPanelIdx, selectedGloboXIdx)}
+                      onClose={() => setSelectedGloboXIdx(null)}
+                    />
+                  )}
                   {selectedCharData && selectedCharDef && (
                     <CharacterPropsPanel
                       key={`char-${selectedCharIdx}`}
@@ -706,6 +853,37 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       })}
                     </div>
                   )}
+
+                  {/* Globo X */}
+                  <select
+                    className="input"
+                    value=""
+                    onChange={e => { if (e.target.value) { addGloboXToPanel(selectedPanelIdx, e.target.value); e.target.value = '' } }}
+                    style={{ fontSize: 12, cursor: 'pointer' }}
+                  >
+                    <option value="">+ globo X...</option>
+                    {projectBalloons.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  {(panel?.globosX || []).length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {panel.globosX.map((item, idx) => {
+                        const textIdx = (panel.globosX || []).slice(0, idx + 1).filter(x => x.text).length
+                        return (
+                          <span
+                            key={item.id}
+                            className={`radio-pill ${selectedGloboXIdx === idx ? 'active' : ''}`}
+                            style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => setSelectedGloboXIdx(selectedGloboXIdx === idx ? null : idx)}
+                          >
+                            X{textIdx || idx + 1}{item.text ? `: ${item.text.slice(0, 12)}` : ''}
+                            <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeGloboXFromPanel(selectedPanelIdx, idx) }}>x</span>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -745,12 +923,23 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                   <span style={{ fontSize: 12 }}>poner</span>
                 </label>
                 {panel?.narration && (
-                  <AutoTextarea
-                    value={panel.narration.text || ''}
-                    onChange={e => updateNarrationInPanel(selectedPanelIdx, { text: e.target.value })}
-                    placeholder="texto del narrador..."
-                    minRows={2}
-                  />
+                  <>
+                    <AutoTextarea
+                      value={panel.narration.text || ''}
+                      onChange={e => updateNarrationInPanel(selectedPanelIdx, { text: e.target.value })}
+                      placeholder="texto del narrador..."
+                      minRows={2}
+                    />
+                    <select
+                      className="input"
+                      value={panel.narration.balloonId || ''}
+                      onChange={e => updateNarrationInPanel(selectedPanelIdx, { balloonId: e.target.value || null })}
+                      style={{ fontSize: 12, cursor: 'pointer' }}
+                    >
+                      <option value="">estilo del globo (default del tipo)</option>
+                      {projectBalloons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </>
                 )}
               </div>
             </div>

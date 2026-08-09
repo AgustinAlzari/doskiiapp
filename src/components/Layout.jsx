@@ -4,6 +4,7 @@ import useCharacterStore from '../store/characterStore'
 import useStripStore from '../store/stripStore'
 import useBackgroundStore from '../store/backgroundStore'
 import useObjectStore from '../store/objectStore'
+import useBalloonStore from '../store/balloonStore'
 import useProjectStore from '../store/projectStore'
 
 export default function Layout({ children, currentView, onNavigate, activeProject, onExitProject }) {
@@ -15,6 +16,7 @@ export default function Layout({ children, currentView, onNavigate, activeProjec
       await useCharacterStore.getState().load()
       await useBackgroundStore.getState().load()
       await useObjectStore.getState().load()
+      await useBalloonStore.getState().load()
       await useStripStore.getState().load()
       await useProjectStore.getState().migrate()
     })()

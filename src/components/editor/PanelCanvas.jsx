@@ -8,7 +8,7 @@ import ConnectionArrows from './ConnectionArrows'
 import CompositionGuides from './CompositionGuides'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 
-export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onMoveBalloon, onResizeBalloon, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef }) {
+export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onMoveGloboX, onResizeGloboX, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef }) {
   const [connDrag, setConnDrag] = useState(null)
   const canvasRef2 = useRef(null)
   const wrapperRef = useRef(null)
@@ -72,6 +72,31 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
           y2: (ch.y + ch.height * 0.3) * 100,
         })
       }
+    })
+    ;(panel.globosX || []).forEach(g => {
+      if (!g.text) return
+      const a = g.anchor || {}
+      const x1 = (g.x + g.width / 2) * 100
+      const y1 = (g.y + g.height / 2) * 100
+      let x2 = null
+      let y2 = null
+      if (a.type === 'character') {
+        const ch = (panel.characters || []).find(c => c.characterId === a.id)
+        if (ch) { x2 = (ch.x + ch.width / 2) * 100; y2 = (ch.y + ch.height * 0.3) * 100 }
+      } else if (a.type === 'object') {
+        const o = (panel.objects || []).find(o => o.objectId === a.id)
+        if (o) { x2 = (o.x + o.width / 2) * 100; y2 = (o.y + o.height / 2) * 100 }
+      } else if (a.type === 'narration') {
+        const n = panel.narration
+        if (n) { x2 = (n.x + n.width / 2) * 100; y2 = (n.y + n.height / 2) * 100 }
+      } else if (a.type === 'offpanel') {
+        const dir = a.direction || 'bottom'
+        if (dir === 'left') { x2 = -4; y2 = y1 }
+        else if (dir === 'right') { x2 = 104; y2 = y1 }
+        else if (dir === 'top') { x2 = x1; y2 = -4 }
+        else { x2 = x1; y2 = 104 }
+      }
+      if (x2 != null) tails.push({ x1, y1, x2, y2 })
     })
     return { linkSegments: links, tailSegments: tails }
   })()
@@ -309,7 +334,6 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
                 x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
                 stroke="#c0392b"
                 strokeWidth="0.7"
-                strokeDasharray="3 3"
                 vectorEffect="non-scaling-stroke"
               />
             ))}
@@ -333,6 +357,22 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             onRemove={() => onRemoveBalloon?.(b)}
           />
         ))}
+
+        {/* Globo X blocks (free balloons, top layer) */}
+        {(panel.globosX || []).map((g, idx) => {
+          const textIdx = (panel.globosX || []).slice(0, idx + 1).filter(x => x.text).length
+          return (
+            <BalloonBlock
+              key={g.id || `globox-${idx}`}
+              balloon={{ ...g, type: g.channel || 'speech', label: `X${textIdx || idx + 1}`, number: textIdx || idx + 1 }}
+              isSelected={selectedGloboXIdx === idx}
+              onSelect={() => onSelectGloboX?.(idx)}
+              onMove={(x, y) => onMoveGloboX?.(idx, { x, y })}
+              onResize={(updates) => onResizeGloboX?.(idx, updates)}
+              onRemove={() => onRemoveGloboX?.(idx)}
+            />
+          )
+        })}
       </div>
     </div>
   )

@@ -1,0 +1,66 @@
+{
+  "id": "bbbb0000-0000-4000-8000-000000000110",
+  "title": "ej10 cartela sin cola + cita",
+  "generalStyle": "estilo sempé, linea fina, bn, humor nordico cartoon",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "bbbb0000-0000-4000-8000-000000000210",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "cdbbc80c-8e9d-4575-8c40-60366bd761d0",
+          "x": 0.1,
+          "y": 0.4,
+          "width": 0.18,
+          "height": 0.5,
+          "direction": "front",
+          "expression": "",
+          "dialogue": "Él dijo: «Ya vuelvo».",
+          "dialogueType": "speech",
+          "dialoguePosition": "top",
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.1,
+            "y": 0.1,
+            "width": 0.46,
+            "height": 0.12
+          }
+        }
+      ],
+      "objects": [],
+      "narration": null,
+      "globosX": [
+        {
+          "id": "bbbb0000-0000-4000-8000-000000000302",
+          "text": "FIN.",
+          "channel": "speech",
+          "balloonId": null,
+          "x": 0.4,
+          "y": 0.72,
+          "width": 0.2,
+          "height": 0.08,
+          "anchor": {
+            "type": "none"
+          }
+        }
+      ],
+      "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
+      "background": {
+        "x": 0.05,
+        "y": 0.1,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "horizon": null,
+      "connections": []
+    }
+  ],
+  "createdAt": "2026-08-09T15:37:12.380Z",
+  "updatedAt": "2026-08-09T15:37:12.380Z",
+  "projectId": "6448d0d0-9424-4cd0-951d-e55c1619b5fc"
+}
