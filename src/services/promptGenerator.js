@@ -1,5 +1,5 @@
 import { DIALOGUE_TYPES, DIRECTIONS, SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, MOTION_LINE_DESCS, ACTION_EFFECTS, ASPECT_RATIOS } from '../data/actionPresets'
-import { balloonLawsToPrompt } from '../data/balloonLaws'
+import { balloonLawsToPrompt, balloonLawDiffSentences, lawsEqual, makeDefaultBalloonLaws } from '../data/balloonLaws'
 
 function describePosition(x = 0, y = 0, width = 0, height = 0) {
   const centerX = x + width / 2
@@ -51,6 +51,10 @@ function referenceText(entity) {
     : ''
 }
 
+function cleanPromptText(text) {
+  return (text || '').trim().replace(/[.\s]+$/, '')
+}
+
 export function projectStyleText(project) {
   if (!project) return ''
   const parts = []
@@ -59,6 +63,12 @@ export function projectStyleText(project) {
   if (project.world) parts.push(`Setting/world: ${project.world}`)
   if (project.styleNotes) parts.push(project.styleNotes)
   return parts.join('. ')
+}
+
+function combineStyleText(projectStyle, generalStyle) {
+  const ps = (projectStyle || '').trim().replace(/[.\s]+$/, '')
+  if (ps && generalStyle) return `${ps}. ${generalStyle}`
+  return ps || generalStyle || ''
 }
 
 export function paletteText(project) {
@@ -98,6 +108,13 @@ function dialoguePlacementText(d) {
   const cy = Math.round((d.y + d.height / 2) * 100)
   const zone = cy < 33 ? 'in the upper area' : cy > 66 ? 'in the lower area' : 'in the middle area'
   return `${zone} (balloon center at x ${cx}%, y ${cy}%)`
+}
+
+function channelStyleText(type) {
+  if (type === 'thought') return ' Render it as a thought cloud, with smaller, italic lettering.'
+  if (type === 'whisper') return ' Render it as whispered dialogue: smaller and italic.'
+  if (type === 'shout') return ' Render it as a shout: larger and bolder lettering, punchy.'
+  return ''
 }
 
 export function orderedPanelDialogues(panel, characters = []) {
@@ -225,7 +242,6 @@ export function usedBalloonTypes(panel) {
 
 const BALLOON_LETTERING_RULES = [
   'Typography MUST be hand-lettered, drawn with a brush pen: irregular, slightly wobbly, with varying stroke weight. NEVER a computer, digital, or sans-serif typeface.',
-  'The balloon outline stroke must be THICK and heavy (visibly bold), not thin.',
   'If a tail is present it must be wavy and trembling, with undulating edges (Crumb style) — never a straight line or a simple smooth curve.',
 ]
 
@@ -238,12 +254,10 @@ function resolveBalloonEntity(kind, project, balloonDefs = []) {
   return null
 }
 
-function entityPieces(entity) {
+function entityDescPieces(entity) {
   const pieces = []
   if (entity.promptText?.trim()) pieces.push(entity.promptText.trim().replace(/[.\s]+$/, ''))
   if (entity.text?.trim()) pieces.push(`Default text: "${entity.text.trim()}" (used only when the panel text is empty)`)
-  const lawSentences = balloonLawsToPrompt(entity.laws)
-  if (lawSentences.length) pieces.push(`Rules: ${lawSentences.join(' ')}`)
   if (entity.referenceImages?.length) pieces.push(`use the attached reference image "${entity.referenceImages[0].fileName}" exactly as the balloon graphic`)
   return pieces
 }
@@ -252,30 +266,48 @@ function balloonGraphicsText(project, panel, balloonDefs = []) {
   const used = [...usedBalloonTypes(panel)]
   if (!used.length) return ''
 
-  const lines = ['BALLOON GRAPHICS:']
+  const defaultLaws = makeDefaultBalloonLaws()
+  const entries = []
+  const pushEntry = (label, pieces, entity) => entries.push({ label, pieces, entity })
+
   used.forEach(type => {
     const label = BALLOON_LABELS[type] || type
     if (type === 'other') {
       const ids = [...new Set((panel.globosX || []).map(g => g.balloonId).filter(Boolean))]
       const entities = ids.map(id => (balloonDefs || []).find(b => b.id === id)).filter(Boolean)
       if (entities.length) {
-        entities.forEach(entity => {
-          const pieces = entityPieces(entity)
-          lines.push(`- ${label.toUpperCase()} ("${entity.name}"): ${pieces.length ? pieces.join('. ') : '(default comic balloon style)'}`)
-        })
+        entities.forEach(entity => pushEntry(`${label.toUpperCase()} ("${entity.name}")`, entityDescPieces(entity), entity))
         return
       }
     }
     const entity = resolveBalloonEntity(type, project, balloonDefs)
     const cfg = project?.balloons?.[type]
-    const pieces = entity
-      ? entityPieces(entity)
-      : (cfg?.description?.trim()
-        ? [cfg.description.trim().replace(/[.\s]+$/, ''), ...(cfg.fileName ? [`use the attached reference image "${cfg.fileName}" exactly as the balloon graphic`] : [])]
-        : [])
-    lines.push(`- ${label.toUpperCase()}: ${pieces.length ? pieces.join('. ') : '(default comic balloon style)'}`)
+    if (entity) {
+      pushEntry(label.toUpperCase(), entityDescPieces(entity), entity)
+    } else if (cfg?.description?.trim()) {
+      pushEntry(label.toUpperCase(), [cfg.description.trim().replace(/[.\s]+$/, ''), ...(cfg.fileName ? [`use the attached reference image "${cfg.fileName}" exactly as the balloon graphic`] : [])], null)
+    } else {
+      pushEntry(label.toUpperCase(), [], null)
+    }
   })
-  lines.push(`- COMMON RULES (apply to every balloon): ${BALLOON_LETTERING_RULES.join(' ')}`)
+
+  const lines = ['BALLOON GRAPHICS:']
+  entries.forEach(e => {
+    let text = e.pieces.length ? e.pieces.join('. ') : ''
+    if (text && !/[.!?…]$/.test(text)) text += '.'
+    lines.push(`- ${e.label}: ${text || '(default comic balloon style)'}`)
+  })
+
+  lines.push('')
+  lines.push('RULES:')
+  lines.push(`- BASE (apply to every balloon): ${BALLOON_LETTERING_RULES.join(' ')}`)
+  lines.push(`- DEFAULT STYLE (apply to every balloon unless an override below states otherwise): ${balloonLawsToPrompt(defaultLaws).join(' ')}`)
+  entries.forEach(e => {
+    if (!e.entity || lawsEqual(e.entity.laws, defaultLaws)) return
+    const diff = balloonLawDiffSentences(e.entity.laws)
+    if (!diff.additions.length && !diff.exemptions.length) return
+    lines.push(`- OVERRIDE "${e.entity.name}": ${[...diff.additions, ...diff.exemptions].join(' ')}`)
+  })
   return lines.join('\n')
 }
 
@@ -312,7 +344,7 @@ function headerLines(ctx, layoutFileName) {
 function stylePaletteLines(project, generalStyle) {
   const lines = []
   const projectStyle = projectStyleText(project)
-  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  const styleText = combineStyleText(projectStyle, generalStyle)
   if (styleText) {
     lines.push(`GLOBAL STYLE: ${styleText}`)
     lines.push('')
@@ -354,7 +386,7 @@ function sceneBodyLines(ctx, panel, styleText = '') {
       const placement = describeLandscapePlacement(background)
       const prompt = backgroundDef.comodin
         ? `ONE-OFF BACKGROUND — ${panel.comodinDesc?.trim() ? panel.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
-        : `${backgroundDef.promptText}.${referenceText(backgroundDef)}`
+        : `${cleanPromptText(backgroundDef.promptText)}.${referenceText(backgroundDef)}`
       lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${prompt} ${placement}`)
     }
   } else {
@@ -371,7 +403,7 @@ function sceneBodyLines(ctx, panel, styleText = '') {
       const { size } = describePosition(item.x, item.y, item.width, item.height)
       const prompt = definition.comodin
         ? `ONE-OFF OBJECT — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
-        : `${definition.promptText}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''}`
+        : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''}`
       lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     })
   }
@@ -388,7 +420,7 @@ function sceneBodyLines(ctx, panel, styleText = '') {
     const { size } = describePosition(item.x, item.y, item.width, item.height)
     const prompt = definition.comodin
       ? `ONE-OFF CHARACTER — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
-      : `${definition.promptText}.${referenceText(definition)}`
+      : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}`
     lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     if (item.expression) lines.push(`  Expression: ${item.expression}.`)
     if (item.actions?.length > 0) {
@@ -517,9 +549,9 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
         }
       }
       if (idx === 0) {
-        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${styleRef}`)
+        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${channelStyleText(d.type)}${styleRef}`)
       } else {
-        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${linked}${styleRef}`)
+        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${channelStyleText(d.type)}${linked}${styleRef}`)
       }
     })
 
@@ -536,7 +568,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
       const anchor = globoXAnchorText(g, ctx)
       const entity = g.balloonId ? (balloonDefs || []).find(b => b.id === g.balloonId) : null
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
-      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and contains exactly: "${g.text}". Channel: ${channel}. Its ${anchor}.${styleRef}`)
+      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and contains exactly: "${g.text}". Channel: ${channel}.${channelStyleText(g.channel)} Its ${anchor}.${styleRef}`)
     })
   }
 
@@ -547,7 +579,7 @@ export function generateScenePrompt(panel, characters = [], generalStyle, backgr
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
-  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
     ...headerLines(ctx, layoutName),
     ...stylePaletteLines(project, generalStyle),
@@ -581,7 +613,7 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
-  const styleText = (projectStyle && generalStyle) ? `${projectStyle}. ${generalStyle}` : (projectStyle || generalStyle || '')
+  const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
     ...headerLines(ctx, layoutName),
     ...stylePaletteLines(project, generalStyle),
