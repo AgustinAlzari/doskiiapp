@@ -10,7 +10,7 @@ export PATH="/Users/edicionesalz/.local/node-v20.18.0-darwin-x64/bin:$PATH" && n
 
 ## Datos de usuario (`data/`)
 
-La carpeta `data/` en la raíz del repo **NO es código**: es una copia de los datos de la app (proyectos, personajes, tiras, fondos, objetos e imágenes de referencia).
+La carpeta `data/` en la raíz del repo **NO es código**: es una copia de los datos de la app (autores, proyectos, personajes, tiras, fondos, objetos, globos, paletas e imágenes de referencia).
 
 - **Ubicación original en disco:** `~/Library/Application Support/dibuweb/data/` (la ruta exacta la resuelve Electron con `app.getPath('appData')`).
 - La app lee y escribe SIEMPRE en la ubicación de Electron (`DATA_DIR` en `electron/main.js`), **nunca** en `data/`.
@@ -26,7 +26,7 @@ Hay un script `sync.sh` en la raíz que maneja la copia en ambas direcciones:
 ./sync.sh status   # compara qué carpetas difieren
 ```
 
-> El script solo copia las carpetas de datos (`backgrounds`, `balloons`, `characters`, `objects`, `projects`, `references`, `strips`). Nunca copia `refs-usadas/`, `cache/` ni `.DS_Store`. Detener la app antes de `pull`.
+> El script solo copia las carpetas de datos (`authors`, `backgrounds`, `balloons`, `characters`, `objects`, `palettes`, `projects`, `references`, `strips`). Nunca copia `refs-usadas/`, `cache/` ni `.DS_Store`. Detener la app antes de `pull`.
 
 ### Restaurar los datos en una máquina nueva
 

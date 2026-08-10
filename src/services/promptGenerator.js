@@ -1,4 +1,4 @@
-import { DIALOGUE_TYPES, DIRECTIONS, SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, MOTION_LINE_DESCS, ACTION_EFFECTS, ASPECT_RATIOS } from '../data/actionPresets'
+import { DIALOGUE_TYPES, DIRECTIONS, DIRECTION_MODES, DIRECTION_MODE_HAS_GAZE, SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, MOTION_LINE_DESCS, ACTION_EFFECTS, ASPECT_RATIOS } from '../data/actionPresets'
 import { balloonLawsToPrompt, balloonLawDiffSentences, lawsEqual, makeDefaultBalloonLaws } from '../data/balloonLaws'
 
 function describePosition(x = 0, y = 0, width = 0, height = 0) {
@@ -71,10 +71,10 @@ function combineStyleText(projectStyle, generalStyle) {
   return ps || generalStyle || ''
 }
 
-export function paletteText(project) {
+export function paletteText(project, paletteColors) {
   if (!project) return ''
   if (project.colorMode === 'bw') return 'COLOR PALETTE: pure black ink on white paper — black-and-white line art. Draw with solid black strokes and solid black ink accents only. NO gray midtones, NO gray fills, NO flat gray areas, NO shading with gray tones, NO color.'
-  const colors = (project.palette || []).filter(c => c.hex)
+  const colors = (paletteColors || project.palette || []).filter(c => c.hex)
   if (!colors.length) return ''
   const parts = colors.map(c => `${c.label || c.role}: ${c.hex}`)
   const modeLabel = project.colorMode === 'duotone'
@@ -358,32 +358,31 @@ function computeContext(panel, characters = [], backgrounds = [], objects = [], 
   const bgs = Array.isArray(backgrounds) ? backgrounds : []
   const objs = Array.isArray(objects) ? objects : []
   const panelCharacters = panel.characters || []
-  const panelConnections = panel.connections || []
   const panelObjects = panel.objects || []
-  const connectedCharacters = new Set()
-  panelConnections.forEach(connection => {
-    const targetName = connectionTargetName(connection, chars, objs, bgs)
-    const source = chars.find(item => item.id === connection.from)
-    if (source && targetName) {
-      connectedCharacters.add(source.id)
-      if ((connection.toType || 'character') === 'character') connectedCharacters.add(connection.to)
-    }
+  const panelCharIds = new Set(panelCharacters.map(c => c.characterId))
+  const panelObjIds = new Set(panelObjects.map(o => o.objectId))
+  const panelConnections = (panel.connections || []).filter(connection => {
+    const toType = connection.toType || 'character'
+    if (toType === 'object') return panelObjIds.has(connection.to)
+    if (toType === 'background') return panel.backgroundId === connection.to
+    return panelCharIds.has(connection.to) && panelCharIds.has(connection.from)
   })
   const resolvedAspect = resolveAspectRatio(stripAspectRatio, project)
   const ar = ASPECT_RATIOS.find(item => item.id === resolvedAspect)
   const ratioLabel = ar ? ar.ratio : 'defined'
-  return { chars, bgs, objs, panelCharacters, panelObjects, panelConnections, connectedCharacters, resolvedAspect, ratioLabel }
+  return { chars, bgs, objs, panelCharacters, panelObjects, panelConnections, resolvedAspect, ratioLabel }
 }
 
 function headerLines(ctx, layoutFileName) {
+  const shape = ctx.resolvedAspect === 'square' ? 'square' : ctx.resolvedAspect === 'hd' ? 'widescreen rectangle' : 'tall vertical rectangle'
   return [
-    `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this rectangle.`,
+    `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this ${shape}.`,
     `POSITIONAL LAYOUT: The file "${layoutFileName}" is a layout reference image showing exact element sizes, positions, and spatial relationships. Use it as a precise compositional guide.`,
     '',
   ]
 }
 
-function stylePaletteLines(project, generalStyle) {
+function stylePaletteLines(project, generalStyle, paletteColors) {
   const lines = []
   const projectStyle = projectStyleText(project)
   const styleText = combineStyleText(projectStyle, generalStyle)
@@ -391,7 +390,7 @@ function stylePaletteLines(project, generalStyle) {
     lines.push(`GLOBAL STYLE: ${styleText}`)
     lines.push('')
   }
-  const palette = paletteText(project)
+  const palette = paletteText(project, paletteColors)
   if (palette) {
     lines.push(palette)
     lines.push('')
@@ -481,9 +480,16 @@ function sceneBodyLines(ctx, panel, styleText = '') {
       lines.push(`  Action description: ${item.actionNotes}.`)
     }
 
-    if (!ctx.connectedCharacters.has(item.characterId)) {
-      const direction = DIRECTIONS.find(value => value.id === item.direction)
-      if (direction) lines.push(`  Body orientation: ${direction.name}.`)
+    const hasGazeArrow = ctx.panelConnections.some(c => c.from === item.characterId)
+    const direction = DIRECTIONS.find(value => value.id === item.direction)
+    if (direction) {
+      const mode = item.directionMode || 'body'
+      const wantsBody = mode === 'body' || mode === 'body-gaze'
+      const wantsFace = mode === 'face-gaze'
+      const wantsGaze = DIRECTION_MODE_HAS_GAZE.has(mode) && !hasGazeArrow
+      if (wantsBody) lines.push(`  Body orientation: ${direction.name}.`)
+      if (wantsFace) lines.push(`  Face orientation: ${direction.name}.`)
+      if (wantsGaze) lines.push(`  Gaze direction: ${direction.name}.`)
     }
   })
 
@@ -616,14 +622,14 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
   return lines
 }
 
-export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null) {
+export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, paletteColors = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
   const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
     ...headerLines(ctx, layoutName),
-    ...stylePaletteLines(project, generalStyle),
+    ...stylePaletteLines(project, generalStyle, paletteColors),
     'LETTERING LOCK: This prompt describes the SCENE layer only, WITHOUT any dialogue or lettering. Do NOT draw any speech balloons, thought bubbles, narration boxes, captions, or sound-effect words. Do not write any text, letters, or typography anywhere in the image. Do not leave blank outlines, circles, or box placeholders hinting at future balloons. The scene must stand alone as a text-free panel; lettering is added later in a separate step.',
     '',
     ...sceneBodyLines(ctx, panel, styleText),
@@ -650,14 +656,14 @@ export function generateLetteringPrompt(panel, characters = [], generalStyle, ba
   return lines.join('\n')
 }
 
-export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = []) {
+export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = [], paletteColors = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
   const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
     ...headerLines(ctx, layoutName),
-    ...stylePaletteLines(project, generalStyle),
+    ...stylePaletteLines(project, generalStyle, paletteColors),
     ...sceneBodyLines(ctx, panel, styleText),
     ...letteringLines(ctx, panel, project, layoutName, balloons),
     '',
@@ -667,12 +673,12 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   return lines.join('\n')
 }
 
-export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null, balloons = []) {
+export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null, balloons = [], paletteColors = null) {
   const chars = Array.isArray(characters) ? characters : []
   const bgs = Array.isArray(backgrounds) ? backgrounds : []
   const objs = Array.isArray(objects) ? objects : []
   return (strip?.panels || []).map((panel, index) => {
-    const prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, index, strip, project, balloons)
+    const prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, index, strip, project, balloons, paletteColors)
     return `=== PANEL ${index + 1} ===\n\n${prompt}`
   }).join('\n\n')
 }

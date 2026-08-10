@@ -33,6 +33,8 @@ export const makeDefaultProject = () => ({
   defaultPanelCount: 3,
   colorMode: 'bw',
   palette: [],
+  paletteId: null,
+  authorId: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 })

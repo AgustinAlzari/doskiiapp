@@ -26,6 +26,16 @@ contextBridge.exposeInMainWorld('api', {
     save: (b) => ipcRenderer.invoke('balloons:save', b),
     delete: (id) => ipcRenderer.invoke('balloons:delete', id),
   },
+  palettes: {
+    list: () => ipcRenderer.invoke('palettes:list'),
+    save: (p) => ipcRenderer.invoke('palettes:save', p),
+    delete: (id) => ipcRenderer.invoke('palettes:delete', id),
+  },
+  authors: {
+    list: () => ipcRenderer.invoke('authors:list'),
+    save: (a) => ipcRenderer.invoke('authors:save', a),
+    delete: (id) => ipcRenderer.invoke('authors:delete', id),
+  },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
     save: (p) => ipcRenderer.invoke('projects:save', p),
@@ -39,6 +49,10 @@ contextBridge.exposeInMainWorld('api', {
     save: (opts) => ipcRenderer.invoke('dialog:save', opts),
     open: (opts) => ipcRenderer.invoke('dialog:open', opts),
   },
+  clipboard: {
+    write: (text) => ipcRenderer.invoke('clipboard:write', text),
+    readImage: () => ipcRenderer.invoke('clipboard:read-image'),
+  },
   references: {
     choose: () => ipcRenderer.invoke('references:choose'),
     import: (data) => ipcRenderer.invoke('references:import', data),
@@ -47,6 +61,7 @@ contextBridge.exposeInMainWorld('api', {
     openUsedFolder: (fileNames) => ipcRenderer.invoke('references:open-used-folder', fileNames),
     saveSvg: (data) => ipcRenderer.invoke('references:save-svg', data),
     saveFile: (data) => ipcRenderer.invoke('references:save-file', data),
+    paste: (data) => ipcRenderer.invoke('references:paste', data),
     startDrag: (filePath) => ipcRenderer.send('references:startDrag', filePath),
   },
 });

@@ -79,6 +79,15 @@ export const DIRECTIONS = [
   { id: 'down-right', label: '↘', name: 'lower right' },
 ]
 
+export const DIRECTION_MODES = [
+  { id: 'body', label: 'cuerpo' },
+  { id: 'gaze', label: 'solo mirada' },
+  { id: 'body-gaze', label: 'cuerpo y mirada' },
+  { id: 'face-gaze', label: 'cara y mirada' },
+]
+
+export const DIRECTION_MODE_HAS_GAZE = new Set(['gaze', 'body-gaze', 'face-gaze'])
+
 export const SHOT_TYPES = [
   { id: 'close-up', label: 'close-up', name: 'close-up', desc: 'tight framing, face or detail only', scope: 'character' },
   { id: 'horizon-high', label: '3/4', name: 'three-quarter shot', desc: 'three-quarter framing, dominant figure, background present', scope: 'character' },

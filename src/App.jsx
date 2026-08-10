@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import StripList from './components/StripList'
@@ -12,6 +12,8 @@ import ObjectList from './components/objects/ObjectList'
 import ObjectForm from './components/objects/ObjectForm'
 import BalloonList from './components/balloons/BalloonList'
 import BalloonForm from './components/balloons/BalloonForm'
+import AuthorList from './components/authors/AuthorList'
+import AuthorForm from './components/authors/AuthorForm'
 import ProjectList from './components/projects/ProjectList'
 import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
@@ -24,6 +26,7 @@ const SCOPED_VIEWS = [
   'backgrounds', 'new-background', 'edit-background',
   'objects', 'new-object', 'edit-object',
   'balloons', 'new-balloon', 'edit-balloon',
+  'authors', 'new-author', 'edit-author',
 ]
 
 export default function App() {
@@ -34,6 +37,7 @@ export default function App() {
   const [editingBackground, setEditingBackground] = useState(null)
   const [editingObject, setEditingObject] = useState(null)
   const [editingBalloon, setEditingBalloon] = useState(null)
+  const [editingAuthor, setEditingAuthor] = useState(null)
   const [promptData, setPromptData] = useState(null)
 
   const projects = useProjectStore(s => s.projects)
@@ -46,6 +50,7 @@ export default function App() {
     setActiveProjectId(id)
     setSelectedStripId(null)
     setView('strips')
+    try { localStorage.setItem('doski:lastProject', id) } catch {}
   }
 
   const exitProject = () => {
@@ -54,10 +59,24 @@ export default function App() {
   }
 
   const navigate = (section) => {
+    if (section === 'projects') { setView('projects'); return }
     if (!activeProject && SCOPED_VIEWS.includes(section) && section !== 'edit-project') return
     if (section === 'edit-project' && !activeProject) return
     setView(section)
   }
+
+  useEffect(() => {
+    if (!projectsLoaded) return
+    let savedId = null
+    try { savedId = localStorage.getItem('doski:lastProject') } catch {}
+    const target = savedId && projects.find(p => p.id === savedId)
+    if (target) {
+      setActiveProjectId(target.id)
+      setSelectedStripId(null)
+      setView('strips')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectsLoaded])
 
   const noProject = projectsLoaded && !activeProject
 
@@ -207,6 +226,24 @@ export default function App() {
             projectId={activeProjectId}
             onSaved={() => { setEditingBalloon(null); setView('balloons') }}
             onCancel={() => { setEditingBalloon(null); setView('balloons') }}
+          />
+        )
+
+      case 'authors':
+        return (
+          <AuthorList
+            onNew={() => { setEditingAuthor(null); setView('edit-author') }}
+            onEdit={(author) => { setEditingAuthor(author); setView('edit-author') }}
+          />
+        )
+
+      case 'edit-author':
+      case 'new-author':
+        return (
+          <AuthorForm
+            author={editingAuthor}
+            onSaved={() => { setEditingAuthor(null); setView('authors') }}
+            onCancel={() => { setEditingAuthor(null); setView('authors') }}
           />
         )
 

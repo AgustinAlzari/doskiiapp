@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useProjectStore from '../../store/projectStore'
+import useAuthorStore from '../../store/authorStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import PaletteEditor from './PaletteEditor'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
@@ -20,7 +21,11 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [defaultPanelCount, setDefaultPanelCount] = useState(project?.defaultPanelCount || 3)
   const [colorMode, setColorMode] = useState(project?.colorMode || 'bw')
   const [palette, setPalette] = useState(project?.palette || [])
+  const [paletteId, setPaletteId] = useState(project?.paletteId || null)
+  const [authorId, setAuthorId] = useState(project?.authorId || null)
   const [saving, setSaving] = useState(false)
+
+  const authors = useAuthorStore(s => s.authors)
 
   const collect = () => ({
     ...project,
@@ -35,6 +40,8 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     defaultPanelCount,
     colorMode,
     palette,
+    paletteId,
+    authorId,
   })
 
   const handleSave = async () => {
@@ -90,6 +97,24 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
         </div>
 
         <div>
+          <label className="label">autor</label>
+          <select
+            className="input"
+            value={authorId || ''}
+            onChange={e => setAuthorId(e.target.value || null)}
+            style={{ cursor: 'pointer' }}
+          >
+            <option value="">— sin autor —</option>
+            {authors.map(a => <option key={a.id} value={a.id}>{a.fullName}</option>)}
+          </select>
+          {authors.length === 0 && (
+            <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              creá autores desde la sección "autores" del menú.
+            </div>
+          )}
+        </div>
+
+        <div>
           <label className="label">sinopsis</label>
           <AutoTextarea value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="de qué trata la serie..." minRows={2} />
         </div>
@@ -138,7 +163,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
         <div className="card" style={{ padding: 12 }}>
           <label className="label" style={{ marginBottom: 8 }}>paleta de colores</label>
-          <PaletteEditor palette={palette} colorMode={colorMode} onModeChange={setColorMode} onPaletteChange={setPalette} />
+          <PaletteEditor palette={palette} colorMode={colorMode} onModeChange={setColorMode} onPaletteChange={setPalette} paletteId={paletteId} onPaletteIdChange={setPaletteId} />
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

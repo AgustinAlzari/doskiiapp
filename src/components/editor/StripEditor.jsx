@@ -142,8 +142,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const removeCharacterFromPanel = useCallback((panelIdx, charIdx) => {
     setData(prev => {
       const panels = [...prev.panels]
+      const removedId = panels[panelIdx].characters[charIdx]?.characterId
       const characters = panels[panelIdx].characters.filter((_, i) => i !== charIdx)
-      panels[panelIdx] = { ...panels[panelIdx], characters }
+        .map(c => c.gazeTarget?.type === 'character' && c.gazeTarget?.id === removedId ? { ...c, gazeTarget: null } : c)
+      const connections = (panels[panelIdx].connections || []).filter(c =>
+        c.from !== removedId && !(c.to === removedId && (c.toType || 'character') === 'character')
+      )
+      panels[panelIdx] = { ...panels[panelIdx], characters, connections }
       return { ...prev, panels }
     })
     setSelectedCharIdx(null)
@@ -152,10 +157,14 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const setBackgroundForPanel = useCallback((panelIdx, backgroundId) => {
     setData(prev => {
       const panels = [...prev.panels]
+      const connections = backgroundId
+        ? panels[panelIdx].connections
+        : (panels[panelIdx].connections || []).filter(c => (c.toType || 'character') !== 'background')
       panels[panelIdx] = {
         ...panels[panelIdx],
         backgroundId,
         background: backgroundId ? (panels[panelIdx].background || { x: 0.05, y: 0.1, width: 0.9, height: 0.45 }) : null,
+        connections,
       }
       return { ...prev, panels }
     })
@@ -202,7 +211,12 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setData(prev => {
       const panels = [...prev.panels]
       const objects = (panels[panelIdx].objects || []).filter((_, i) => i !== objIdx)
-      panels[panelIdx] = { ...panels[panelIdx], objects }
+      const removedId = (panels[panelIdx].objects || [])[objIdx]?.objectId
+      const connections = (panels[panelIdx].connections || []).filter(c => !(c.to === removedId && (c.toType || 'character') === 'object'))
+      const characters = (panels[panelIdx].characters || []).map(c =>
+        c.gazeTarget?.type === 'object' && c.gazeTarget?.id === removedId ? { ...c, gazeTarget: null } : c
+      )
+      panels[panelIdx] = { ...panels[panelIdx], objects, connections, characters }
       return { ...prev, panels }
     })
   }, [])
@@ -682,6 +696,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       panelCharacters={panel?.characters || []}
                       panelObjects={panel?.objects || []}
                       panelNarration={panel?.narration}
+                      panelConnections={panel?.connections || []}
                       allCharacters={characters}
                       allObjects={objects}
                       defaultBalloonId={wildcardBalloon?.id || null}

@@ -5,6 +5,8 @@ import useStripStore from '../store/stripStore'
 import useBackgroundStore from '../store/backgroundStore'
 import useObjectStore from '../store/objectStore'
 import useBalloonStore from '../store/balloonStore'
+import usePaletteStore from '../store/paletteStore'
+import useAuthorStore from '../store/authorStore'
 import useProjectStore from '../store/projectStore'
 
 export default function Layout({ children, currentView, onNavigate, activeProject, onExitProject }) {
@@ -20,6 +22,8 @@ export default function Layout({ children, currentView, onNavigate, activeProjec
       await step('backgrounds.load', () => useBackgroundStore.getState().load())
       await step('objects.load', () => useObjectStore.getState().load())
       await step('balloons.load', () => useBalloonStore.getState().load())
+      await step('palettes.load', () => usePaletteStore.getState().load())
+      await step('authors.load', () => useAuthorStore.getState().load())
       await step('strips.load', () => useStripStore.getState().load())
       await step('migrate', () => useProjectStore.getState().migrate())
     })()

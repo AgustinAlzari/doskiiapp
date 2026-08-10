@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dist": "vite build && electron-builder --mac",
+    "dist:all": "vite build && electron-builder --mac --x64 --arm64"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^5.0.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
@@ -21,9 +23,48 @@
     "autoprefixer": "^10.4.19",
     "concurrently": "^8.2.2",
     "electron": "^33.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.8.9",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "vite": "^5.4.0",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.agustinalzari.doski",
+    "productName": "doski",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "AgustinAlzari",
+      "repo": "doskiiapp"
+    }
   }
 }

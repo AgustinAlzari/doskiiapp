@@ -27,12 +27,14 @@
             "standing"
           ],
           "actionNotes": "se ve medio cuerpo, porque está en primer plano",
-          "gazeTarget": null
+          "gazeTarget": null,
+          "directionMode": "face-gaze",
+          "framing": "close-up"
         },
         {
           "characterId": "0f5e9045-6904-4b77-8585-8bd31fc96654",
-          "x": 0.7383123832503113,
-          "y": 0.05678704856787051,
+          "x": 0.7495203533623911,
+          "y": 0.2921544209215442,
           "width": 0.10656931039850559,
           "height": 0.1,
           "direction": "up-left",
@@ -45,12 +47,13 @@
           "actions": [],
           "actionNotes": "",
           "gazeTarget": null,
-          "comodinDesc": "un hornero bn volando"
+          "comodinDesc": "un hornero bn volando",
+          "directionMode": "body-gaze"
         },
         {
           "characterId": "0f5e9045-6904-4b77-8585-8bd31fc96654",
-          "x": 0.5378580323785803,
-          "y": 0.16513075965130763,
+          "x": 0.3585305105853051,
+          "y": 0.06674968866749692,
           "width": 0.09274420143212951,
           "height": 0.1,
           "direction": "down-left",
@@ -63,7 +66,8 @@
           "actions": [],
           "actionNotes": "",
           "gazeTarget": null,
-          "comodinDesc": "hornero hembra volando en bn"
+          "comodinDesc": "hornero hembra volando en bn",
+          "directionMode": "body-gaze"
         }
       ],
       "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
@@ -76,18 +80,19 @@
         "width": 1,
         "height": 0.5
       },
-      "sfx": [
-        {
-          "text": "mmmmm",
-          "x": 0.6,
-          "y": 0.1,
-          "width": 0.15,
-          "height": 0.1,
-          "style": "whisper"
-        }
-      ]
+      "sfx": []
     }
   ],
   "createdAt": "2026-08-09T23:41:40.952Z",
-  "updatedAt": "2026-08-09T23:55:25.882Z"
+  "updatedAt": "2026-08-10T13:57:49.125Z",
+  "results": [
+    {
+      "id": "64bb33f8-5825-4593-9626-516c7c9dfbb2",
+      "fileName": "bd4a9721-result1.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/bd4a9721-result1.png",
+      "observations": "Quedó perfecto",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0
 }

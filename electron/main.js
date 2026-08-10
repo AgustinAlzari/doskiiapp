@@ -1,10 +1,65 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, clipboard, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
 const isDev = !app.isPackaged;
 let mainWindow;
+
+// --- Version check (GitHub releases) ---
+const UPDATE_REPO = 'AgustinAlzari/doskiiapp';
+const UPDATE_URL = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
+
+function parseVersion(v) {
+  const parts = String(v || '').replace(/^v/i, '').split('.');
+  return parts.map(p => parseInt(p, 10) || 0);
+}
+
+function isNewer(latest, current) {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return false;
+}
+
+function checkForUpdates() {
+  if (isDev) return;
+  const request = net.request(UPDATE_URL);
+  request.setHeader('Accept', 'application/vnd.github.v3+json');
+  request.setHeader('User-Agent', 'doski');
+  let body = '';
+  request.on('response', (response) => {
+    if (response.statusCode !== 200) return;
+    response.on('data', (chunk) => { body += chunk; });
+    response.on('end', () => {
+      try {
+        const release = JSON.parse(body);
+        const latest = release.tag_name;
+        if (!isNewer(latest, app.getVersion()) || !mainWindow) return;
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Nueva versión disponible',
+          message: `Hay una versión nueva de doski: ${latest}`,
+          detail: `Estás usando la ${app.getVersion()}. Podés descargar la actualización desde la página de releases.`,
+          buttons: ['Descargar', 'Después'],
+          defaultId: 0,
+          cancelId: 1,
+        }).then(({ response }) => {
+          if (response === 0) shell.openExternal(`https://github.com/${UPDATE_REPO}/releases/latest`);
+        });
+      } catch (e) {
+        console.error('update check parse error:', e);
+      }
+    });
+  });
+  request.on('error', () => {});
+  request.end();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,7 +86,10 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  setTimeout(checkForUpdates, 3000);
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
@@ -46,6 +104,8 @@ function ensureDataDirs() {
   ensureDir(path.join(DATA_DIR, 'backgrounds'));
   ensureDir(path.join(DATA_DIR, 'objects'));
   ensureDir(path.join(DATA_DIR, 'balloons'));
+  ensureDir(path.join(DATA_DIR, 'palettes'));
+  ensureDir(path.join(DATA_DIR, 'authors'));
   ensureDir(path.join(DATA_DIR, 'references'));
 }
 
@@ -278,6 +338,55 @@ ipcMain.handle('balloons:delete', async (_, id) => {
   return true;
 });
 
+// --- IPC: Palettes ---
+ipcMain.handle('palettes:list', async () => {
+  ensureDataDirs();
+  const dir = path.join(DATA_DIR, 'palettes');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+});
+
+ipcMain.handle('palettes:save', async (_, palette) => {
+  ensureDataDirs();
+  const filePath = path.join(DATA_DIR, 'palettes', `${palette.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(palette, null, 2), 'utf-8');
+  return palette;
+});
+
+ipcMain.handle('palettes:delete', async (_, id) => {
+  const filePath = path.join(DATA_DIR, 'palettes', `${id}.json`);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  return true;
+});
+
+// --- IPC: Authors ---
+ipcMain.handle('authors:list', async () => {
+  ensureDataDirs();
+  const dir = path.join(DATA_DIR, 'authors');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+});
+
+ipcMain.handle('authors:save', async (_, author) => {
+  ensureDataDirs();
+  const filePath = path.join(DATA_DIR, 'authors', `${author.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(author, null, 2), 'utf-8');
+  return author;
+});
+
+ipcMain.handle('authors:delete', async (_, id) => {
+  const filePath = path.join(DATA_DIR, 'authors', `${id}.json`);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  return true;
+});
+
+// --- IPC: Read image from clipboard (for paste-to-hex) ---
+ipcMain.handle('clipboard:read-image', async () => {
+  const image = clipboard.readImage();
+  if (image.isEmpty()) return null;
+  return { dataUrl: `data:image/png;base64,${image.toPNG().toString('base64')}` };
+});
+
 // --- IPC: Projects ---
 ipcMain.handle('projects:list', async () => {
   ensureDataDirs();
@@ -460,6 +569,24 @@ ipcMain.handle('references:save-file', async (_, { fileName, data }) => {
   const buffer = Buffer.from(data, 'base64');
   fs.writeFileSync(filePath, buffer);
   return { fileName, path: filePath };
+});
+
+// --- IPC: Write text to clipboard ---
+ipcMain.handle('clipboard:write', async (_, text) => {
+  clipboard.writeText(String(text || ''));
+  return true;
+});
+
+// --- IPC: Paste image from clipboard to references ---
+ipcMain.handle('references:paste', async (_, { fileName }) => {
+  const image = clipboard.readImage();
+  if (image.isEmpty()) return null;
+  ensureDataDirs();
+  const base = String(fileName || 'pegado').replace(/[^a-z0-9._-]+/gi, '_').replace(/^_+|_+$/g, '') || 'pegado';
+  const safeName = base.endsWith('.png') ? base : `${base}.png`;
+  const filePath = path.join(DATA_DIR, 'references', safeName);
+  fs.writeFileSync(filePath, image.toPNG());
+  return { fileName: safeName, path: filePath };
 });
 
 // --- IPC: Native file drag for reference images ---

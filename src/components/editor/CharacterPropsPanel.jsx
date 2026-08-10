@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { ACTION_PRESETS, DIRECTIONS, SHOT_TYPES } from '../../data/actionPresets'
+import { ACTION_PRESETS, DIRECTIONS, DIRECTION_MODES, SHOT_TYPES } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 import AutoTextarea from './AutoTextarea'
 
-export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, allCharacters, allObjects, defaultBalloonId, onUpdate, onRemove, onEdit }) {
+export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, panelConnections, allCharacters, allObjects, defaultBalloonId, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
   const extraDialogues = panelChar.extraDialogues || []
   const [editingExtra, setEditingExtra] = useState(null)
@@ -119,6 +119,26 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
               {d.label}
             </div>
           ))}
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <label className="label">aplicar a</label>
+          <div className="radio-group" style={{ flexWrap: 'wrap' }}>
+            {DIRECTION_MODES.map(m => {
+              const hasGazeArrow = (panelConnections || []).some(c => c.from === panelChar.characterId)
+              const disabled = hasGazeArrow && m.id !== 'body'
+              return (
+                <div
+                  key={m.id}
+                  className={`radio-pill ${(panelChar.directionMode || 'body') === m.id ? 'active' : ''}`}
+                  style={disabled ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                  onClick={() => { if (disabled) return; onUpdate({ directionMode: m.id }) }}
+                  title={disabled ? 'la flecha de mirada define la mirada: solo puede ser cuerpo' : m.label}
+                >
+                  {m.label}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 

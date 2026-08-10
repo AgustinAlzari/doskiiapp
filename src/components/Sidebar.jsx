@@ -5,7 +5,8 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     { id: 'backgrounds', label: 'fondos', active: ['backgrounds', 'new-background', 'edit-background'] },
     { id: 'objects', label: 'objetos', active: ['objects', 'new-object', 'edit-object'] },
     { id: 'balloons', label: 'globos', active: ['balloons', 'new-balloon', 'edit-balloon'] },
-    { id: 'edit-project', label: 'proyecto', active: ['edit-project'] },
+    { id: 'authors', label: 'autores', active: ['authors', 'new-author', 'edit-author'], divider: true },
+    { id: 'projects', label: 'proyectos', active: ['projects'] },
   ]
 
   const isActive = (item) => item.active.includes(currentView)
@@ -48,37 +49,34 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
         </div>
       )}
 
-      {activeProject && (
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
-          {navItems.map(item => (
-            <div
-              key={item.id}
-              className={`sidebar-item ${isActive(item) ? 'active' : ''}`}
-              onClick={() => onNavigate(item.id)}
-            >
-              {item.label}
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: activeProject ? 12 : 12 }}>
+        {navItems.map((item, idx) => {
+          const scoped = item.id !== 'projects'
+          const disabled = scoped && !activeProject
+          return (
+            <div key={item.id}>
+              {item.divider && (
+                <div style={{ height: 1, background: 'var(--color-border-muted)', margin: '8px 4px 8px' }} />
+              )}
+              <div
+                className={`sidebar-item ${isActive(item) ? 'active' : ''}`}
+                style={disabled ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                onClick={() => { if (disabled) return; onNavigate(item.id) }}
+              >
+                {item.label}
+              </div>
             </div>
-          ))}
-        </nav>
-      )}
+          )
+        })}
+      </nav>
 
       {!activeProject && (
         <div style={{ paddingLeft: 12, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 12 }}>
-          elegí un proyecto para empezar
+          abrí un proyecto o creá uno nuevo
         </div>
       )}
 
       <div style={{ flex: 1 }} />
-
-      {activeProject && (
-        <div
-          className="sidebar-item"
-          style={{ color: 'var(--color-accent)' }}
-          onClick={onExitProject}
-        >
-          ← proyectos
-        </div>
-      )}
     </aside>
   )
 }
