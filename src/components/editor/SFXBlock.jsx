@@ -84,6 +84,24 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
       }}
       onMouseDown={handleMouseDown}
     >
+      {/* Asa de arrastre (mover como los otros frames) */}
+      <div
+        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e) }}
+        style={{
+          position: 'absolute',
+          top: -6,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 34,
+          height: 8,
+          cursor: 'grab',
+          background: 'var(--color-border)',
+          borderRadius: 999,
+          opacity: 0.55,
+          zIndex: 22,
+        }}
+        title="arrastrar para mover"
+      />
       <input
         className="sfx-input"
         value={sfx.text}

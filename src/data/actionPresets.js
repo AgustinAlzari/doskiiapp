@@ -80,11 +80,11 @@ export const DIRECTIONS = [
 ]
 
 export const SHOT_TYPES = [
-  { id: 'close-up', label: 'close-up', name: 'close-up', desc: 'tight framing, face or detail only' },
-  { id: 'horizon-high', label: '3/4', name: 'three-quarter shot', desc: 'three-quarter framing, dominant figure, background present' },
-  { id: 'horizon-mid', label: '1/2', name: 'medium shot', desc: 'waist-up framing, figure and background in balance' },
-  { id: 'horizon-low', label: '1/4', name: 'low horizon', desc: 'open framing, small figure, large background visible' },
-  { id: 'wide', label: 'wide', name: 'wide shot', desc: 'wide framing, full scene, small characters' },
+  { id: 'close-up', label: 'close-up', name: 'close-up', desc: 'tight framing, face or detail only', scope: 'character' },
+  { id: 'horizon-high', label: '3/4', name: 'three-quarter shot', desc: 'three-quarter framing, dominant figure, background present', scope: 'character' },
+  { id: 'horizon-mid', label: '1/2', name: 'medium shot', desc: 'waist-up framing, figure and background in balance', scope: 'character' },
+  { id: 'horizon-low', label: '1/4', name: 'low horizon', desc: 'open framing, small figure, large background visible', scope: 'scene' },
+  { id: 'wide', label: 'wide', name: 'wide shot', desc: 'wide framing, full scene, small characters', scope: 'scene' },
 ]
 
 export const ASPECT_RATIOS = [

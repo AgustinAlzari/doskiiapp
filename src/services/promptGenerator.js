@@ -411,8 +411,8 @@ function sceneBodyLines(ctx, panel, styleText = '') {
   if (panel.horizon) lines.push(`HORIZON LINE: at ${Math.round(panel.horizon.y * 100)}% of the panel height.${panel.horizon.description ? ` Description: ${panel.horizon.description}.` : ''} Draw behind landscape, characters, and objects.`)
 
   if (panel.shotType) {
-    const shot = SHOT_TYPES.find(item => item.id === panel.shotType)
-    if (shot) lines.push(`CAMERA AND FRAMING: ${shot.name}. ${shot.desc}.`)
+    const shot = SHOT_TYPES.find(item => item.id === panel.shotType && item.scope === 'scene')
+    if (shot) lines.push(`CAMERA AND FRAMING (scene composition): ${shot.name}. ${shot.desc}.`)
   }
   if (panel.hatch && panel.hatch !== 'none') {
     const hatch = HATCH_TYPES.find(item => item.id === panel.hatch)
@@ -465,6 +465,10 @@ function sceneBodyLines(ctx, panel, styleText = '') {
       : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}`
     lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
     if (item.expression) lines.push(`  Expression: ${item.expression}.`)
+    if (item.framing) {
+      const shot = SHOT_TYPES.find(s => s.id === item.framing)
+      if (shot) lines.push(`  Framing: ${shot.name} — ${shot.desc}.`)
+    }
     if (item.actions?.length > 0) {
       lines.push(`  Action: ${item.actions.join(', ')}.`)
       item.actions.forEach(action => {

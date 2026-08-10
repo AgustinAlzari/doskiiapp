@@ -782,9 +782,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               {/* Shot type + Hatch */}
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label className="label">plano</label>
+                  <label className="label">plano (composición)</label>
                   <div className="radio-group">
-                    {SHOT_TYPES.map(st => (
+                    {SHOT_TYPES.filter(st => st.scope === 'scene').map(st => (
                       <div
                         key={st.id}
                         className={`radio-pill ${panel?.shotType === st.id ? 'active' : ''}`}

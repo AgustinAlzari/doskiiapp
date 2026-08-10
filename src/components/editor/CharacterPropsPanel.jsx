@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ACTION_PRESETS, DIRECTIONS } from '../../data/actionPresets'
+import { ACTION_PRESETS, DIRECTIONS, SHOT_TYPES } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 import AutoTextarea from './AutoTextarea'
 
@@ -117,6 +117,23 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
               title={d.name}
             >
               {d.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Encuadre (plano del personaje) */}
+      <div>
+        <label className="label">encuadre (plano del personaje)</label>
+        <div className="radio-group" style={{ flexWrap: 'wrap' }}>
+          {SHOT_TYPES.filter(st => st.scope === 'character').map(st => (
+            <div
+              key={st.id}
+              className={`radio-pill ${panelChar.framing === st.id ? 'active' : ''}`}
+              onClick={() => onUpdate({ framing: panelChar.framing === st.id ? null : st.id })}
+              title={st.desc}
+            >
+              {st.label}
             </div>
           ))}
         </div>
