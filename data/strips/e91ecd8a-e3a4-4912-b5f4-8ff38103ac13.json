@@ -18,13 +18,18 @@
           "height": 0.36118364726027397,
           "direction": "front",
           "expression": "serio y hasta un poco triste",
-          "dialogue": "...un microondas... me puede venir bien",
+          "dialogue": "... un microondas... me puede venir bien...",
           "dialogueType": "thought",
           "dialoguePosition": null,
           "extraDialogues": [],
           "actions": [],
           "actionNotes": "se rasca la cabeza como pensando",
-          "gazeTarget": null
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.11237483977968256,
+            "y": 0.2362491719880236
+          },
+          "balloonId": "c147f584-fb74-43d0-a265-a6f0db06bccb"
         }
       ],
       "backgroundId": "9160765f-b607-4bd2-abb8-f37a14ca63ce",
@@ -56,5 +61,5 @@
     }
   ],
   "createdAt": "2026-08-09T20:40:18.608Z",
-  "updatedAt": "2026-08-09T20:45:46.225Z"
+  "updatedAt": "2026-08-09T21:08:32.973Z"
 }

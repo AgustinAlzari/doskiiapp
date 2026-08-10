@@ -27,6 +27,7 @@ mkdir -p "$APP_DATA"
 cp -R data/backgrounds "$APP_DATA/" 2>/dev/null
 cp -R data/characters "$APP_DATA/" 2>/dev/null
 cp -R data/objects "$APP_DATA/" 2>/dev/null
+cp -R data/balloons "$APP_DATA/" 2>/dev/null
 cp -R data/projects "$APP_DATA/" 2>/dev/null
 cp -R data/references "$APP_DATA/" 2>/dev/null
 cp -R data/strips "$APP_DATA/" 2>/dev/null
@@ -36,5 +37,23 @@ cp -R data/strips "$APP_DATA/" 2>/dev/null
 
 ### Mantener `data/` actualizada
 
-- Antes de cada push, si se crearon/modificaron datos en la app, sincronizar: `cp -R "$HOME/Library/Application Support/dibuweb/data/" data/` y eliminar `data/refs-usadas`, `data/cache` y `data/.DS_Store` si aparecen.
+- **Siempre** que se creen/modifiquen datos en la app (proyectos, personajes, fondos, objetos, globos, viñetas, resultados, referencias), **sincronizar `data/` en el mismo commit** que los cambios de código, antes de cada push:
+  ```bash
+  cp -R "$HOME/Library/Application Support/dibuweb/data/" data/
+  rm -rf data/refs-usadas data/cache data/.DS_Store
+  git add data/ && git commit -m "sync data"
+  ```
 - No subir `refs-usadas/` ni `cache/` (carpetas temporales).
+
+### Descargar los datos desde el repo (para otra máquina)
+
+`data/` está versionado en el repo y **siempre queda al día con el último commit**, así que en otra máquina se baja directo con el clon:
+
+```bash
+git clone https://github.com/AgustinAlzari/doskiiapp.git
+# y luego restaurar en la máquina nueva:
+bash -c 'APP_DATA="$HOME/Library/Application Support/dibuweb/data"; mkdir -p "$APP_DATA"; cd doskiiapp && cp -R data/backgrounds data/characters data/objects data/balloons data/projects data/references data/strips "$APP_DATA/"'
+```
+
+> Si solo se quieren los datos sin todo el repo, se puede descargar `data/` desde el navegador: https://github.com/AgustinAlzari/doskiiapp/tree/main/data
+
