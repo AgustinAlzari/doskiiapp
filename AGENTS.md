@@ -16,43 +16,37 @@ La carpeta `data/` en la raíz del repo **NO es código**: es una copia de los d
 - La app lee y escribe SIEMPRE en la ubicación de Electron (`DATA_DIR` en `electron/main.js`), **nunca** en `data/`.
 - `data/` existe solo como respaldo/portabilidad para llevar los datos entre máquinas.
 
-### Restaurar los datos en una máquina nueva
+### Sincronizar con el repo (`sync.sh`)
 
-Si la ubicación de Electron está vacía o no existe, copiar el contenido de `data/` a la ubicación real para que la app vea los proyectos:
+Hay un script `sync.sh` en la raíz que maneja la copia en ambas direcciones:
 
 ```bash
-# Detener la app primero
-APP_DATA="$HOME/Library/Application Support/dibuweb/data"
-mkdir -p "$APP_DATA"
-cp -R data/backgrounds "$APP_DATA/" 2>/dev/null
-cp -R data/characters "$APP_DATA/" 2>/dev/null
-cp -R data/objects "$APP_DATA/" 2>/dev/null
-cp -R data/balloons "$APP_DATA/" 2>/dev/null
-cp -R data/projects "$APP_DATA/" 2>/dev/null
-cp -R data/references "$APP_DATA/" 2>/dev/null
-cp -R data/strips "$APP_DATA/" 2>/dev/null
+./sync.sh pull     # repo → ubicación de Electron (máquina nueva o recién clonado)
+./sync.sh push     # Electron → repo (antes de subir a GitHub)
+./sync.sh status   # compara qué carpetas difieren
 ```
 
-> Verificar siempre que los `.json` copiados existan tras la restauración (`ls "$APP_DATA/projects/"`).
+> El script solo copia las carpetas de datos (`backgrounds`, `balloons`, `characters`, `objects`, `projects`, `references`, `strips`). Nunca copia `refs-usadas/`, `cache/` ni `.DS_Store`. Detener la app antes de `pull`.
 
-### Mantener `data/` actualizada
+### Restaurar los datos en una máquina nueva
 
-- **Siempre** que se creen/modifiquen datos en la app (proyectos, personajes, fondos, objetos, globos, viñetas, resultados, referencias), **sincronizar `data/` en el mismo commit** que los cambios de código, antes de cada push:
-  ```bash
-  cp -R "$HOME/Library/Application Support/dibuweb/data/" data/
-  rm -rf data/refs-usadas data/cache data/.DS_Store
-  git add data/ && git commit -m "sync data"
-  ```
-- No subir `refs-usadas/` ni `cache/` (carpetas temporales).
+```bash
+./sync.sh pull
+ls "$HOME/Library/Application Support/dibuweb/data/projects/"
+```
+
+### Mantener `data/` actualizada (antes de push)
+
+```bash
+./sync.sh push
+git add data/ && git commit -m "sync data" && git push
+```
 
 ### Descargar los datos desde el repo (para otra máquina)
 
-`data/` está versionado en el repo y **siempre queda al día con el último commit**, así que en otra máquina se baja directo con el clon:
-
 ```bash
 git clone https://github.com/AgustinAlzari/doskiiapp.git
-# y luego restaurar en la máquina nueva:
-bash -c 'APP_DATA="$HOME/Library/Application Support/dibuweb/data"; mkdir -p "$APP_DATA"; cd doskiiapp && cp -R data/backgrounds data/characters data/objects data/balloons data/projects data/references data/strips "$APP_DATA/"'
+cd doskiiapp && ./sync.sh pull
 ```
 
 > Si solo se quieren los datos sin todo el repo, se puede descargar `data/` desde el navegador: https://github.com/AgustinAlzari/doskiiapp/tree/main/data

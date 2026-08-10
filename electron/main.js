@@ -125,10 +125,17 @@ ipcMain.handle('references:import', async (_, { sourcePath, entityId, entityName
 });
 
 ipcMain.handle('references:read', async (_, filePath) => {
-  if (!filePath || !fs.existsSync(filePath)) return null;
-  const ext = path.extname(filePath).toLowerCase();
+  let resolved = filePath;
+  if (!filePath || !fs.existsSync(filePath)) {
+    if (filePath) {
+      const candidate = path.join(DATA_DIR, 'references', path.basename(filePath));
+      if (fs.existsSync(candidate)) resolved = candidate;
+    }
+  }
+  if (!resolved || !fs.existsSync(resolved)) return null;
+  const ext = path.extname(resolved).toLowerCase();
   const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png';
-  return `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+  return `data:${mime};base64,${fs.readFileSync(resolved).toString('base64')}`;
 });
 
 ipcMain.handle('references:open-folder', async () => shell.openPath(path.join(DATA_DIR, 'references')));
@@ -457,10 +464,17 @@ ipcMain.handle('references:save-file', async (_, { fileName, data }) => {
 
 // --- IPC: Native file drag for reference images ---
 ipcMain.on('references:startDrag', (event, filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
+  let resolved = filePath;
+  if (!filePath || !fs.existsSync(filePath)) {
+    if (filePath) {
+      const candidate = path.join(DATA_DIR, 'references', path.basename(filePath));
+      if (fs.existsSync(candidate)) resolved = candidate;
+    }
+  }
+  if (resolved && fs.existsSync(resolved)) {
     event.sender.startDrag({
-      file: filePath,
-      icon: nativeImage.createFromPath(filePath),
+      file: resolved,
+      icon: nativeImage.createFromPath(resolved),
     });
   }
 });
