@@ -1,0 +1,96 @@
+{
+  "id": "33528e74-6308-4d64-a409-225b966a8807",
+  "title": "camina por el bosque",
+  "generalStyle": "estilo sempé y cartoon de new york, bn, mucho blanco, humanizado",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "be72f776-6da0-4344-ba92-41f8eb210b2d",
+      "scene": "Una tarde... dentro del tupido bosque cercano a Nueva Ansiedad. Carlos lleva más de una hora de paseo...",
+      "characters": [
+        {
+          "characterId": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "x": 0.2773984603368346,
+          "y": 0.4214288896656495,
+          "width": 0.09106138132166444,
+          "height": 0.1832258241213979,
+          "direction": "right",
+          "expression": "hosco, concentrado",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "actions": [
+            "caminando"
+          ],
+          "gazeTarget": null,
+          "framing": "horizon-mid",
+          "actionNotes": "camina mirando el piso"
+        },
+        {
+          "characterId": "66d9a399-5544-46f6-9c47-09cc054c57f7",
+          "x": 0.8100230937829707,
+          "y": 0.26645587192913117,
+          "width": 0.073404542566709,
+          "height": 0.1,
+          "direction": "front",
+          "expression": "pico fruncido",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "balloonId": "24fd5dcf-4fa5-4e65-be57-c49b92abba48",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "comodinDesc": "un pajarito trepado a un arbol mirando con mala cara a Carlos"
+        }
+      ],
+      "backgroundId": "b0b6eee6-1bde-45e3-9bbe-f973902ac385",
+      "objects": [],
+      "shotType": "wide",
+      "narration": {
+        "text": "Una mañana en el bosque cercano a Nueva Ansiedad. Carlos pasea como lo hace habitualmente. Con cara de culo...",
+        "x": 0.22003695474827117,
+        "y": 0.03430749682337993,
+        "width": 0.5704699784904441,
+        "height": 0.17642434433214216,
+        "framed": true
+      },
+      "background": {
+        "x": 0.04390243902439024,
+        "y": 0.5279511242378049,
+        "width": 0.9440977515243902,
+        "height": 0.4720488757621951
+      },
+      "connections": [
+        {
+          "from": "66d9a399-5544-46f6-9c47-09cc054c57f7",
+          "to": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "toType": "character"
+        }
+      ],
+      "signature": {
+        "x": 0.8555203700762388,
+        "y": 0.9405833068614994,
+        "width": 0.1008328700762389,
+        "height": 0.04,
+        "colorId": null
+      }
+    }
+  ],
+  "createdAt": "2026-08-05T13:59:18.194Z",
+  "updatedAt": "2026-08-11T23:06:55.441Z",
+  "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
+  "referenceImages": [],
+  "position": 0,
+  "results": [
+    {
+      "id": "ae91b92c-756b-4acb-a07a-f1b06d1c96c9",
+      "fileName": "33528e74-result1.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/33528e74-result1.png",
+      "observations": "está perfecto",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0
+}

@@ -1,0 +1,100 @@
+{
+  "id": "da8b51b0-676e-4907-8618-bb6adb8da66f",
+  "projectId": "76bf2ca3-b8fa-43f2-b759-72fce6e65673",
+  "title": "0.5",
+  "generalStyle": "",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "a845c2a2-60b4-4431-b0f0-b147b84e2135",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "f69ef4b2-652d-45a2-a4eb-63f951382816",
+          "x": 0,
+          "y": 0.36011538760896644,
+          "width": 0.44068259651307595,
+          "height": 0.6398846123910336,
+          "direction": "down-right",
+          "expression": "mira con sopresa y seriedad...",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "balloonId": "321b21e2-d61b-40eb-8ee0-b4244a70649b",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [
+            "standing"
+          ],
+          "actionNotes": "se ve medio cuerpo, porque está en primer plano",
+          "gazeTarget": null,
+          "directionMode": "face-gaze",
+          "framing": "close-up"
+        },
+        {
+          "characterId": "7a897417-19ad-4272-87aa-b8d86fa6f927",
+          "x": 0.7495203533623911,
+          "y": 0.2921544209215442,
+          "width": 0.10656931039850559,
+          "height": 0.1,
+          "direction": "up-left",
+          "expression": "",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "balloonId": "321b21e2-d61b-40eb-8ee0-b4244a70649b",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "comodinDesc": "un hornero bn volando",
+          "directionMode": "body-gaze"
+        },
+        {
+          "characterId": "7a897417-19ad-4272-87aa-b8d86fa6f927",
+          "x": 0.3585305105853051,
+          "y": 0.06674968866749692,
+          "width": 0.09274420143212951,
+          "height": 0.1,
+          "direction": "down-left",
+          "expression": "",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "balloonId": "321b21e2-d61b-40eb-8ee0-b4244a70649b",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "",
+          "gazeTarget": null,
+          "comodinDesc": "hornero hembra volando en bn",
+          "directionMode": "body-gaze"
+        }
+      ],
+      "backgroundId": "f9bff076-a981-474e-b36a-46320cb7f4fb",
+      "objects": [],
+      "narration": null,
+      "shotType": "horizon-high",
+      "background": {
+        "x": 0,
+        "y": 0.2432129514321295,
+        "width": 1,
+        "height": 0.5
+      },
+      "sfx": [],
+      "connections": []
+    }
+  ],
+  "createdAt": "2026-08-09T23:41:40.952Z",
+  "updatedAt": "2026-08-10T13:57:49.125Z",
+  "results": [
+    {
+      "id": "64bb33f8-5825-4593-9626-516c7c9dfbb2",
+      "fileName": "bd4a9721-result1.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/bd4a9721-result1.png",
+      "observations": "Quedó perfecto",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0,
+  "referenceImages": []
+}

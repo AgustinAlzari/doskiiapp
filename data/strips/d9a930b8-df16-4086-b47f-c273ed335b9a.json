@@ -1,0 +1,66 @@
+{
+  "id": "d9a930b8-df16-4086-b47f-c273ed335b9a",
+  "projectId": "76bf2ca3-b8fa-43f2-b759-72fce6e65673",
+  "title": "1 Carlos se encuentra con el horno",
+  "generalStyle": "",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "8728123c-a879-4a29-a26e-577f597b610f",
+      "scene": "Carlos encuentra el microondas abandonado en el bosque",
+      "characters": [
+        {
+          "characterId": "f69ef4b2-652d-45a2-a4eb-63f951382816",
+          "x": 0.11070983810709839,
+          "y": 0.4665006226650062,
+          "width": 0.29172458748443336,
+          "height": 0.36118364726027397,
+          "direction": "front",
+          "expression": "serio y hasta un poco triste",
+          "dialogue": "... un microondas... me puede venir bien...",
+          "dialogueType": "thought",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "se rasca la cabeza como pensando",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.11237483977968256,
+            "y": 0.2362491719880236
+          },
+          "balloonId": "c147f584-fb74-43d0-a265-a6f0db06bccb"
+        }
+      ],
+      "backgroundId": "f9bff076-a981-474e-b36a-46320cb7f4fb",
+      "objects": [
+        {
+          "objectId": "79ba3862-f66e-446f-98ca-0d9ab064e763",
+          "x": 0.6501245330012453,
+          "y": 0.6723536737235367,
+          "width": 0.16267220579078456,
+          "height": 0.15682012764632627,
+          "note": "rodeado de moscas, se asoma una lauchita"
+        }
+      ],
+      "narration": null,
+      "shotType": "horizon-low",
+      "background": {
+        "x": 0,
+        "y": 0.5,
+        "width": 1,
+        "height": 0.5
+      },
+      "connections": [
+        {
+          "from": "f69ef4b2-652d-45a2-a4eb-63f951382816",
+          "to": "79ba3862-f66e-446f-98ca-0d9ab064e763",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-09T20:40:18.608Z",
+  "updatedAt": "2026-08-09T21:08:32.973Z",
+  "referenceImages": []
+}

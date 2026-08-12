@@ -1,0 +1,61 @@
+{
+  "id": "88c757d3-62f5-47cf-a82a-ae2ee1e7674a",
+  "title": "levanta el micro",
+  "generalStyle": "estilo sempé y cartoon de new york, bn, mucho blanco, humanizado",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "59f6e762-01d6-4556-8a31-90399b6d0c8f",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "f69ef4b2-652d-45a2-a4eb-63f951382816",
+          "x": 0.3,
+          "y": 0.2,
+          "width": 0.18,
+          "height": 0.6,
+          "direction": "right",
+          "expression": "",
+          "dialogue": "Me lo llevo...",
+          "dialogueType": "speech",
+          "actions": [
+            "parado",
+            "está levantando del piso y con mucho esfuerzo el horno"
+          ],
+          "gazeTarget": null
+        }
+      ],
+      "backgroundId": "f9bff076-a981-474e-b36a-46320cb7f4fb",
+      "objects": [
+        {
+          "objectId": "79ba3862-f66e-446f-98ca-0d9ab064e763",
+          "x": 0.44268292682926835,
+          "y": 0.2926829268292683,
+          "width": 0.4076695884146342,
+          "height": 0.283812881097561,
+          "note": "una laucha se tira del microondas está volando hacia el suelo"
+        }
+      ],
+      "narration": null,
+      "shotType": "close-up",
+      "background": {
+        "x": 0.05,
+        "y": 0.1,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "connections": [
+        {
+          "from": "f69ef4b2-652d-45a2-a4eb-63f951382816",
+          "to": "79ba3862-f66e-446f-98ca-0d9ab064e763",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-06T13:16:04.007Z",
+  "updatedAt": "2026-08-07T11:05:48.607Z",
+  "projectId": "76bf2ca3-b8fa-43f2-b759-72fce6e65673",
+  "referenceImages": []
+}

@@ -1,0 +1,69 @@
+{
+  "id": "6d3f46a1-123a-419d-b2b6-cc470e7329a1",
+  "title": "levanta el micro",
+  "generalStyle": "estilo sempé y cartoon de new york, bn, mucho blanco, humanizado",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "59f6e762-01d6-4556-8a31-90399b6d0c8f",
+      "scene": "",
+      "characters": [
+        {
+          "characterId": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "x": 0.4423125794155019,
+          "y": 0.40330368487928847,
+          "width": 0.22076993329097838,
+          "height": 0.45041593869123253,
+          "direction": "right",
+          "expression": "",
+          "dialogue": "Me lo llevo...",
+          "dialogueType": "thought",
+          "actions": [
+            "parado",
+            "está levantando del piso y con mucho esfuerzo el horno"
+          ],
+          "gazeTarget": null,
+          "balloonId": "a3263586-8f26-4b4f-9d4a-908589801750",
+          "dialoguePos": {
+            "x": 0.42429856257941545,
+            "y": 0.2502668360864041
+          }
+        }
+      ],
+      "backgroundId": "b0b6eee6-1bde-45e3-9bbe-f973902ac385",
+      "objects": [
+        {
+          "objectId": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "x": 0.5862661542752658,
+          "y": 0.5531657730808566,
+          "width": 0.3185058336497041,
+          "height": 0.2061643741089968,
+          "note": "una laucha se tira del microondas está volando hacia el suelo"
+        }
+      ],
+      "narration": null,
+      "shotType": "close-up",
+      "background": {
+        "x": 0.05,
+        "y": 0.1,
+        "width": 0.9,
+        "height": 0.45
+      },
+      "connections": [
+        {
+          "from": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "to": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-06T13:16:04.007Z",
+  "updatedAt": "2026-08-12T00:03:44.562Z",
+  "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
+  "referenceImages": [],
+  "position": 3,
+  "results": [],
+  "resultCoverIndex": -1
+}
