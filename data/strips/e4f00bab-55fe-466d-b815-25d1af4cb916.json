@@ -62,17 +62,9 @@
     }
   ],
   "createdAt": "2026-08-09T20:40:18.608Z",
-  "updatedAt": "2026-08-12T00:38:32.613Z",
+  "updatedAt": "2026-08-12T01:07:16.145Z",
   "referenceImages": [],
   "position": 2,
-  "results": [
-    {
-      "id": "6c42cda0-66c9-46ec-9982-c3a1e06b1b29",
-      "fileName": "e4f00bab-result1.png",
-      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/e4f00bab-result1.png",
-      "observations": "tengo que corregirle la mirada...",
-      "pasted": true
-    }
-  ],
-  "resultCoverIndex": 0
+  "results": [],
+  "resultCoverIndex": -1
 }
