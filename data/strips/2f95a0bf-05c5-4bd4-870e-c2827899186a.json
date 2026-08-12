@@ -1,0 +1,20 @@
+{
+  "id": "2f95a0bf-05c5-4bd4-870e-c2827899186a",
+  "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
+  "title": "camina por el campo solo",
+  "generalStyle": "",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "4987a9b8-b8b1-4892-90dd-3a1a29b1b18c",
+      "scene": "",
+      "characters": [],
+      "backgroundId": null,
+      "objects": [],
+      "narration": null
+    }
+  ],
+  "createdAt": "2026-08-12T01:12:46.652Z",
+  "updatedAt": "2026-08-12T01:12:46.652Z"
+}
