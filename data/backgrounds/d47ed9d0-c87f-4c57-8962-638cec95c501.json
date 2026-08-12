@@ -1,0 +1,15 @@
+{
+  "id": "d47ed9d0-c87f-4c57-8962-638cec95c501",
+  "name": "camino rural",
+  "promptText": "Wide-angle rural landscape under bright direct midday light, establishing a high-key monochromatic palette of greys and whites. Camera height is eye-level, slightly elevated looking across. Foreground planes feature detailed dry, coarse grasses interspersed with small rocks and varying wild plants like ferns and low shrubs. A prominent weathered wooden post and barbed-wire fence recedes precisely in perspective across the midground. Behind it, a vast empty field recedes into a flat, distant horizon line featuring a few sparse, small trees. Above the horizon, a large expanse of clear, open sky fills the upper frame. Materialien reflect dry earth, rustic metal, aged wood, and natural foliage textures. Edge-to-edge, immersive, borderless framing with ample clear ground and sky zones for character and text overlays.",
+  "color": "#34c759",
+  "referenceImages": [
+    {
+      "fileName": "camino_rural.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/camino_rural.png"
+    }
+  ],
+  "createdAt": "2026-08-06T14:39:16.389Z",
+  "updatedAt": "2026-08-08T03:00:22.398Z",
+  "projectId": "76bf2ca3-b8fa-43f2-b759-72fce6e65673"
+}

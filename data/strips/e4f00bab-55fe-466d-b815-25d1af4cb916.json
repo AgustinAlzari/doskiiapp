@@ -1,0 +1,77 @@
+{
+  "id": "e4f00bab-55fe-466d-b815-25d1af4cb916",
+  "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
+  "title": "carlos se encuentra con el horno",
+  "generalStyle": "",
+  "panelCount": 1,
+  "aspectRatio": "square",
+  "panels": [
+    {
+      "id": "8728123c-a879-4a29-a26e-577f597b610f",
+      "scene": "Carlos encuentra el microondas abandonado en el bosque",
+      "characters": [
+        {
+          "characterId": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "x": 0.11070983810709839,
+          "y": 0.4665006226650062,
+          "width": 0.29172458748443336,
+          "height": 0.36118364726027397,
+          "direction": "front",
+          "expression": "serio y hasta un poco triste",
+          "dialogue": "... está lindo... me puede venir bien...",
+          "dialogueType": "thought",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [],
+          "actionNotes": "se rasca la cabeza como pensando",
+          "gazeTarget": null,
+          "dialoguePos": {
+            "x": 0.11237483977968256,
+            "y": 0.2362491719880236
+          },
+          "balloonId": "a3263586-8f26-4b4f-9d4a-908589801750"
+        }
+      ],
+      "backgroundId": "b0b6eee6-1bde-45e3-9bbe-f973902ac385",
+      "objects": [
+        {
+          "objectId": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "x": 0.6501245330012453,
+          "y": 0.6723536737235367,
+          "width": 0.16267220579078456,
+          "height": 0.15682012764632627,
+          "note": "rodeado de moscas, se asoma una lauchita"
+        }
+      ],
+      "narration": null,
+      "shotType": "horizon-low",
+      "background": {
+        "x": 0,
+        "y": 0.5,
+        "width": 1,
+        "height": 0.5
+      },
+      "connections": [
+        {
+          "from": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "to": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "toType": "object"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-08-09T20:40:18.608Z",
+  "updatedAt": "2026-08-11T23:20:16.183Z",
+  "referenceImages": [],
+  "position": 2,
+  "results": [
+    {
+      "id": "a5b72c60-5610-4355-8703-0eb60608b60b",
+      "fileName": "e4f00bab-result1.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/e4f00bab-result1.png",
+      "observations": "",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0
+}

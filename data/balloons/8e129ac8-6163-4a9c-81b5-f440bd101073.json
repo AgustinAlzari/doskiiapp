@@ -1,0 +1,41 @@
+{
+  "id": "8e129ac8-6163-4a9c-81b5-f440bd101073",
+  "projectId": "76bf2ca3-b8fa-43f2-b759-72fce6e65673",
+  "name": "Dialogo standar",
+  "kind": "speech",
+  "color": "#a98cde",
+  "text": "",
+  "promptText": "",
+  "referenceImages": [
+    {
+      "fileName": "dialogo_standar.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/dialogo_standar.png"
+    }
+  ],
+  "laws": {
+    "A1": true,
+    "A2": true,
+    "A3": "constante",
+    "A4": "gradual",
+    "A5": "media",
+    "B1": "organica-sutil",
+    "B2": "grueso",
+    "B3": true,
+    "B4": true,
+    "B5": true,
+    "B6": false,
+    "C1": true,
+    "C2": true,
+    "C3": "normal",
+    "C4": true,
+    "C5": true,
+    "C6": [],
+    "C7": true,
+    "C8": true,
+    "D1": true,
+    "D2": true,
+    "D3": true
+  },
+  "createdAt": "2026-08-09T20:39:14.736Z",
+  "updatedAt": "2026-08-09T20:39:14.741Z"
+}
