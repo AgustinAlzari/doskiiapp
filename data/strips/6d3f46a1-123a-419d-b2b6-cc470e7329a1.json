@@ -60,10 +60,18 @@
     }
   ],
   "createdAt": "2026-08-06T13:16:04.007Z",
-  "updatedAt": "2026-08-12T00:03:44.562Z",
+  "updatedAt": "2026-08-12T00:10:51.866Z",
   "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
   "referenceImages": [],
   "position": 3,
-  "results": [],
-  "resultCoverIndex": -1
+  "results": [
+    {
+      "id": "875096f1-d310-4ecf-97b0-9eedaa30c598",
+      "fileName": "6d3f46a1-result1.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/6d3f46a1-result1.png",
+      "observations": "",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0
 }
