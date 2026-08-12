@@ -9,12 +9,57 @@
     {
       "id": "4987a9b8-b8b1-4892-90dd-3a1a29b1b18c",
       "scene": "",
-      "characters": [],
-      "backgroundId": null,
-      "objects": [],
-      "narration": null
+      "characters": [
+        {
+          "characterId": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "x": 0.44321295143212946,
+          "y": 0.35566625155666254,
+          "width": 0.2622744785180573,
+          "height": 0.4380584526774595,
+          "direction": "down-right",
+          "expression": "va serio y aparecen alrededor de su rostro gotas de sudor",
+          "dialogue": "",
+          "dialogueType": "speech",
+          "balloonId": "24fd5dcf-4fa5-4e65-be57-c49b92abba48",
+          "dialoguePosition": null,
+          "extraDialogues": [],
+          "actions": [
+            "walking"
+          ],
+          "actionNotes": "camina avanza cargando el horno que es muy pesado",
+          "gazeTarget": null,
+          "directionMode": "face-gaze",
+          "framing": "horizon-high"
+        }
+      ],
+      "backgroundId": "35c51c8f-0925-467b-bd06-de7258cccbf3",
+      "objects": [
+        {
+          "objectId": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "x": 0.6663138231631383,
+          "y": 0.4980074719800747,
+          "width": 0.15,
+          "height": 0.15,
+          "note": "chorrea un liquido negruzco y oleoso..."
+        }
+      ],
+      "narration": null,
+      "connections": [
+        {
+          "from": "64290c97-10fb-4026-8e4c-dea067cc1049",
+          "to": "a9c0e0a1-a52c-4f22-960a-181f040df28d",
+          "toType": "object"
+        }
+      ],
+      "background": {
+        "x": 0,
+        "y": 0.12864259028642588,
+        "width": 0.548135896637609,
+        "height": 0.2740679483188045
+      },
+      "comodinDesc": "bosque lejano, difuso, no rodea al personaje, sino que lo ha dejado atrás y en esa pocision. el personaje camina por el pasto crecido, hay algunas flores silvestres"
     }
   ],
   "createdAt": "2026-08-12T01:12:46.652Z",
-  "updatedAt": "2026-08-12T01:12:46.652Z"
+  "updatedAt": "2026-08-12T01:16:25.293Z"
 }
