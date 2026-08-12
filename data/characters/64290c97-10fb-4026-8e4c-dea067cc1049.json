@@ -1,7 +1,7 @@
 {
   "id": "64290c97-10fb-4026-8e4c-dea067cc1049",
   "name": "Carlos",
-  "promptText": "Carlos is a short, stocky, elderly man. His silhouette features a slightly oversized head with prominent ears, a bulbous nose, and wisps of grey hair. Distinctive round, dark-framed spectacles cover his eyes, and he has a neutral expression. He wears a long, white lab coat over a light-colored collared shirt, dark trousers, and dark leather shoes. Consistent anatomy and a clean monochromatic grey-scale palette define the figure against a white field, illuminated by even,",
+  "promptText": "Carlos is a short, stocky, elderly man. His silhouette features a slightly oversized head with prominent ears, a bulbous nose, and wisps of hair. Distinctive round, dark-framed spectacles cover his eyes, and he has a neutral expression. He wears a long, white lab coat over a light-colored collared shirt, white trousers, and white leather shoes. Consistent anatomy and a clean monochromatic palette define the figure against a white field, illuminated by even,",
   "color": "#007aff",
   "referenceImages": [
     {
@@ -10,6 +10,6 @@
     }
   ],
   "createdAt": "2026-08-05T13:29:11.592Z",
-  "updatedAt": "2026-08-10T13:26:03.315Z",
+  "updatedAt": "2026-08-12T01:35:54.180Z",
   "projectId": "8cb1b454-897b-4acb-a103-70430990962e"
 }
