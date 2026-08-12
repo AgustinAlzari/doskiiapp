@@ -38,9 +38,11 @@
                 "y": 0.25078796366247236,
                 "width": 0.33340986924034866,
                 "height": 0.12563628580323785
-              }
+              },
+              "balloonId": "f338b07c-07db-43ff-b7d8-6caf0afeb0cd"
             }
-          ]
+          ],
+          "balloonId": "f338b07c-07db-43ff-b7d8-6caf0afeb0cd"
         },
         {
           "characterId": "470ff00e-e4bf-45ae-9204-eebee2c478f8",
@@ -66,14 +68,16 @@
                 "y": 0.16792430564935198,
                 "width": 0.3558160803237858,
                 "height": 0.14814465286425904
-              }
+              },
+              "balloonId": "f338b07c-07db-43ff-b7d8-6caf0afeb0cd"
             }
           ],
           "actionNotes": "tiene las manos en la cintura como dos asas de pava",
           "dialoguePos": {
             "x": 0.46737990951020625,
             "y": 0.04072815292419904
-          }
+          },
+          "balloonId": "f338b07c-07db-43ff-b7d8-6caf0afeb0cd"
         }
       ],
       "backgroundId": "b0012ea9-0a32-4577-8e53-fd871cd4bff4",
@@ -114,7 +118,7 @@
     }
   ],
   "createdAt": "2026-08-06T13:57:32.078Z",
-  "updatedAt": "2026-08-07T13:55:03.394Z",
+  "updatedAt": "2026-08-12T01:30:00.057Z",
   "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
   "referenceImages": [],
   "position": 5
