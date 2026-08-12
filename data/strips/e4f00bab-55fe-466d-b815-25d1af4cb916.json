@@ -62,9 +62,17 @@
     }
   ],
   "createdAt": "2026-08-09T20:40:18.608Z",
-  "updatedAt": "2026-08-12T01:07:16.145Z",
+  "updatedAt": "2026-08-12T01:08:44.322Z",
   "referenceImages": [],
   "position": 2,
-  "results": [],
-  "resultCoverIndex": -1
+  "results": [
+    {
+      "id": "c0d77b8a-22c3-4ea0-a730-7477aae05fa6",
+      "fileName": "e4f00bab-result1.png",
+      "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/e4f00bab-result1.png",
+      "observations": "",
+      "pasted": true
+    }
+  ],
+  "resultCoverIndex": 0
 }
