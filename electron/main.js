@@ -2,9 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, clipboard, net 
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const initBackup = require('./backup');
 
 const isDev = !app.isPackaged;
 let mainWindow;
+let flushed = false;
 
 // --- Version check (GitHub releases) ---
 const UPDATE_REPO = 'AgustinAlzari/doskiiapp';
@@ -72,6 +74,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      // Permite el tag <webview> para el chat de IA embarcado en la vista de prompts.
+      webviewTag: true,
     },
     titleBarStyle: 'hiddenInset',
   });
@@ -92,9 +96,25 @@ app.whenReady().then(() => {
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('before-quit', async (e) => {
+  if (flushed) return;
+  e.preventDefault();
+  flushed = true;
+  await Promise.race([
+    backup.flush(),
+    new Promise(res => setTimeout(res, 10000)),
+  ]);
+  app.quit();
+});
 
 // --- Data directory ---
 const DATA_DIR = path.join(app.getPath('appData'), 'dibuweb', 'data');
+const APP_DATA_DIR = path.join(app.getPath('appData'), 'dibuweb');
+const backup = initBackup({
+  dataDir: DATA_DIR,
+  appDataDir: APP_DATA_DIR,
+  getWindow: () => mainWindow,
+});
 function ensureDir(dir) { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); }
 function ensureDataDirs() {
   ensureDir(DATA_DIR);
@@ -181,6 +201,7 @@ ipcMain.handle('references:import', async (_, { sourcePath, entityId, entityName
   const fileName = `${safeName || 'referencia'}${ext}`;
   const destination = path.join(DATA_DIR, 'references', fileName);
   fs.copyFileSync(sourcePath, destination);
+  backup.markDirty();
   return { fileName, path: destination };
 });
 
@@ -223,6 +244,13 @@ ipcMain.handle('references:open-used-folder', async (_, fileNames) => {
   return { ok: true, folder };
 });
 
+// --- IPC: Backup a la nube ---
+ipcMain.handle('backup:get-status', async () => backup.getStatus());
+ipcMain.handle('backup:sync-now', async () => {
+  await backup.syncNow();
+  return backup.getStatus();
+});
+
 // --- IPC: Characters ---
 ipcMain.handle('characters:list', async () => {
   ensureDataDirs();
@@ -235,12 +263,14 @@ ipcMain.handle('characters:save', async (_, character) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'characters', `${character.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(character, null, 2), 'utf-8');
+  backup.markDirty();
   return character;
 });
 
 ipcMain.handle('characters:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'characters', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -256,12 +286,14 @@ ipcMain.handle('strips:save', async (_, strip) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'strips', `${strip.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(strip, null, 2), 'utf-8');
+  backup.markDirty();
   return strip;
 });
 
 ipcMain.handle('strips:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'strips', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -287,12 +319,14 @@ ipcMain.handle('backgrounds:save', async (_, background) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'backgrounds', `${background.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(background, null, 2), 'utf-8');
+  backup.markDirty();
   return background;
 });
 
 ipcMain.handle('backgrounds:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'backgrounds', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -308,12 +342,14 @@ ipcMain.handle('objects:save', async (_, object) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'objects', `${object.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(object, null, 2), 'utf-8');
+  backup.markDirty();
   return object;
 });
 
 ipcMain.handle('objects:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'objects', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -329,12 +365,14 @@ ipcMain.handle('balloons:save', async (_, balloon) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'balloons', `${balloon.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(balloon, null, 2), 'utf-8');
+  backup.markDirty();
   return balloon;
 });
 
 ipcMain.handle('balloons:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'balloons', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -350,12 +388,14 @@ ipcMain.handle('palettes:save', async (_, palette) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'palettes', `${palette.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(palette, null, 2), 'utf-8');
+  backup.markDirty();
   return palette;
 });
 
 ipcMain.handle('palettes:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'palettes', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -371,12 +411,14 @@ ipcMain.handle('authors:save', async (_, author) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'authors', `${author.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(author, null, 2), 'utf-8');
+  backup.markDirty();
   return author;
 });
 
 ipcMain.handle('authors:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'authors', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -396,12 +438,14 @@ ipcMain.handle('projects:list', async () => {
 ipcMain.handle('projects:save', async (_, project) => {
   ensureDataDirs();
   writeJsonFile(path.join(DATA_DIR, 'projects'), project);
+  backup.markDirty();
   return project;
 });
 
 ipcMain.handle('projects:delete', async (_, id) => {
   const filePath = path.join(DATA_DIR, 'projects', `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  backup.markDirty();
   return true;
 });
 
@@ -419,6 +463,7 @@ ipcMain.handle('projects:deleteAll', async (_, projectId) => {
   deleteOwned(path.join(DATA_DIR, 'strips'));
   const p = path.join(DATA_DIR, 'projects', `${projectId}.json`);
   if (fs.existsSync(p)) fs.unlinkSync(p);
+  backup.markDirty();
   return true;
 });
 
@@ -466,6 +511,7 @@ ipcMain.handle('projects:duplicate', async (_, projectId) => {
       updatedAt: new Date().toISOString(),
     });
   });
+  backup.markDirty();
   return newProject;
 });
 
@@ -551,6 +597,7 @@ ipcMain.handle('projects:import', async (_, filePath) => {
     updatedAt: new Date().toISOString(),
   });
   writeJsonFile(path.join(DATA_DIR, 'projects'), newProject);
+  backup.markDirty();
   return newProject;
 });
 
@@ -559,7 +606,15 @@ ipcMain.handle('references:save-svg', async (_, { fileName, svgContent }) => {
   ensureDataDirs();
   const filePath = path.join(DATA_DIR, 'references', fileName);
   fs.writeFileSync(filePath, svgContent, 'utf-8');
+  backup.markDirty();
   return { fileName, path: filePath };
+});
+
+// --- IPC: Save exported image to an arbitrary path chosen by the user ---
+ipcMain.handle('export:save', async (_, { filePath, data }) => {
+  if (!filePath) return { ok: false };
+  fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+  return { ok: true, filePath };
 });
 
 // --- IPC: Save binary file (JPG) to references ---
@@ -568,12 +623,28 @@ ipcMain.handle('references:save-file', async (_, { fileName, data }) => {
   const filePath = path.join(DATA_DIR, 'references', fileName);
   const buffer = Buffer.from(data, 'base64');
   fs.writeFileSync(filePath, buffer);
+  backup.markDirty();
   return { fileName, path: filePath };
+});
+
+// --- IPC: Open external URL (popups/links del chat embarcado) ---
+ipcMain.handle('chat:open-external', async (_, url) => {
+  if (typeof url === 'string' && /^https?:/i.test(url)) shell.openExternal(url)
+  return true;
 });
 
 // --- IPC: Write text to clipboard ---
 ipcMain.handle('clipboard:write', async (_, text) => {
   clipboard.writeText(String(text || ''));
+  return true;
+});
+
+// --- IPC: Write image (base64) to clipboard ---
+ipcMain.handle('clipboard:write-image', async (_, data) => {
+  if (!data) return false;
+  const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'));
+  if (image.isEmpty()) return false;
+  clipboard.writeImage(image);
   return true;
 });
 
@@ -586,6 +657,7 @@ ipcMain.handle('references:paste', async (_, { fileName }) => {
   const safeName = base.endsWith('.png') ? base : `${base}.png`;
   const filePath = path.join(DATA_DIR, 'references', safeName);
   fs.writeFileSync(filePath, image.toPNG());
+  backup.markDirty();
   return { fileName: safeName, path: filePath };
 });
 

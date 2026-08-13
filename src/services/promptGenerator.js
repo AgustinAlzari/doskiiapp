@@ -400,7 +400,7 @@ function stylePaletteLines(project, generalStyle, paletteColors) {
   return lines
 }
 
-function sceneBodyLines(ctx, panel, styleText = '') {
+function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author = null) {
   const lines = []
   if (panel.timeTransition) {
     const transition = TIME_TRANSITIONS.find(item => item.id === panel.timeTransition)
@@ -503,7 +503,35 @@ function sceneBodyLines(ctx, panel, styleText = '') {
     })
   }
 
+  if (panel.signature) {
+    lines.push('')
+    lines.push(...signaturePromptLines(panel.signature, author, paletteColors))
+  }
+
   return lines
+}
+
+function signaturePromptLines(signature, author, paletteColors = []) {
+  const color = (paletteColors || []).find(c => c.id === signature.colorId)
+  const colorDesc = color
+    ? `${color.hex}${color.label ? ` ("${color.label}")` : ''}`
+    : 'the project default ink (as the rest of the line art)'
+  const image = author?.signatureImage?.[0]
+  const textSig = author?.signatureText?.trim() || author?.fullName?.trim() || ''
+  let graphic
+  if (image) {
+    graphic = `Use the attached signature reference image "${image.fileName}" exactly as the signature, scaled to fit the area.`
+  } else if (textSig) {
+    graphic = `Draw the signature as handwritten text: "${textSig}", in a loose personal handwriting style consistent with the rest of the panel.`
+  } else {
+    graphic = 'No signature graphic available: leave this area empty.'
+  }
+  return [
+    'SIGNATURE: Place the author\'s signature in the area at ' +
+      `x ${Math.round(signature.x * 100)}%, y ${Math.round(signature.y * 100)}%, w ${Math.round(signature.width * 100)}%, h ${Math.round(signature.height * 100)}%.`,
+    `- Color: ${colorDesc}.`,
+    `- Graphic: ${graphic}`,
+  ]
 }
 
 function globoXAnchorText(gx, ctx) {
@@ -622,7 +650,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
   return lines
 }
 
-export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, paletteColors = null) {
+export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, paletteColors = null, author = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
@@ -632,7 +660,7 @@ export function generateScenePrompt(panel, characters = [], generalStyle, backgr
     ...stylePaletteLines(project, generalStyle, paletteColors),
     'LETTERING LOCK: This prompt describes the SCENE layer only, WITHOUT any dialogue or lettering. Do NOT draw any speech balloons, thought bubbles, narration boxes, captions, or sound-effect words. Do not write any text, letters, or typography anywhere in the image. Do not leave blank outlines, circles, or box placeholders hinting at future balloons. The scene must stand alone as a text-free panel; lettering is added later in a separate step.',
     '',
-    ...sceneBodyLines(ctx, panel, styleText),
+    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author),
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved, and with NO text, lettering, or balloons of any kind. Use "${layoutName}" strictly as a spatial guide for where each scene element sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
   ]
@@ -656,7 +684,7 @@ export function generateLetteringPrompt(panel, characters = [], generalStyle, ba
   return lines.join('\n')
 }
 
-export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = [], paletteColors = null) {
+export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = [], paletteColors = null, author = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileNameFor(strip, panelIndex)
   const projectStyle = projectStyleText(project)
@@ -664,7 +692,7 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   const lines = [
     ...headerLines(ctx, layoutName),
     ...stylePaletteLines(project, generalStyle, paletteColors),
-    ...sceneBodyLines(ctx, panel, styleText),
+    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author),
     ...letteringLines(ctx, panel, project, layoutName, balloons),
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
@@ -673,12 +701,12 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   return lines.join('\n')
 }
 
-export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null, balloons = [], paletteColors = null) {
+export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null, balloons = [], paletteColors = null, author = null) {
   const chars = Array.isArray(characters) ? characters : []
   const bgs = Array.isArray(backgrounds) ? backgrounds : []
   const objs = Array.isArray(objects) ? objects : []
   return (strip?.panels || []).map((panel, index) => {
-    const prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, index, strip, project, balloons, paletteColors)
+    const prompt = generatePanelPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, index, strip, project, balloons, paletteColors, author)
     return `=== PANEL ${index + 1} ===\n\n${prompt}`
   }).join('\n\n')
 }

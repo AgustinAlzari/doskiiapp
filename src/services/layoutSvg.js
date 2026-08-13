@@ -57,6 +57,11 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
       const def = objects.find(o => o.id === obj.objectId)
       rects.push({ x: obj.x * svgW, y: obj.y * svgH, w: obj.width * svgW, h: obj.height * svgH, stroke: def?.color || '#666', fill: 'none', label: def?.name || `O${i + 1}` })
     })
+
+    if (panel.signature) {
+      const sig = panel.signature
+      rects.push({ x: sig.x * svgW, y: sig.y * svgH, w: sig.width * svgW, h: sig.height * svgH, stroke: '#8e44ad', fill: 'none', dash: '4 3', label: 'firma' })
+    }
   } else {
     if (panel.narration && panel.narration.text) {
       const n = panel.narration

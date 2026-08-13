@@ -42,7 +42,7 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>objetos</h1>
+        <h1 className="ui-h1">objetos</h1>
         <button className="btn btn-primary" onClick={onNew}>nuevo objeto</button>
       </div>
 
@@ -59,7 +59,7 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
               onClick={() => onEdit(obj)}
             >
               <ObjectThumb referenceImages={obj.referenceImages} />
-              <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>
+              <div className="ui-h3">
                 {obj.name}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>

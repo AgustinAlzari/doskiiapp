@@ -11,7 +11,7 @@ export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
 
   const [name, setName] = useState(object?.name || '')
   const [promptText, setPromptText] = useState(object?.promptText || '')
-  const [color, setColor] = useState(object?.color || '#ff9500')
+  const [color, setColor] = useState(object?.color || '#6e6e73')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [referenceImages, setReferenceImages] = useState(object?.referenceImages || [])
@@ -34,11 +34,11 @@ export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
 
   return (
     <div style={{ maxWidth: 520 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+        <h1 className="ui-h1">
           {isNew ? 'nuevo objeto' : 'editar objeto'}
         </h1>
-        <button className="btn btn-ghost" onClick={onCancel}>cancelar</button>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -102,7 +102,6 @@ export default function ObjectForm({ object, projectId, onSaved, onCancel }) {
           <button type="submit" className="btn btn-primary" disabled={saving || !name.trim()}>
             {saving ? 'guardando...' : 'guardar'}
           </button>
-          <button type="button" className="btn" onClick={onCancel}>cancelar</button>
         </div>
       </form>
     </div>

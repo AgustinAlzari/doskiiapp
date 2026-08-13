@@ -29,7 +29,7 @@ export default function AuthorList({ onNew, onEdit }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>autores</h1>
+        <h1 className="ui-h1">autores</h1>
         <button className="btn btn-primary" onClick={onNew}>nuevo autor</button>
       </div>
 
@@ -48,7 +48,7 @@ export default function AuthorList({ onNew, onEdit }) {
                 onClick={() => onEdit(author)}
               >
                 <SignatureThumb signatureImage={author.signatureImage} />
-                <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>
+                <div className="ui-h3">
                   {author.fullName}
                 </div>
                 {author.signatureText && (

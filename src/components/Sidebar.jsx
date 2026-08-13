@@ -1,12 +1,49 @@
+import { useEffect, useState } from 'react'
+
+const STATUS_UI = {
+  idle: { label: 'hecho' },
+  syncing: { label: 'sincronizando...' },
+  pending: { label: 'pendiente' },
+  offline: { label: 'sin conexión' },
+  error: { label: 'error' },
+  disabled: { label: 'desactivado' },
+}
+
 export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject }) {
+  const [backupStatus, setBackupStatus] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+
+  useEffect(() => {
+    const api = window.api?.backup
+    if (!api) return
+    api.getStatus().then(setBackupStatus).catch(() => {})
+    return api.onStatus(setBackupStatus)
+  }, [])
+
+  const handleSync = async () => {
+    const api = window.api?.backup
+    if (!api || syncing) return
+    setSyncing(true)
+    try {
+      setBackupStatus(await api.syncNow())
+    } catch {
+      setBackupStatus({ state: 'error', message: 'no se pudo sincronizar' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const statusMeta = STATUS_UI[backupStatus?.state] || { label: '...' }
   const navItems = [
     { id: 'strips', label: 'viñetas', active: ['strips', 'new-strip', 'editor', 'prompts'] },
     { id: 'characters', label: 'personajes', active: ['characters', 'new-character', 'edit-character'] },
     { id: 'backgrounds', label: 'fondos', active: ['backgrounds', 'new-background', 'edit-background'] },
     { id: 'objects', label: 'objetos', active: ['objects', 'new-object', 'edit-object'] },
     { id: 'balloons', label: 'globos', active: ['balloons', 'new-balloon', 'edit-balloon'] },
+    { id: 'export', label: 'preview y export', active: ['export'], divider: true },
     { id: 'authors', label: 'autores', active: ['authors', 'new-author', 'edit-author'], divider: true },
     { id: 'projects', label: 'proyectos', active: ['projects'] },
+    { id: 'modelo', label: 'modelos', active: ['modelo'], divider: true },
   ]
 
   const isActive = (item) => item.active.includes(currentView)
@@ -51,7 +88,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: activeProject ? 12 : 12 }}>
         {navItems.map((item, idx) => {
-          const scoped = item.id !== 'projects'
+          const scoped = item.id !== 'projects' && item.id !== 'modelo'
           const disabled = scoped && !activeProject
           return (
             <div key={item.id}>
@@ -77,6 +114,19 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
       )}
 
       <div style={{ flex: 1 }} />
+
+      <div style={{ borderTop: '1px solid var(--color-border-muted)', paddingTop: 8, marginTop: 8 }}>
+        <div
+          className="sidebar-item"
+          onClick={handleSync}
+          style={syncing ? { cursor: 'default', opacity: 0.5 } : undefined}
+        >
+          sincronizar
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 12, marginTop: 2 }}>
+          {statusMeta.label}
+        </div>
+      </div>
     </aside>
   )
 }

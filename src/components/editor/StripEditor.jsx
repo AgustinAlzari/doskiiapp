@@ -4,6 +4,8 @@ import useCharacterStore from '../../store/characterStore'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
 import useBalloonStore from '../../store/balloonStore'
+import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
+import useAuthorStore from '../../store/authorStore'
 import { SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, SFX_STYLES, ASPECT_RATIOS } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 import PanelCanvas from './PanelCanvas'
@@ -17,6 +19,8 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
   const balloons = useBalloonStore(s => s.balloons)
+  const palettes = usePaletteStore(s => s.palettes)
+  const authors = useAuthorStore(s => s.authors)
   const [data, setDataState] = useState(strip)
   const [selectedPanelIdx, setSelectedPanelIdx] = useState(0)
   const [selectedCharIdx, setSelectedCharIdx] = useState(null)
@@ -25,6 +29,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [selectedNarr, setSelectedNarr] = useState(false)
   const [selectedBalloon, setSelectedBalloon] = useState(null)
   const [selectedGloboXIdx, setSelectedGloboXIdx] = useState(null)
+  const [selectedSignature, setSelectedSignature] = useState(false)
   const [saveState, setSaveState] = useState(null)
   const [showDescModal, setShowDescModal] = useState(false)
   const [descDraft, setDescDraft] = useState('')
@@ -33,6 +38,11 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
 
   const projectBalloons = balloons.filter(b => b.projectId === project?.id)
   const wildcardBalloon = projectBalloons.find(b => b.comodin) || null
+
+  // Solo los elementos del proyecto activo (los desplegables no deben mezclar proyectos).
+  const projectCharacters = characters.filter(c => c.projectId === project?.id)
+  const projectBackgrounds = backgrounds.filter(b => b.projectId === project?.id)
+  const projectObjects = objects.filter(o => o.projectId === project?.id)
 
   const dataRef = useRef(strip)
   const historyRef = useRef([])
@@ -61,6 +71,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedNarr(false)
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
+    setSelectedSignature(false)
   }, [])
 
   const undo = useCallback(() => {
@@ -291,6 +302,40 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedNarr(false)
   }, [])
 
+  // Signature (firma)
+  const updateSignatureInPanel = useCallback((panelIdx, updates) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const signature = { ...(panels[panelIdx].signature || {}), ...updates }
+      panels[panelIdx] = { ...panels[panelIdx], signature }
+      return { ...prev, panels }
+    })
+  }, [setData])
+
+  const removeSignatureFromPanel = useCallback((panelIdx) => {
+    updatePanel(panelIdx, { signature: null })
+    setSelectedSignature(false)
+  }, [updatePanel])
+
+  const toggleSignature = useCallback(() => {
+    if (panel?.signature) {
+      removeSignatureFromPanel(selectedPanelIdx)
+    } else {
+      updatePanel(selectedPanelIdx, { signature: { x: 0.7, y: 0.85, width: 0.25, height: 0.1, colorId: null } })
+      setSelectedSignature(true)
+    }
+  }, [panel?.signature, selectedPanelIdx, updatePanel, removeSignatureFromPanel])
+
+  const selectSignature = useCallback(() => {
+    setSelectedSignature(true)
+    setSelectedCharIdx(null)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedNarr(false)
+    setSelectedBalloon(null)
+    setSelectedGloboXIdx(null)
+  }, [])
+
   // Balloons (dialogue positions on canvas)
   const updateDialoguePos = useCallback((panelIdx, characterId, isExtra, extraIdx, updates) => {
     setData(prev => {
@@ -452,6 +497,11 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setTimeout(() => setSaveState(null), 2000)
   }
 
+  // Autoguarda el título al salir del campo (o Enter): se persiste desde el editor.
+  const autosaveTitle = () => {
+    if (data.title !== (strip?.title)) save(data)
+  }
+
   const selectedCharData = selectedCharIdx != null ? panel?.characters[selectedCharIdx] : null
   const selectedCharDef = selectedCharData ? characters.find(c => c.id === selectedCharData.characterId) : null
   const selectedSfxData = panel?.sfx?.[selectedSfxIdx]
@@ -481,18 +531,43 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     ? `X${((panel?.globosX || []).slice(0, selectedGloboXIdx + 1).filter(x => x.text).length) || selectedGloboXIdx + 1}`
     : 'X'
 
+  const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
+  const paletteColors = resolvePaletteColors(project, palettes)
+  const signatureColor = (() => {
+    const c = paletteColors.find(c => c.id === panel?.signature?.colorId)
+    return c?.hex || null
+  })()
+  const signatureText = author?.signatureText || author?.fullName || ''
+  const signatureImageRef = author?.signatureImage?.[0] || null
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div className="editor-header" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--color-border-muted)' }}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>←</button>
+        <button className="back-arrow" onClick={onBack}>←</button>
         <input
-          className="input"
+          className="ui-h2"
           value={data.title}
           onChange={e => setData(prev => ({ ...prev, title: e.target.value }))}
+          onBlur={autosaveTitle}
+          onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); autosaveTitle() } }}
           placeholder="título..."
-          style={{ flex: 1, fontWeight: 700, fontSize: 16, border: 'none', background: 'transparent', padding: 0 }}
+          style={{ flex: 1, fontSize: 16, border: 'none', background: 'transparent', padding: 0, outline: 'none' }}
         />
+        <span
+          onClick={undo}
+          title="deshacer · Ctrl+Z"
+          style={{
+            fontSize: 12,
+            color: undoSteps === 0 ? 'var(--color-text-muted)' : 'var(--color-accent)',
+            cursor: undoSteps === 0 ? 'default' : 'pointer',
+            userSelect: 'none',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          ctrl-z
+        </span>
         <select
           className="time-pill"
           value={data.aspectRatio || 'hd'}
@@ -502,9 +577,6 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         >
           {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
         </select>
-        <button className="btn btn-sm" onClick={undo} disabled={undoSteps === 0} title="Ctrl+Z · deshacer">
-          deshacer ({undoSteps})
-        </button>
         <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters, balloons)}>
           prompts
         </button>
@@ -546,7 +618,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               maxRows={16}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowDescModal(false)}>cerrar</button>
+              <button className="back-arrow" onClick={() => setShowDescModal(false)} title="cerrar">←</button>
               <button className="btn btn-primary btn-sm" onClick={() => { setData(prev => ({ ...prev, generalStyle: descDraft })); setShowDescModal(false) }}>guardar</button>
             </div>
           </div>
@@ -586,7 +658,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 <div
                   className={`sidebar-item ${i === selectedPanelIdx ? 'active' : ''}`}
                   style={{ justifyContent: 'center', fontSize: 12 }}
-                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedNarr(false) }}
+                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedNarr(false); setSelectedSignature(false) }}
                 >
                   cuadro {i + 1}
                 </div>
@@ -641,6 +713,14 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 onAddConnection={(fromId, toId, toType) => addConnection(selectedPanelIdx, fromId, toId, toType)}
                 onRemoveConnection={(fromId, toId) => removeConnection(selectedPanelIdx, fromId, toId)}
                 onCanvasClick={deselectAll}
+                signature={panel?.signature || null}
+                selectedSignature={selectedSignature}
+                onSelectSignature={selectSignature}
+                onUpdateSignature={(updates) => updateSignatureInPanel(selectedPanelIdx, updates)}
+                onRemoveSignature={() => removeSignatureFromPanel(selectedPanelIdx)}
+                signatureColor={signatureColor}
+                signatureText={signatureText}
+                signatureImagePath={signatureImageRef?.path || null}
               />
             </div>
 
@@ -776,11 +856,63 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               <div className="editor-guide-tools">
                 <label className="label">guías</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button className={`btn btn-sm ${panel?.horizon ? '' : 'btn-ghost'}`} onClick={toggleHorizon}>Horizonte</button>
-                  <button className={`btn btn-sm ${gridVisible ? '' : 'btn-ghost'}`} onClick={() => setGridVisible(value => !value)}>Grilla</button>
+                  <button className={`btn btn-sm ${panel?.horizon ? '' : 'btn-ghost'}`} onClick={toggleHorizon}>horizonte</button>
+                  <button className={`btn btn-sm ${gridVisible ? '' : 'btn-ghost'}`} onClick={() => setGridVisible(value => !value)}>grilla</button>
                   {panel?.horizon && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => updatePanel(selectedPanelIdx, { horizon: null })}>×</button>}
                 </div>
                 {panel?.horizon && <input className="input" value={panel.horizon.description || ''} onChange={e => updatePanel(selectedPanelIdx, { horizon: { ...panel.horizon, description: e.target.value } })} placeholder="descripción del horizonte..." style={{ fontSize: 12 }} />}
+              </div>
+
+              {/* Firma */}
+              <div>
+                <label className="label">firma</label>
+                <label className="check-item" style={{ marginBottom: 6 }}>
+                  <div
+                    className={`check-box ${panel?.signature ? 'checked' : ''}`}
+                    onClick={toggleSignature}
+                  />
+                  <span style={{ fontSize: 12 }}>poner</span>
+                </label>
+                {panel?.signature && (
+                  <>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                      {author
+                        ? (signatureImageRef
+                          ? `firma en imagen: ${signatureImageRef.fileName}`
+                          : signatureText
+                            ? `firma: «${signatureText}»`
+                            : `firma de ${author.fullName}`)
+                        : 'el proyecto no tiene autor asignado: la firma se dibuja igual (sin imagen).'}
+                    </div>
+                    <label className="label">color</label>
+                    <div className="radio-group" style={{ flexWrap: 'wrap' }}>
+                      <div
+                        className={`radio-pill ${!panel.signature.colorId ? 'active' : ''}`}
+                        onClick={() => updateSignatureInPanel(selectedPanelIdx, { colorId: null })}
+                        title="tinta por defecto (negro en B&N)"
+                      >
+                        vacío (tinta)
+                      </div>
+                      {paletteColors.filter(c => c.hex).map(c => (
+                        <div
+                          key={c.id}
+                          className={`radio-pill ${panel.signature.colorId === c.id ? 'active' : ''}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                          onClick={() => updateSignatureInPanel(selectedPanelIdx, { colorId: c.id })}
+                          title={c.label || c.hex}
+                        >
+                          <span className="color-dot" style={{ background: c.hex }} />
+                          {c.label || c.hex}
+                        </div>
+                      ))}
+                    </div>
+                    {paletteColors.length === 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                        el proyecto está en B&N o sin colores de paleta: se usa la tinta por defecto.
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Scene */}
@@ -840,7 +972,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     style={{ fontSize: 12, cursor: 'pointer' }}
                   >
                     <option value="">+ personaje...</option>
-                    {characters.map(char => (
+                    {projectCharacters.map(char => (
                       <option key={char.id} value={char.id}>{char.name}</option>
                     ))}
                   </select>
@@ -872,7 +1004,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     style={{ fontSize: 12, cursor: 'pointer' }}
                   >
                     <option value="">fondo...</option>
-                    {backgrounds.map(bg => (
+                    {projectBackgrounds.map(bg => (
                       <option key={bg.id} value={bg.id}>{bg.name}</option>
                     ))}
                   </select>
@@ -897,7 +1029,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     style={{ fontSize: 12, cursor: 'pointer' }}
                   >
                     <option value="">+ objeto...</option>
-                    {objects.map(obj => (
+                    {projectObjects.map(obj => (
                       <option key={obj.id} value={obj.id}>{obj.name}</option>
                     ))}
                   </select>
