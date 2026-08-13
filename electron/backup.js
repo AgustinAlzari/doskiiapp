@@ -230,20 +230,21 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   // --- conjunto nube (excluye proyectos "solo local") ---
-  function computeAllowed() {
+  function computeCloudSets() {
     const localOnly = new Set();
     readJsonFiles(path.join(dataDir, 'projects')).forEach(p => {
       if (p.cloudBackup === false) localOnly.add(p.id);
     });
 
-    const excludeIds = new Set();
+    const excludedBySub = {};
     const refLocal = new Set();
     const refCloud = new Set();
+    OWNED.forEach(sub => { excludedBySub[sub] = new Set(); });
 
     OWNED.forEach(sub => {
       readJsonFiles(path.join(dataDir, sub)).forEach(e => {
         const excluded = e.projectId && localOnly.has(e.projectId);
-        if (excluded) excludeIds.add(e.id);
+        if (excluded) excludedBySub[sub].add(e.id);
         const target = excluded ? refLocal : refCloud;
         (e.referenceImages || []).forEach(r => {
           if (r.fileName) target.add(r.fileName);
@@ -251,13 +252,18 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
       });
     });
 
+    return { localOnly, excludedBySub, refLocal, refCloud };
+  }
+
+  function computeAllowed() {
+    const { localOnly, excludedBySub, refLocal, refCloud } = computeCloudSets();
     const allowed = {};
     allowed.projects = new Set(
       readJsonFiles(path.join(dataDir, 'projects')).filter(p => !localOnly.has(p.id)).map(p => `${p.id}.json`)
     );
     OWNED.forEach(sub => {
       allowed[sub] = new Set(
-        readJsonFiles(path.join(dataDir, sub)).filter(e => !excludeIds.has(e.id)).map(e => `${e.id}.json`)
+        readJsonFiles(path.join(dataDir, sub)).filter(e => !excludedBySub[sub].has(e.id)).map(e => `${e.id}.json`)
       );
     });
     allowed.references = new Set(
@@ -270,6 +276,17 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
       allowed[sub] = new Set(listFiles(path.join(dataDir, sub)));
     });
     return allowed;
+  }
+
+  // Rutas relativas que NO se deben descargar: archivos de proyectos "solo local"
+  // y referencias que solo usan proyectos locales.
+  function computeExcludedPaths() {
+    const { localOnly, excludedBySub, refLocal, refCloud } = computeCloudSets();
+    const ex = new Set([TOMB_FILE]);
+    localOnly.forEach(id => ex.add(`projects/${id}.json`));
+    Object.entries(excludedBySub).forEach(([sub, ids]) => ids.forEach(id => ex.add(`${sub}/${id}.json`)));
+    refLocal.forEach(n => { if (!refCloud.has(n)) ex.add(`references/${n}`); });
+    return ex;
   }
 
   function isCloudPath(sub, name) {
@@ -302,6 +319,30 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     });
     fs.writeFileSync(FILES_LIST, lines.join('\n'), 'utf-8');
     return FILES_LIST;
+  }
+
+  function writePathsToFile(paths, file) {
+    fs.writeFileSync(file, paths.join('\n'), 'utf-8');
+    return file;
+  }
+
+  async function listCloudFiles() {
+    const out = await rclone('lsf', '-R', '--files-only', '--format', 'p', config.rclone.remote);
+    return String(out).split('\n').map(s => s.trim()).filter(Boolean);
+  }
+
+  function countFiles(dir) {
+    if (!fs.existsSync(dir)) return 0;
+    let n = 0;
+    const walk = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else n++;
+      }
+    };
+    walk(dir);
+    return n;
   }
 
   // --- tombstones ---
@@ -386,6 +427,9 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   // --- bajar (refrescar antes de abrir) ---
+  // Lista la nube, excluye tombstones y proyectos "solo local", y descarga lo
+  // más nuevo SIN pisar trabajo local más actual (`--update`). Los archivos
+  // locales que la nube reemplaza quedan respaldados en .sync-backup/cloud.
   async function refresh() {
     if (!config.enabled) {
       setStatus('disabled', { message: 'backup desactivado en backup.json' });
@@ -398,13 +442,23 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     setStatus('syncing', { message: 'actualizando desde la nube...' });
     try {
       await rclone('copyto', `${config.rclone.remote}/${TOMB_FILE}`, TOMB_LOCAL).catch(() => {});
-      const allowed = computeAllowed();
-      const list = writeFilesFrom(allowed);
-      if (fs.readFileSync(list, 'utf-8').trim()) {
-        await rclone('copy', '--update', `--files-from=${list}`, config.rclone.remote, dataDir, '--transfers', '4', '--stats', '0');
+      const excluded = computeExcludedPaths();
+      const cloudFiles = await listCloudFiles();
+      const files = cloudFiles.filter(p => !excluded.has(p));
+      const backupDir = path.join(BASE, '.sync-backup', 'cloud');
+      if (files.length) {
+        const list = writePathsToFile(files, FILES_LIST);
+        await rclone(
+          'copy', '--update', `--backup-dir=${backupDir}`, `--files-from=${list}`,
+          config.rclone.remote, dataDir, '--transfers', '4', '--stats', '0'
+        );
       }
       applyTombstones();
-      setStatus('idle', { message: 'actualizado', lastSync: new Date().toISOString() });
+      const replaced = countFiles(backupDir);
+      setStatus('idle', {
+        message: replaced > 0 ? `actualizado (${replaced} reemplazados, respaldados en .sync-backup)` : 'actualizado',
+        lastSync: new Date().toISOString(),
+      });
     } catch (err) {
       setStatus('error', { message: `rclone: ${String(err && err.message || err)}` });
     }
