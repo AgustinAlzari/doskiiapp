@@ -107,12 +107,23 @@ El backup automático **no usa git**: sube los datos a **Google Drive vía rclon
 
 - **Modo** (se pregunta al iniciar): `online` (autobackup activo) o `local` (autobackup apagado; se puede subir con "sincronizar").
 - **Regla del autobackup**: ON ⇔ `enabled` Y modo = en línea Y **proyecto activo no es "solo local"**.
-- **Sincronización bidireccional segura** (modo en línea): sube en cada cambio y **descarga antes de abrir un proyecto** (`rclone copy --update`, más nuevo gana, **nunca pisa un archivo más actual**).
+- **Sincronización bidireccional segura** (modo en línea): sube en cada cambio y **descarga antes de abrir un proyecto** (`rclone copy --update`, más nuevo gana, **nunca pisa un archivo más actual**). La descarga lista la nube, excluye tombstones y proyectos "solo local", y los archivos locales que la nube reemplaza quedan respaldados en `.sync-backup/cloud` (nada se pierde en silencio).
 - **Borrados con tombstone**: al borrar algo que está en la nube avisa *"se pierde para siempre"*; registra el borrado en `.tombstones.json` (en la nube) para que no reviva en otra máquina. Si el trabajo local es más nuevo que el borrado, gana lo local.
 - Solo sube el "conjunto nube" (excluye proyectos con `cloudBackup: false`). Los proyectos tienen un switch **"solo local / local + nube"**.
 - `rclone copy` es **aditivo**: nunca borra nada en la nube (salvo borrados confirmados con tombstone).
 - **Configuración una sola vez:** `brew install rclone` y `rclone config` (remoto `gdrive`, OAuth en el navegador). El usuario final no ve nada de esto.
 - El provider `git` queda como respaldo pero no es el default. Los commits "backup" ya no tocan el repo de la app.
 - Cada entidad guarda `savedAt` (fecha de guardado local) y `id` uuid robusto (validado al migrar).
+
+### Máquina nueva / restauración segura
+
+1. **No abrir la app todavía** (si no hay datos, crearía un "proyecto principal" por defecto; y una versión vieja con backup git ensuciaría el repo).
+2. `git clone https://github.com/AgustinAlzari/doskiiapp.git` y `cd doskiiapp && npm install`.
+3. (Opcional, sin Drive) `./sync.sh pull` para traer `data/` del repo.
+4. `brew install rclone && rclone config` (remoto `gdrive`, una sola vez).
+5. Abrir la app → elegir modo → si es **en línea**, descarga lo más nuevo de Drive antes de abrir (baja todo si la máquina está limpia).
+
+**Garantías al arrancar en modo en línea:** nunca pisa un archivo local más nuevo (`--update`), no borra archivos locales salvo tombstones con fecha más vieja, excluye proyectos "solo local", y lo que la nube reemplaza queda respaldado en `.sync-backup/cloud`.
+
 
 
