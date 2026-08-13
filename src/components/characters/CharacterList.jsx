@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import useCharacterStore from '../../store/characterStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
+import ChatLayout from '../chat/ChatLayout'
 
 function CharacterThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -41,11 +42,14 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">personajes</h1>
-        <button className="btn btn-primary" onClick={onNew}>nuevo personaje</button>
-      </div>
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">personajes</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-primary" onClick={onNew}>nuevo personaje</button>
+          </div>
+        </div>
 
       {scoped.length === 0 ? (
         <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
@@ -94,6 +98,7 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

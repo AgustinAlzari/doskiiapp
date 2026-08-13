@@ -4,6 +4,7 @@ import useCharacterStore from '../../store/characterStore'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
+import ChatLayout from '../chat/ChatLayout'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -42,14 +43,15 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">proyectos</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" onClick={handleImport}>importar .doski</button>
-          <button className="btn btn-primary" onClick={onNew}>nuevo proyecto</button>
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">proyectos</h1>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={handleImport}>importar .doski</button>
+            <button className="btn btn-primary" onClick={onNew}>nuevo proyecto</button>
+          </div>
         </div>
-      </div>
 
       {projects.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '64px 24px' }}>
@@ -105,6 +107,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

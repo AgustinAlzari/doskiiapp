@@ -4,6 +4,7 @@ import useProjectStore from '../../store/projectStore'
 import useAuthorStore from '../../store/authorStore'
 import { exportCleanImage, resolveAuthor, slugify, FORMAT_EXT } from '../../services/imageExport'
 import ImagePreview from '../ImagePreview'
+import ChatLayout from '../chat/ChatLayout'
 
 // PNG es lossless; JPEG/WebP exportan con el máximo factor de calidad.
 const FORMATS = [
@@ -196,9 +197,10 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     .map(it => ({ src: srcs[it.key], title: `${it.stripTitle} · resultado ${it.resultIdx + 1}` }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <ChatLayout>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Encabezado */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+      <div className="section-header" style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h1 className="ui-h1" style={{ marginBottom: 4 }}>preview y export</h1>
           {project?.name && (
@@ -339,6 +341,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           ]}
         />
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

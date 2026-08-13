@@ -216,7 +216,7 @@ export default function App() {
       case 'prompts':
         return promptData && (
           <>
-            <div className="editor-header" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--color-border-muted)' }}>
+            <div className="section-header">
               <button className="back-arrow" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
               <span className="ui-h2">prompts — {promptData.strip?.title || 'viñeta'}</span>
             </div>
@@ -251,7 +251,6 @@ export default function App() {
           <CharacterForm
             character={editingCharacter}
             projectId={activeProjectId}
-            onSaved={() => { setEditingCharacter(null); setView('characters') }}
             onCancel={() => { setEditingCharacter(null); setView('characters') }}
           />
         )
@@ -271,7 +270,6 @@ export default function App() {
           <BackgroundForm
             background={editingBackground}
             projectId={activeProjectId}
-            onSaved={() => { setEditingBackground(null); setView('backgrounds') }}
             onCancel={() => { setEditingBackground(null); setView('backgrounds') }}
           />
         )
@@ -291,7 +289,6 @@ export default function App() {
           <ObjectForm
             object={editingObject}
             projectId={activeProjectId}
-            onSaved={() => { setEditingObject(null); setView('objects') }}
             onCancel={() => { setEditingObject(null); setView('objects') }}
           />
         )
@@ -311,7 +308,6 @@ export default function App() {
           <BalloonForm
             balloon={editingBalloon}
             projectId={activeProjectId}
-            onSaved={() => { setEditingBalloon(null); setView('balloons') }}
             onCancel={() => { setEditingBalloon(null); setView('balloons') }}
           />
         )
@@ -329,7 +325,6 @@ export default function App() {
         return (
           <AuthorForm
             author={editingAuthor}
-            onSaved={() => { setEditingAuthor(null); setView('authors') }}
             onCancel={() => { setEditingAuthor(null); setView('authors') }}
           />
         )

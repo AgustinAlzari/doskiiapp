@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useChatStore from '../store/chatStore'
+import ChatLayout from './chat/ChatLayout'
 
 export default function ModelList() {
   const models = useChatStore(s => s.models)
@@ -27,10 +28,11 @@ export default function ModelList() {
   }
 
   return (
-    <div style={{ maxWidth: 560 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">modelos</h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 560 }}>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">modelos</h1>
+        </div>
 
       {/* Nuevo modelo */}
       <form className="card" style={{ padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleAdd}>
@@ -95,6 +97,7 @@ export default function ModelList() {
       <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
         el favorito (★) es el que se abre en el chat de la vista prompts. por defecto: chatgpt.
       </div>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

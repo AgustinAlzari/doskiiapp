@@ -4,6 +4,7 @@ import useAuthorStore from '../../store/authorStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import PaletteEditor from './PaletteEditor'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
+import ChatLayout from '../chat/ChatLayout'
 
 export default function ProjectForm({ project, onBack, onProjectChanged, onDeleted }) {
   const save = useProjectStore(s => s.save)
@@ -25,12 +26,14 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [authorId, setAuthorId] = useState(project?.authorId || null)
   const [cloudBackup, setCloudBackup] = useState(project?.cloudBackup !== false)
   const [saving, setSaving] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedId, setSavedId] = useState(project?.id || null)
 
   const authors = useAuthorStore(s => s.authors)
 
   const collect = () => ({
     ...project,
-    id: project?.id || crypto.randomUUID(),
+    id: savedId || crypto.randomUUID(),
     name,
     synopsis,
     genre,
@@ -50,8 +53,10 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     if (!name.trim()) return
     setSaving(true)
     const saved = await save(collect())
+    setSavedId(saved.id)
     setSaving(false)
-    onProjectChanged(saved)
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 2000)
   }
 
   const handleDuplicate = async () => {
@@ -84,13 +89,14 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   }
 
   return (
-    <div style={{ maxWidth: 560 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="back-arrow" onClick={onBack} title="volver">←</button>
-        <h1 className="ui-h1">
-          {isNew ? 'nuevo proyecto' : 'proyecto'}
-        </h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 560 }}>
+        <div className="section-header">
+          <button className="back-arrow" onClick={onBack} title="volver">←</button>
+          <h1 className="ui-h1">
+            {isNew ? 'nuevo proyecto' : 'proyecto'}
+          </h1>
+        </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
@@ -187,7 +193,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || !name.trim()}>
-            {saving ? 'guardando...' : 'guardar'}
+            {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
           <button className="btn" onClick={handleDuplicate} disabled={!project?.id || saving}>duplicar</button>
           <button className="btn" onClick={handleExport} disabled={!project?.id || saving}>exportar .doski</button>
@@ -196,6 +202,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

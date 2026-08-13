@@ -3,6 +3,7 @@ import useBalloonStore from '../../store/balloonStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 import { BALLOON_LAWS } from '../../data/balloonLaws'
+import ChatLayout from '../chat/ChatLayout'
 
 const KIND_LABELS = { speech: 'diálogo', thought: 'pensamiento', narration: 'narración', other: 'globo x' }
 
@@ -44,10 +45,13 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">globos</h1>
-        <button className="btn btn-primary" onClick={onNew}>nuevo globo</button>
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">globos</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-primary" onClick={onNew}>nuevo globo</button>
+          </div>
       </div>
 
       {scoped.length === 0 ? (
@@ -101,6 +105,7 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

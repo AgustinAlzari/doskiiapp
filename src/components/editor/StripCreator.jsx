@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useStripStore from '../../store/stripStore'
+import ChatLayout from '../chat/ChatLayout'
 import AutoTextarea from './AutoTextarea'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
 
@@ -35,11 +36,12 @@ export default function StripCreator({ project, onCreated, onBack }) {
   }
 
   return (
-    <div style={{ maxWidth: 480 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="back-arrow" onClick={onBack} title="volver">←</button>
-        <h1 className="ui-h1">nueva viñeta</h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 480 }}>
+        <div className="section-header">
+          <button className="back-arrow" onClick={onBack} title="volver">←</button>
+          <h1 className="ui-h1">nueva viñeta</h1>
+        </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
@@ -128,9 +130,10 @@ export default function StripCreator({ project, onCreated, onBack }) {
         </div>
 
         <button className="btn btn-primary" onClick={handleCreate} disabled={!title.trim()}>
-          crear viñeta
+          crear
         </button>
       </div>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

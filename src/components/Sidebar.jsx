@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useChatStore from '../store/chatStore'
 
 const STATUS_UI = {
   idle: { label: 'hecho' },
@@ -11,6 +12,8 @@ const STATUS_UI = {
 
 export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject, onToggleMode }) {
   const [backupStatus, setBackupStatus] = useState(null)
+  const chatOpen = useChatStore(s => s.open)
+  const toggleChat = useChatStore(s => s.toggle)
 
   useEffect(() => {
     const api = window.api?.backup
@@ -33,6 +36,8 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
   ]
 
   const isActive = (item) => item.active.includes(currentView)
+
+  const isLocal = backupStatus?.mode === 'local'
 
   return (
     <aside style={{
@@ -91,6 +96,12 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
             </div>
           )
         })}
+        {/* chat ia: en la misma categoría que modelos (debajo, sin divider extra) */}
+        <div style={{ marginTop: 2 }}>
+          <div className={`btn ${chatOpen ? '' : 'btn-ghost'}`} style={{ width: '100%' }} onClick={toggleChat}>
+            {chatOpen ? 'ocultar chat' : 'chat ia'}
+          </div>
+        </div>
       </nav>
 
       {!activeProject && (
@@ -102,24 +113,42 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
       <div style={{ flex: 1 }} />
 
       <div style={{ borderTop: '1px solid var(--color-border-muted)', paddingTop: 10, marginTop: 8 }}>
-        {/* Switch maestro: sincronizar / no sincronizar */}
-        <div className="radio-group" style={{ paddingLeft: 4 }}>
+        {/* Switch maestro: nube on/off (toggle deslizante, fondo transparente) */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', cursor: 'pointer' }}
+          onClick={() => onToggleMode && onToggleMode(isLocal ? 'online' : 'local')}
+          title={isLocal ? 'encender sincronización' : 'apagar sincronización'}
+        >
+          <span style={{ fontSize: 12, color: 'var(--color-text-2)' }}>nube</span>
           <div
-            className={`radio-pill ${backupStatus?.mode !== 'local' ? 'active' : ''}`}
-            onClick={() => onToggleMode && onToggleMode('online')}
+            style={{
+              width: 34,
+              height: 18,
+              borderRadius: 9,
+              border: '1px solid var(--color-border)',
+              background: 'transparent',
+              position: 'relative',
+              flexShrink: 0,
+              transition: 'border-color 0.12s ease',
+            }}
           >
-            sincronizar
-          </div>
-          <div
-            className={`radio-pill ${backupStatus?.mode === 'local' ? 'active' : ''}`}
-            onClick={() => onToggleMode && onToggleMode('local')}
-          >
-            no sincronizar
+            <div
+              style={{
+                position: 'absolute',
+                top: 2,
+                left: isLocal ? 2 : 16,
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                background: isLocal ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                transition: 'left 0.15s ease, background 0.15s ease',
+              }}
+            />
           </div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 12, marginTop: 6 }}>
-          {backupStatus?.mode === 'local' ? 'apagado' : statusMeta.label}
-          {backupStatus?.message && backupStatus.message !== statusMeta.label && backupStatus.mode !== 'local' ? ` · ${backupStatus.message}` : ''}
+          {isLocal ? 'apagado' : statusMeta.label}
+          {backupStatus?.message && backupStatus.message !== statusMeta.label && !isLocal ? ` · ${backupStatus.message}` : ''}
         </div>
       </div>
     </aside>

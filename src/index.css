@@ -59,6 +59,17 @@ body {
   line-height: 24px;
 }
 
+/* Header de sección: rayita clara que separa el título del resto del material */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
 input, textarea, select, button { font: inherit; }
 
 /* ── Jerarquía tipográfica (ley de importancia y tamaños) ── */

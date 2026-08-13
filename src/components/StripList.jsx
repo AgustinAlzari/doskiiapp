@@ -4,6 +4,7 @@ import useAuthorStore from '../store/authorStore'
 import useProjectStore from '../store/projectStore'
 import { confirmDelete, isInCloud } from '../utils/confirmDelete'
 import GalleryPreview from './GalleryPreview'
+import ChatLayout from './chat/ChatLayout'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -110,26 +111,27 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">viñetas</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span
-            onClick={openGallery}
-            title={hasAnyResult ? 'ver todos los resultados en galería' : 'sin resultados para ver'}
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: hasAnyResult ? 'var(--color-text)' : 'var(--color-text-muted)',
-              cursor: hasAnyResult ? 'pointer' : 'default',
-              userSelect: 'none',
-            }}
-          >
-            ver
-          </span>
-          <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">viñetas</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span
+              onClick={openGallery}
+              title={hasAnyResult ? 'ver todos los resultados en galería' : 'sin resultados para ver'}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: hasAnyResult ? 'var(--color-text)' : 'var(--color-text-muted)',
+                cursor: hasAnyResult ? 'pointer' : 'default',
+                userSelect: 'none',
+              }}
+            >
+              ver
+            </span>
+            <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
+          </div>
         </div>
-      </div>
 
       {scopedStrips.length === 0 ? (
         <div style={{
@@ -218,6 +220,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
       {gallery && (
         <GalleryPreview items={gallery} author={author} onClose={() => setGallery(null)} />
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

@@ -3,6 +3,7 @@ import useBalloonStore from '../../store/balloonStore'
 import { BALLOON_LAWS, BALLOON_LAW_GROUPS, makeDefaultBalloonLaws, balloonLawsToPrompt } from '../../data/balloonLaws'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import ChatLayout from '../chat/ChatLayout'
 
 const KIND_OPTIONS = [
   { id: 'speech', label: 'diálogo' },
@@ -62,7 +63,7 @@ function LawControl({ law, value, onChange }) {
   return null
 }
 
-export default function BalloonForm({ balloon, projectId, onSaved, onCancel }) {
+export default function BalloonForm({ balloon, projectId, onCancel }) {
   const save = useBalloonStore(s => s.save)
   const isNew = !balloon?.id
 
@@ -74,7 +75,9 @@ export default function BalloonForm({ balloon, projectId, onSaved, onCancel }) {
   const [referenceImages, setReferenceImages] = useState(balloon?.referenceImages || [])
   const [laws, setLaws] = useState({ ...makeDefaultBalloonLaws(), ...(balloon?.laws || {}) })
   const [saving, setSaving] = useState(false)
-  const draftId = balloon?.id || 'draft-balloon'
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedId, setSavedId] = useState(balloon?.id || null)
+  const draftId = savedId || balloon?.id || 'draft-balloon'
 
   const setLaw = (id, value) => setLaws(prev => ({ ...prev, [id]: value }))
 
@@ -82,21 +85,24 @@ export default function BalloonForm({ balloon, projectId, onSaved, onCancel }) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    await save({ ...balloon, id: balloon?.id || crypto.randomUUID(), projectId: balloon?.projectId || projectId, name, kind, color, text, promptText, referenceImages, laws })
+    const updated = await save({ ...balloon, id: savedId || crypto.randomUUID(), projectId: balloon?.projectId || projectId, name, kind, color, text, promptText, referenceImages, laws })
+    setSavedId(updated.id)
     setSaving(false)
-    onSaved()
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 2000)
   }
 
   const preview = balloonLawsToPrompt(laws)
 
   return (
-    <div style={{ maxWidth: 560 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="back-arrow" onClick={onCancel} title="volver">←</button>
-        <h1 className="ui-h1">
-          {isNew ? 'nuevo globo' : 'editar globo'}
-        </h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 560 }}>
+        <div className="section-header">
+          <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+          <h1 className="ui-h1">
+            {isNew ? 'nuevo globo' : 'editar globo'}
+          </h1>
+        </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', gap: 12 }}>
@@ -192,10 +198,11 @@ export default function BalloonForm({ balloon, projectId, onSaved, onCancel }) {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" className="btn btn-primary" disabled={saving || !name.trim()}>
-            {saving ? 'guardando...' : 'guardar'}
+            {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

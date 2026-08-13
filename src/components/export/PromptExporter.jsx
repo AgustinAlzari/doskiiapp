@@ -25,7 +25,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const [results, setResults] = useState([])
   const [coverIndex, setCoverIndex] = useState(-1)
   const chatOpen = useChatStore(s => s.open)
-  const toggleChat = useChatStore(s => s.toggle)
 
   const chars = characters || []
   const bgs = backgrounds || []
@@ -290,12 +289,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
         </button>
         <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
           {generating ? 'generando vectores...' : 'regenerar vectores'}
-        </button>
-
-        <div style={{ width: 1, height: 22, background: 'var(--color-border-muted)' }} />
-
-        <button className={`btn btn-sm ${chatOpen ? '' : 'btn-ghost'}`} onClick={toggleChat}>
-          {chatOpen ? 'ocultar chat' : 'chat IA'}
         </button>
       </div>
 
