@@ -4,8 +4,7 @@
 // Config en `~/Library/Application Support/dibuweb/backup.json`:
 //   {
 //     "enabled": true,
-//     "mode": "online",            // "online" | "local"
-//     "prompted": false,           // ¿ya se preguntó el modo al iniciar?
+//     "mode": "online",            // "online" | "local" (default en línea)
 //     "provider": "rclone",
 //     "rclone": { "remote": "gdrive:doski-backup" }
 //   }
@@ -32,7 +31,6 @@ const TOMB_FILE = '.tombstones.json';
 const DEFAULTS = {
   enabled: true,
   mode: 'online',
-  prompted: false,
   provider: 'rclone',
   rclone: {
     remote: 'gdrive:doski-backup',
@@ -128,7 +126,6 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
       ...extra,
       state,
       mode: config.mode,
-      prompted: config.prompted,
       activeCloud,
       enabled: config.enabled,
       effective: isEnabled(),
@@ -141,14 +138,13 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   function getStatus() {
-    return { ...status, mode: config.mode, prompted: config.prompted, activeCloud, enabled: config.enabled, effective: isEnabled() };
+    return { ...status, mode: config.mode, activeCloud, enabled: config.enabled, effective: isEnabled() };
   }
 
   function getConfig() {
     return {
       enabled: config.enabled,
       mode: config.mode,
-      prompted: config.prompted,
       provider: config.provider,
       remote: config.rclone.remote,
     };
@@ -159,9 +155,8 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     return config.enabled && config.mode !== 'local' && activeCloud;
   }
 
-  function setMode({ mode, prompted }) {
+  function setMode({ mode }) {
     config = { ...config, mode: mode === 'local' ? 'local' : 'online' };
-    if (typeof prompted === 'boolean') config.prompted = prompted;
     writeConfig(config);
     refreshStatus();
   }

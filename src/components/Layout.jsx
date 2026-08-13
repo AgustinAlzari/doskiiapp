@@ -9,7 +9,7 @@ import usePaletteStore from '../store/paletteStore'
 import useAuthorStore from '../store/authorStore'
 import useProjectStore from '../store/projectStore'
 
-export default function Layout({ children, currentView, onNavigate, activeProject, onExitProject }) {
+export default function Layout({ children, currentView, onNavigate, activeProject, onExitProject, onToggleMode }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -33,7 +33,7 @@ export default function Layout({ children, currentView, onNavigate, activeProjec
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
       <div className="title-drag-region" />
-      <Sidebar currentView={currentView} onNavigate={onNavigate} activeProject={activeProject} onExitProject={onExitProject} />
+      <Sidebar currentView={currentView} onNavigate={onNavigate} activeProject={activeProject} onExitProject={onExitProject} onToggleMode={onToggleMode} />
       <main className="app-main" style={{ flex: 1, overflow: 'auto', padding: '48px 32px 32px' }}>
         {children}
       </main>
