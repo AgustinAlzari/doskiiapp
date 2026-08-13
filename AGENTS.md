@@ -102,10 +102,10 @@ cd doskiiapp && ./sync.sh pull
 El backup automático **no usa git**: sube los datos a **Google Drive vía rclone** (`gdrive:doski-backup`, carpeta única). Config en `~/Library/Application Support/dibuweb/backup.json`:
 
 ```json
-{ "enabled": true, "mode": "online", "prompted": false, "provider": "rclone", "rclone": { "remote": "gdrive:doski-backup" } }
+{ "enabled": true, "mode": "online", "provider": "rclone", "rclone": { "remote": "gdrive:doski-backup" } }
 ```
 
-- **Modo** (se pregunta al iniciar): `online` (autobackup activo) o `local` (autobackup apagado; se puede subir con "sincronizar").
+- **Sin menú de inicio**: no se pregunta nada al abrir. El **switch maestro** está en el sidebar (sincronizar / no sincronizar) y por defecto **encendido (en línea)**. Apagar el switch = modo local (autobackup apagado, nada toca la nube).
 - **Regla del autobackup**: ON ⇔ `enabled` Y modo = en línea Y **proyecto activo no es "solo local"**.
 - **Sincronización bidireccional segura** (modo en línea): sube en cada cambio y **descarga antes de abrir un proyecto** (`rclone copy --update`, más nuevo gana, **nunca pisa un archivo más actual**). La descarga lista la nube, excluye tombstones y proyectos "solo local", y los archivos locales que la nube reemplaza quedan respaldados en `.sync-backup/cloud` (nada se pierde en silencio).
 - **Borrados con tombstone**: al borrar algo que está en la nube avisa *"se pierde para siempre"*; registra el borrado en `.tombstones.json` (en la nube) para que no reviva en otra máquina. Si el trabajo local es más nuevo que el borrado, gana lo local.
@@ -121,7 +121,7 @@ El backup automático **no usa git**: sube los datos a **Google Drive vía rclon
 2. `git clone https://github.com/AgustinAlzari/doskiiapp.git` y `cd doskiiapp && npm install`.
 3. (Opcional, sin Drive) `./sync.sh pull` para traer `data/` del repo.
 4. `brew install rclone && rclone config` (remoto `gdrive`, una sola vez).
-5. Abrir la app → elegir modo → si es **en línea**, descarga lo más nuevo de Drive antes de abrir (baja todo si la máquina está limpia).
+5. Abrir la app → por defecto está **en línea**, descarga lo más nuevo de Drive antes de abrir (baja todo si la máquina está limpia).
 
 **Garantías al arrancar en modo en línea:** nunca pisa un archivo local más nuevo (`--update`), no borra archivos locales salvo tombstones con fecha más vieja, excluye proyectos "solo local", y lo que la nube reemplaza queda respaldado en `.sync-backup/cloud`.
 

@@ -9,9 +9,8 @@ const STATUS_UI = {
   disabled: { label: 'desactivado' },
 }
 
-export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject }) {
+export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject, onToggleMode }) {
   const [backupStatus, setBackupStatus] = useState(null)
-  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     const api = window.api?.backup
@@ -19,41 +18,6 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     api.getStatus().then(setBackupStatus).catch(() => {})
     return api.onStatus(setBackupStatus)
   }, [])
-
-  const handleSync = async () => {
-    const api = window.api?.backup
-    if (!api || syncing) return
-    setSyncing(true)
-    try {
-      setBackupStatus(await api.syncNow())
-    } catch {
-      setBackupStatus({ state: 'error', message: 'no se pudo sincronizar' })
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const handleRefresh = async () => {
-    const api = window.api?.backup
-    if (!api || syncing) return
-    setSyncing(true)
-    try {
-      setBackupStatus(await api.refresh())
-    } catch {
-      setBackupStatus({ state: 'error', message: 'no se pudo actualizar' })
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const toggleMode = async () => {
-    const api = window.api?.backup
-    if (!api) return
-    const next = backupStatus?.mode === 'local' ? 'online' : 'local'
-    try {
-      setBackupStatus(await api.setMode({ mode: next, prompted: true }))
-    } catch {}
-  }
 
   const statusMeta = STATUS_UI[backupStatus?.state] || { label: '...' }
   const navItems = [
@@ -137,28 +101,25 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ borderTop: '1px solid var(--color-border-muted)', paddingTop: 8, marginTop: 8 }}>
-        <div
-          className="sidebar-item"
-          onClick={toggleMode}
-          title="cambiar modo en línea / local"
-          style={{ cursor: 'pointer' }}
-        >
-          {backupStatus?.mode === 'local' ? 'local' : 'en línea'}
+      <div style={{ borderTop: '1px solid var(--color-border-muted)', paddingTop: 10, marginTop: 8 }}>
+        {/* Switch maestro: sincronizar / no sincronizar */}
+        <div className="radio-group" style={{ paddingLeft: 4 }}>
+          <div
+            className={`radio-pill ${backupStatus?.mode !== 'local' ? 'active' : ''}`}
+            onClick={() => onToggleMode && onToggleMode('online')}
+          >
+            sincronizar
+          </div>
+          <div
+            className={`radio-pill ${backupStatus?.mode === 'local' ? 'active' : ''}`}
+            onClick={() => onToggleMode && onToggleMode('local')}
+          >
+            no sincronizar
+          </div>
         </div>
-        <div className="sidebar-item" onClick={handleRefresh} style={syncing ? { cursor: 'default', opacity: 0.5 } : undefined}>
-          actualizar
-        </div>
-        <div
-          className="sidebar-item"
-          onClick={handleSync}
-          style={syncing ? { cursor: 'default', opacity: 0.5 } : undefined}
-        >
-          sincronizar
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 12, marginTop: 2 }}>
-          {statusMeta.label}
-          {backupStatus?.message && backupStatus.message !== statusMeta.label ? ` · ${backupStatus.message}` : ''}
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 12, marginTop: 6 }}>
+          {backupStatus?.mode === 'local' ? 'apagado' : statusMeta.label}
+          {backupStatus?.message && backupStatus.message !== statusMeta.label && backupStatus.mode !== 'local' ? ` · ${backupStatus.message}` : ''}
         </div>
       </div>
     </aside>

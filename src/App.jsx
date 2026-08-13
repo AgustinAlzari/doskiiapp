@@ -19,7 +19,6 @@ import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
 import PreviewExport from './components/export/PreviewExport'
 import ModelList from './components/ModelList'
-import ModePrompt from './components/ModePrompt'
 import useProjectStore from './store/projectStore'
 import useStripStore from './store/stripStore'
 import useCharacterStore from './store/characterStore'
@@ -49,7 +48,6 @@ export default function App() {
   const [editingAuthor, setEditingAuthor] = useState(null)
   const [promptData, setPromptData] = useState(null)
   const [backupConfig, setBackupConfig] = useState(null)
-  const [showModePrompt, setShowModePrompt] = useState(false)
   const [backupReady, setBackupReady] = useState(false)
 
   const reloadAllStores = async () => {
@@ -70,14 +68,16 @@ export default function App() {
     await reloadAllStores()
   }
 
-  const applyMode = async ({ mode, prompted }) => {
+  // Switch maestro del sidebar: encender = sincronizar ya (sube local + baja nube).
+  const toggleSyncMode = async (nextMode) => {
     try {
-      if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode, prompted })
+      if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode: nextMode })
     } catch {}
-    setBackupConfig({ ...(backupConfig || {}), mode, prompted })
-    setShowModePrompt(false)
-    if (mode === 'online') await refreshAndReload()
-    setBackupReady(true)
+    setBackupConfig(c => ({ ...c, mode: nextMode }))
+    if (nextMode === 'online') {
+      try { if (window.api?.backup?.syncNow) await window.api.backup.syncNow() } catch {}
+      await refreshAndReload()
+    }
   }
 
   useEffect(() => {
@@ -86,14 +86,9 @@ export default function App() {
       let cfg = null
       try { if (window.api?.backup?.getConfig) cfg = await window.api.backup.getConfig() } catch {}
       if (!active) return
-      if (!cfg || !cfg.prompted) {
-        setBackupConfig(cfg)
-        setShowModePrompt(true)
-      } else {
-        setBackupConfig(cfg)
-        if (cfg.mode === 'online') await refreshAndReload()
-        setBackupReady(true)
-      }
+      setBackupConfig(cfg)
+      if (cfg?.mode === 'online') await refreshAndReload()
+      setBackupReady(true)
     })()
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +104,7 @@ export default function App() {
   const objects = useObjectStore(s => s.objects)
 
   const openProject = async (id) => {
-    if (backupConfig?.mode === 'online' && !showModePrompt) {
+    if (backupConfig?.mode === 'online') {
       await refreshAndReload()
     }
     const proj = projects.find(p => p.id === id)
@@ -348,11 +343,8 @@ export default function App() {
   }
 
   return (
-    <>
-      <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject}>
-        <ErrorBoundary>{renderContent()}</ErrorBoundary>
-      </Layout>
-      {showModePrompt && <ModePrompt onChoose={applyMode} />}
-    </>
+    <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject} onToggleMode={toggleSyncMode}>
+      <ErrorBoundary>{renderContent()}</ErrorBoundary>
+    </Layout>
   )
 }
