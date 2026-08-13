@@ -67,13 +67,13 @@ export default function GazeArrows({ panel, characters, objects, onClearGaze }) 
       <defs>
         <marker
           id="gaze-arrowhead"
-          markerWidth="8"
-          markerHeight="6"
-          refX="7"
-          refY="3"
+          markerWidth="12"
+          markerHeight="9"
+          refX="10.5"
+          refY="4.5"
           orient="auto"
         >
-          <polygon points="0 0, 8 3, 0 6" fill="currentColor" />
+          <polygon points="0 0, 12 4.5, 0 9" fill="currentColor" />
         </marker>
       </defs>
 
@@ -101,7 +101,7 @@ export default function GazeArrows({ panel, characters, objects, onClearGaze }) 
             <path
               d={pathD}
               stroke={arrow.color}
-              strokeWidth="2"
+              strokeWidth="3"
               fill="none"
               strokeDasharray="6 3"
               opacity="0.7"
@@ -113,7 +113,7 @@ export default function GazeArrows({ panel, characters, objects, onClearGaze }) 
               y={labelY}
               textAnchor="middle"
               fill={arrow.color}
-              fontSize="9"
+              fontSize="11"
               fontWeight="500"
               opacity="0.8"
               pointerEvents="none"

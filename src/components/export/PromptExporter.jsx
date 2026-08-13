@@ -2,15 +2,21 @@ import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
 import useStripStore from '../../store/stripStore'
-import usePaletteStore from '../../store/paletteStore'
+import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
+import useAuthorStore from '../../store/authorStore'
+import useChatStore from '../../store/chatStore'
 import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
-import AutoTextarea from '../editor/AutoTextarea'
+import ChatPanel from '../chat/ChatPanel'
+
+const MAX_RESULTS = 2
+import ImagePreview from '../ImagePreview'
 
 export default function PromptExporter({ strip, characters, project, balloons }) {
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
   const palettes = usePaletteStore(s => s.palettes)
+  const authors = useAuthorStore(s => s.authors)
   const saveStrip = useStripStore(s => s.save)
   const liveStrip = useStripStore(s => s.strips.find(st => st.id === strip?.id)) || strip
   const [copied, setCopied] = useState(null)
@@ -18,11 +24,47 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const [generating, setGenerating] = useState(false)
   const [results, setResults] = useState([])
   const [coverIndex, setCoverIndex] = useState(-1)
+  const chatOpen = useChatStore(s => s.open)
+  const toggleChat = useChatStore(s => s.toggle)
 
   const chars = characters || []
   const bgs = backgrounds || []
   const objs = objects || []
-  const resolvedPalette = project?.paletteId ? (palettes.find(p => p.id === project.paletteId)?.colors || null) : null
+  const resolvedPalette = resolvePaletteColors(project, palettes)
+  const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
+
+  const hasLettering = (panel) => {
+    if (panel?.narration?.text) return true
+    if ((panel?.sfx || []).some(item => item.text)) return true
+    if ((panel?.globosX || []).some(g => g.text)) return true
+    if ((panel?.characters || []).some(c => c.dialogue || (c.extraDialogues || []).some(e => e.text))) return true
+    return false
+  }
+
+  const [preview, setPreview] = useState(null)
+  const [copiedImage, setCopiedImage] = useState(false)
+
+  // Copia la imagen del resultado al portapapeles (para pegarla donde se quiera).
+  const copyResultImage = async (r) => {
+    if (!window.api?.references?.read || !window.api?.clipboard?.writeImage) return
+    const url = await window.api.references.read(r.path)
+    if (!url) return
+    const base64 = url.split(',')[1]
+    const ok = await window.api.clipboard.writeImage(base64)
+    if (ok) {
+      setCopiedImage(true)
+      setTimeout(() => setCopiedImage(false), 2000)
+    }
+  }
+  const copyFirstResult = () => {
+    const r = (results || [])[0]
+    if (r) copyResultImage(r)
+  }
+
+  const openPreview = async (r, idx) => {
+    const src = window.api?.references ? await window.api.references.read(r.path) : null
+    if (src) setPreview({ src, title: `resultado ${idx + 1}${r.pasted ? ' · pegada' : ''} — ${strip.title || ''}` })
+  }
 
   useEffect(() => {
     setResults(strip?.results || [])
@@ -38,7 +80,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
 
   let allPrompts = ''
   try {
-    allPrompts = generateAllPanelsPrompt(strip, chars, bgs, objs, project, balloons, resolvedPalette)
+    allPrompts = generateAllPanelsPrompt(strip, chars, bgs, objs, project, balloons, resolvedPalette, author)
   } catch {
     allPrompts = 'Error generando prompts'
   }
@@ -145,7 +187,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
     saveStrip({ ...liveStrip, results: nextResults, resultCoverIndex: nextCover })
   }
   const pasteResult = async () => {
-    if ((results || []).length >= 3) return
+    if ((results || []).length >= MAX_RESULTS) return
     if (!window.api?.references?.paste) {
       alert('reiniciá la app para activar "pegar resultado"')
       return
@@ -159,6 +201,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
     const next = [...(results || []), { id: crypto.randomUUID(), fileName: imported.fileName, path: imported.path, observations: '', pasted: true }]
     persistResults(next, coverIndex < 0 ? 0 : coverIndex)
   }
+
   const updateObservation = (id, observations) => {
     const next = (results || []).map(r => r.id === id ? { ...r, observations } : r)
     setResults(next)
@@ -179,13 +222,27 @@ export default function PromptExporter({ strip, characters, project, balloons })
   // ---- referencias por panel ----
   const panelSceneRefs = (panel) => {
     const refs = []
+    const seen = new Set()
     const usedCharIds = new Set((panel.characters || []).map(c => c.characterId))
     const usedObjIds = new Set((panel.objects || []).map(o => o.objectId))
     const bgId = panel.backgroundId
-    const add = (list) => list.forEach(e => (e.referenceImages || []).forEach(r => refs.push({ ...r, entityName: e.name })))
+    const add = (list) => list.forEach(e => (e.referenceImages || []).forEach(r => {
+      const key = r.path || r.fileName
+      if (seen.has(key)) return
+      seen.add(key)
+      refs.push({ ...r, entityName: e.name })
+    }))
     add(chars.filter(c => usedCharIds.has(c.id)))
     add(objs.filter(o => usedObjIds.has(o.id)))
     if (bgId) add(bgs.filter(b => b.id === bgId))
+    if (panel.signature && author?.signatureImage?.[0]) {
+      const r = author.signatureImage[0]
+      const key = r.path || r.fileName
+      if (!seen.has(key)) {
+        seen.add(key)
+        refs.push({ ...r, entityName: 'firma' })
+      }
+    }
     return refs
   }
   const panelBalloonRefs = (panel) => {
@@ -201,14 +258,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
       })
     })
     return refs
-  }
-
-  const hasLettering = (panel) => {
-    if (panel?.narration?.text) return true
-    if ((panel?.sfx || []).some(item => item.text)) return true
-    if ((panel?.globosX || []).some(g => g.text)) return true
-    if ((panel?.characters || []).some(c => c.dialogue || (c.extraDialogues || []).some(e => e.text))) return true
-    return false
   }
 
   const usedFileNames = [...new Set([
@@ -230,7 +279,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginRight: chatOpen ? 520 : 0 }}>
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn btn-sm" onClick={() => copyToClipboard(allPrompts, 'all')}>
@@ -242,52 +291,85 @@ export default function PromptExporter({ strip, characters, project, balloons })
         <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
           {generating ? 'generando vectores...' : 'regenerar vectores'}
         </button>
+
+        <div style={{ width: 1, height: 22, background: 'var(--color-border-muted)' }} />
+
+        <button className={`btn btn-sm ${chatOpen ? '' : 'btn-ghost'}`} onClick={toggleChat}>
+          {chatOpen ? 'ocultar chat' : 'chat IA'}
+        </button>
       </div>
 
-      {/* Resultados de generación */}
-      <div className="card" style={{ padding: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600 }}>resultados de generación (máx. 3)</span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
-              abrir carpeta
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={pasteResult} disabled={(results || []).length >= 3}>
-              + pegar resultado
-            </button>
-          </div>
+      {/* Resultados: imágenes solas sobre fondo blanco */}
+      <div style={{
+        background: '#fff',
+        border: '1px solid var(--color-border)',
+        borderRadius: 8,
+        padding: 12,
+        display: 'inline-block',
+        maxWidth: '100%',
+        alignSelf: 'flex-start',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          {(results || []).length > 0 && (
+            <>
+              <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
+                abrir carpeta
+              </button>
+              <button className="btn btn-sm" onClick={copyFirstResult}>
+                {copiedImage ? 'copiado' : 'copiar'}
+              </button>
+            </>
+          )}
+          <button className="btn btn-sm" onClick={pasteResult} disabled={(results || []).length >= MAX_RESULTS}>
+            + pegar resultado
+          </button>
         </div>
+        {(results || []).length >= MAX_RESULTS && (
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10, border: '1px dashed var(--color-border)', borderRadius: 6, padding: '4px 10px', display: 'inline-block' }}>
+            dos img max
+          </div>
+        )}
         {(results || []).length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            todavía no pegaste resultados: la imagen que generó la IA con estos prompts.
+            todavía no pegaste resultados: copiá la imagen del chat de IA (⌘C) y usá "+ pegar resultado".
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {(results || []).map((r, idx) => (
-              <div key={r.id} style={{ width: 230, border: '1px solid var(--color-border)', borderRadius: 6, padding: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600 }}>resultado {idx + 1}{r.pasted ? ' ✓ pegada' : ''}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      className={`btn btn-sm ${coverIndex === idx ? '' : 'btn-ghost'}`}
-                      style={{ fontSize: 10, padding: '2px 6px' }}
-                      onClick={() => selectCover(idx)}
-                    >
-                      {coverIndex === idx ? 'portada ✓' : 'usar como portada'}
-                    </button>
-                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeResult(r.id)} style={{ fontSize: 10 }}>×</button>
-                  </div>
+              <div key={r.id} style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+                <div
+                  style={{ position: 'relative', width: 280, height: 250, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in' }}
+                  onClick={() => openPreview(r, idx)}
+                  title="ver en grande"
+                >
+                  {window.api?.references?.read && <ReferenceThumbnail reference={{ path: r.path, fileName: r.fileName }} dragDisabled />}
+                  <span
+                    onClick={(e) => { e.stopPropagation(); removeResult(r.id) }}
+                    title="eliminar"
+                    style={{ position: 'absolute', top: 0, right: 4, fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', lineHeight: 1 }}
+                  >
+                    ×
+                  </span>
                 </div>
-                <div style={{ height: 120, border: '1px solid var(--color-border)', borderRadius: 5, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                  {window.api?.references?.read && <ReferenceThumbnail reference={{ path: r.path, fileName: r.fileName }} />}
-                </div>
-                <label className="label" style={{ marginBottom: 2 }}>observaciones</label>
-                <AutoTextarea
+                <textarea
                   value={r.observations || ''}
                   onChange={e => updateObservation(r.id, e.target.value)}
-                  placeholder="qué corregir o tener en cuenta..."
-                  minRows={1}
-                  maxRows={4}
+                  placeholder="nota"
+                  title="nota sobre este resultado"
+                  style={{
+                    width: 280,
+                    height: 250,
+                    resize: 'none',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 6,
+                    background: '#fff',
+                    color: 'var(--color-text-2)',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    padding: '6px 8px',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
                 />
               </div>
             ))}
@@ -300,7 +382,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
         let scenePrompt = ''
         let letteringPrompt = ''
         try {
-          scenePrompt = generateScenePrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, sceneLayoutFileNameFor(strip, i), resolvedPalette)
+          scenePrompt = generateScenePrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, sceneLayoutFileNameFor(strip, i), resolvedPalette, author)
           letteringPrompt = generateLetteringPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, letteringLayoutFileNameFor(strip, i), balloons)
         } catch (err) {
           console.error(`Error generando prompt cuadro ${i}:`, err)
@@ -402,15 +484,22 @@ export default function PromptExporter({ strip, characters, project, balloons })
           </div>
         )
       })}
+      {chatOpen && (
+        <ChatPanel />
+      )}
+      {preview && (
+        <ImagePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />
+      )}
     </div>
   )
 }
 
-function ReferenceThumbnail({ reference }) {
+function ReferenceThumbnail({ reference, dragDisabled }) {
   const [src, setSrc] = useState(null)
   useEffect(() => { window.api.references.read(reference.path).then(setSrc) }, [reference.path])
 
   const handleMouseDown = (e) => {
+    if (dragDisabled) return
     e.preventDefault()
     if (window.api?.references?.startDrag) {
       window.api.references.startDrag(reference.path)
@@ -422,8 +511,9 @@ function ReferenceThumbnail({ reference }) {
     <img
       src={src}
       alt={reference.entityName}
+      draggable={!dragDisabled}
       onMouseDown={handleMouseDown}
-      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: 'grab' }}
+      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', cursor: dragDisabled ? 'zoom-in' : 'grab' }}
     />
   )
 }

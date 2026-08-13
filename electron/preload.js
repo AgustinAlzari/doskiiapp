@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   clipboard: {
     write: (text) => ipcRenderer.invoke('clipboard:write', text),
+    writeImage: (data) => ipcRenderer.invoke('clipboard:write-image', data),
     readImage: () => ipcRenderer.invoke('clipboard:read-image'),
   },
   references: {
@@ -63,5 +64,20 @@ contextBridge.exposeInMainWorld('api', {
     saveFile: (data) => ipcRenderer.invoke('references:save-file', data),
     paste: (data) => ipcRenderer.invoke('references:paste', data),
     startDrag: (filePath) => ipcRenderer.send('references:startDrag', filePath),
+  },
+  export: {
+    save: (data) => ipcRenderer.invoke('export:save', data),
+  },
+  chat: {
+    openExternal: (url) => ipcRenderer.invoke('chat:open-external', url),
+  },
+  backup: {
+    getStatus: () => ipcRenderer.invoke('backup:get-status'),
+    syncNow: () => ipcRenderer.invoke('backup:sync-now'),
+    onStatus: (callback) => {
+      const listener = (_event, status) => callback(status)
+      ipcRenderer.on('backup:status-changed', listener)
+      return () => ipcRenderer.removeListener('backup:status-changed', listener)
+    },
   },
 });

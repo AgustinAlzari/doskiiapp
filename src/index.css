@@ -14,8 +14,8 @@
   --color-text-muted: #6e6e73;
   --color-border: #d2d2d7;
   --color-border-muted: #e5e5ea;
-  --color-accent: #007aff;
-  --color-accent-hover: #0056b3;
+  --color-accent: #6e6e73;
+  --color-accent-hover: #424245;
   --color-title: #b5651d;
   --radius-sm: 3px;
   --radius-md: 5px;
@@ -32,8 +32,8 @@
     --color-text-muted: #a1a1a6;
     --color-border: #38383a;
     --color-border-muted: #2c2c2e;
-    --color-accent: #007aff;
-    --color-accent-hover: #409cff;
+    --color-accent: #a1a1a6;
+    --color-accent-hover: #c7c7cc;
     --color-title: #c97b3a;
   }
 }
@@ -61,6 +61,37 @@ body {
 
 input, textarea, select, button { font: inherit; }
 
+/* ── Jerarquía tipográfica (ley de importancia y tamaños) ── */
+.ui-h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); }
+.ui-h2 { font-size: 16px; font-weight: 700; color: var(--color-text); }
+.ui-h3 { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.ui-muted { font-size: 11px; color: var(--color-text-muted); }
+
+/* Slider sutil y minimalista */
+input[type="range"].size-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-border);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-text-2);
+  cursor: pointer;
+  border: none;
+}
+input[type="range"].size-slider:active::-webkit-slider-thumb {
+  background: var(--color-accent);
+}
+
 /* ── Title bar drag region (macOS hiddenInset) ── */
 .title-drag-region {
   -webkit-app-region: drag;
@@ -82,43 +113,65 @@ input, textarea, select, button { font: inherit; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 
-/* ── Buttons ── */
+/* ── Buttons (todas las variantes se ven igual; fondo = fondo donde están) ── */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 14px;
+  height: 28px;
+  padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg);
+  background: transparent;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.12s ease;
   white-space: nowrap;
 }
-.btn:hover { background: var(--color-surface); }
+.btn:hover { background: var(--color-border-muted); }
 .btn:active { transform: scale(0.98); }
-.btn-primary {
-  background: var(--color-accent);
-  color: white;
-  border-color: var(--color-accent);
-}
-.btn-primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
-.btn-ghost {
-  border-color: transparent;
+.btn-sm { padding: 0 10px; }
+/* Sin estados coloreados: primary/ghost/danger se ven igual que .btn */
+.btn-primary,
+.btn-ghost,
+.btn-danger {
   background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
-.btn-ghost:hover { background: var(--color-surface); }
-.btn-sm { padding: 4px 10px; font-size: 12px; }
-.btn-danger { color: #ff3b30; border-color: #ff3b30; }
-.btn-danger:hover { background: #ff3b30; color: white; }
+.btn-primary:hover,
+.btn-ghost:hover,
+.btn-danger:hover {
+  background: var(--color-border-muted);
+  color: var(--color-text);
+}
 
-/* ── Inputs ── */
+/* Flecha de retorno: sin recuadro, texto plano */
+.back-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.back-arrow:hover { color: var(--color-text-2); }
+
+/* ── Inputs (mismo alto que los botones) ── */
 .input {
   width: 100%;
-  padding: 8px 12px;
+  height: 28px;
+  padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -147,7 +200,7 @@ input, textarea, select, button { font: inherit; }
 .label {
   display: block;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text-2);
   margin-bottom: 4px;
   text-transform: lowercase;
@@ -208,7 +261,7 @@ input, textarea, select, button { font: inherit; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #ff3b30;
+  background: var(--color-accent);
   color: white;
   border: 2px solid var(--color-bg);
   font-size: 11px;
@@ -228,13 +281,14 @@ input, textarea, select, button { font: inherit; }
 .char-block:hover > .block-remove-btn,
 .obj-block:hover > .block-remove-btn,
 .background-block:hover > .block-remove-btn,
-.sfx-block:hover > .block-remove-btn {
+.sfx-block:hover > .block-remove-btn,
+.signature-block:hover > .block-remove-btn {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
 }
 .block-remove-btn:hover {
-  background: #d32f2f;
+  background: var(--color-accent-hover);
   transform: scale(1.15) !important;
 }
 
@@ -363,7 +417,10 @@ input, textarea, select, button { font: inherit; }
   flex-wrap: wrap;
 }
 .radio-pill {
-  padding: 4px 10px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: 20px;
   font-size: 12px;
@@ -475,6 +532,35 @@ input, textarea, select, button { font: inherit; }
 }
 .narration-textarea::placeholder { color: var(--color-text-muted); }
 
+/* ── Signature block ── */
+.signature-block {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  z-index: 13;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  transition: box-shadow 0.1s ease;
+}
+.signature-block-text {
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 12px;
+  text-align: center;
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.signature-block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.signature-block.selected { box-shadow: 0 0 0 2px var(--color-accent); }
+.signature-block.dragging { cursor: grabbing; opacity: 0.9; }
+
 /* ── Balloon blocks (dialogue graphic indications) ── */
 .balloon-block {
   position: absolute;
@@ -573,7 +659,8 @@ input, textarea, select, button { font: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  height: 28px;
+  padding: 0 10px;
   border-radius: 10px;
   font-size: 10px;
   color: var(--color-text-muted);

@@ -23,6 +23,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [palette, setPalette] = useState(project?.palette || [])
   const [paletteId, setPaletteId] = useState(project?.paletteId || null)
   const [authorId, setAuthorId] = useState(project?.authorId || null)
+  const [cloudBackup, setCloudBackup] = useState(project?.cloudBackup !== false)
   const [saving, setSaving] = useState(false)
 
   const authors = useAuthorStore(s => s.authors)
@@ -42,6 +43,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     palette,
     paletteId,
     authorId,
+    cloudBackup,
   })
 
   const handleSave = async () => {
@@ -67,7 +69,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     if (!window.api?.projects || !window.api?.dialog) return
     const result = await window.api.dialog.save({
       defaultPath: `${name.replace(/[^a-z0-9_-]+/gi, '_').toLowerCase() || 'proyecto'}.doski`,
-      filters: [{ name: 'Proyecto doski', extensions: ['doski'] }],
+      filters: [{ name: 'proyecto doski', extensions: ['doski'] }],
     })
     if (!result.canceled && result.filePath) {
       await window.api.projects.export({ projectId: project.id, filePath: result.filePath })
@@ -83,11 +85,11 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
   return (
     <div style={{ maxWidth: 560 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="back-arrow" onClick={onBack} title="volver">←</button>
+        <h1 className="ui-h1">
           {isNew ? 'nuevo proyecto' : 'proyecto'}
         </h1>
-        <button className="btn btn-ghost" onClick={onBack}>← volver</button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -164,6 +166,19 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
         <div className="card" style={{ padding: 12 }}>
           <label className="label" style={{ marginBottom: 8 }}>paleta de colores</label>
           <PaletteEditor palette={palette} colorMode={colorMode} onModeChange={setColorMode} onPaletteChange={setPalette} paletteId={paletteId} onPaletteIdChange={setPaletteId} />
+        </div>
+
+        <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={!cloudBackup}
+            onChange={e => setCloudBackup(!e.target.checked)}
+            style={{ width: 16, height: 16, cursor: 'pointer' }}
+          />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>mantener solo local</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>no se sincroniza a la nube (proyecto, personajes, fondos, objetos, globos, viñetas y referencias)</div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

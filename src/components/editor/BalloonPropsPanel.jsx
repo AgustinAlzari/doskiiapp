@@ -29,7 +29,7 @@ export default function BalloonPropsPanel({
         </span>
         {characterName && <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>· {characterName}</span>}
         <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ fontSize: 11 }}>cerrar</button>
+        <button className="back-arrow" onClick={onClose} title="cerrar">←</button>
         <button className="btn btn-ghost btn-sm btn-danger" onClick={onRemove}>×</button>
       </div>
 

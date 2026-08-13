@@ -17,11 +17,16 @@ import AuthorForm from './components/authors/AuthorForm'
 import ProjectList from './components/projects/ProjectList'
 import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
+import PreviewExport from './components/export/PreviewExport'
+import ModelList from './components/ModelList'
 import useProjectStore from './store/projectStore'
 import useStripStore from './store/stripStore'
+import useCharacterStore from './store/characterStore'
+import useBackgroundStore from './store/backgroundStore'
+import useObjectStore from './store/objectStore'
 
 const SCOPED_VIEWS = [
-  'strips', 'new-strip', 'editor', 'prompts',
+  'strips', 'new-strip', 'editor', 'prompts', 'export',
   'characters', 'new-character', 'edit-character',
   'backgrounds', 'new-background', 'edit-background',
   'objects', 'new-object', 'edit-object',
@@ -45,6 +50,9 @@ export default function App() {
   const activeProject = activeProjectId ? projects.find(p => p.id === activeProjectId) || null : null
   const strips = useStripStore(s => s.strips)
   const selectedStrip = selectedStripId ? strips.find(st => st.id === selectedStripId) || null : null
+  const characters = useCharacterStore(s => s.characters)
+  const backgrounds = useBackgroundStore(s => s.backgrounds)
+  const objects = useObjectStore(s => s.objects)
 
   const openProject = (id) => {
     setActiveProjectId(id)
@@ -111,6 +119,7 @@ export default function App() {
       case 'strips':
         return (
           <StripList
+            project={activeProject}
             projectId={activeProjectId}
             onNew={() => setView('new-strip')}
             onEdit={(strip) => { setSelectedStripId(strip.id); setView('editor') }}
@@ -142,11 +151,23 @@ export default function App() {
         return promptData && (
           <>
             <div className="editor-header" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--color-border-muted)' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
-              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-title)' }}>prompts — {promptData.strip?.title || 'viñeta'}</span>
+              <button className="back-arrow" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
+              <span className="ui-h2">prompts — {promptData.strip?.title || 'viñeta'}</span>
             </div>
             <PromptExporter strip={promptData.strip} characters={promptData.characters} project={activeProject} balloons={promptData.balloons || []} />
           </>
+        )
+
+      case 'export':
+        return activeProject && (
+          <PreviewExport
+            project={activeProject}
+            strips={strips.filter(s => s.projectId === activeProjectId)}
+            characters={characters}
+            backgrounds={backgrounds}
+            objects={objects}
+            focusStripId={selectedStripId}
+          />
         )
 
       case 'characters':
@@ -246,6 +267,9 @@ export default function App() {
             onCancel={() => { setEditingAuthor(null); setView('authors') }}
           />
         )
+
+      case 'modelo':
+        return <ModelList />
 
       default:
         return renderProjectList()

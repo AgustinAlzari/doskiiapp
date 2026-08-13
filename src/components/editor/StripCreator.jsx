@@ -36,9 +36,9 @@ export default function StripCreator({ project, onCreated, onBack }) {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>nueva viñeta</h1>
-        <button className="btn btn-ghost" onClick={onBack}>cancelar</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="back-arrow" onClick={onBack} title="volver">←</button>
+        <h1 className="ui-h1">nueva viñeta</h1>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

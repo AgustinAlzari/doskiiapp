@@ -6,9 +6,10 @@ import NarrationBlock from './NarrationBlock'
 import BalloonBlock from './BalloonBlock'
 import ConnectionArrows from './ConnectionArrows'
 import CompositionGuides from './CompositionGuides'
+import SignatureBlock from './SignatureBlock'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 
-export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onMoveGloboX, onResizeGloboX, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef }) {
+export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onMoveGloboX, onResizeGloboX, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
   const [connDrag, setConnDrag] = useState(null)
   const canvasRef2 = useRef(null)
   const wrapperRef = useRef(null)
@@ -373,6 +374,20 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             />
           )
         })}
+
+        {panel.signature && (
+          <SignatureBlock
+            signature={panel.signature}
+            color={signatureColor}
+            text={signatureText}
+            imagePath={signatureImagePath}
+            isSelected={selectedSignature}
+            onSelect={() => onSelectSignature?.()}
+            onMove={(x, y) => onUpdateSignature?.({ x, y })}
+            onResize={(updates) => onUpdateSignature?.(updates)}
+            onRemove={() => onRemoveSignature?.()}
+          />
+        )}
       </div>
     </div>
   )

@@ -26,8 +26,8 @@ export default function ConnectionArrows({ connections, panelCharacters, charact
         y1: fromPos.y * 100,
         x2: toPos.x * 100,
         y2: toPos.y * 100,
-        fromColor: fromDef.color || '#6a994e',
-        toColor: toDef.color || '#bc4749',
+        fromColor: fromDef.color || '#6e6e73',
+        toColor: toDef.color || '#424245',
         fromName: fromDef.name,
         toName: toDef.name,
       }

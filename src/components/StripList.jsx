@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import useStripStore from '../store/stripStore'
+import useAuthorStore from '../store/authorStore'
+import GalleryPreview from './GalleryPreview'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -32,19 +34,98 @@ function StripCover({ strip }) {
   )
 }
 
-export default function StripList({ projectId, onNew, onEdit }) {
+export default function StripList({ project, projectId, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
   const loaded = useStripStore(s => s.loaded)
   const remove = useStripStore(s => s.remove)
+  const reorder = useStripStore(s => s.reorder)
+  const authors = useAuthorStore(s => s.authors)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
+  const hasAnyResult = scopedStrips.some(s => (s.results || []).length)
+  const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
+
+  const [dragIdx, setDragIdx] = useState(null)
+  const [insertIdx, setInsertIdx] = useState(null)
+  const [gallery, setGallery] = useState(null)
+
+  // Galería de todos los resultados del proyecto en el orden de la lista de viñetas.
+  const openGallery = async () => {
+    if (!window.api?.references) return
+    const items = []
+    for (const s of scopedStrips) {
+      const results = s.results || []
+      for (let ri = 0; ri < results.length; ri++) {
+        const src = await window.api.references.read(results[ri].path)
+        if (src) {
+          items.push({
+            src,
+            title: `${s.title || 'sin título'} · resultado ${ri + 1}`,
+            path: results[ri].path,
+            stripTitle: s.title || 'sin título',
+            resultNum: ri + 1,
+          })
+        }
+      }
+    }
+    if (items.length) setGallery(items)
+  }
+
+  const onDragStart = (e, idx) => {
+    setDragIdx(idx)
+    setInsertIdx(null)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const onDragOver = (e, idx) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    // Indicador del ESPACIO entre tarjetas: izquierda o derecha según el puntero.
+    const rect = e.currentTarget.getBoundingClientRect()
+    const before = e.clientX < rect.left + rect.width / 2
+    const next = before ? idx : idx + 1
+    if (next !== insertIdx) setInsertIdx(next)
+  }
+  const onDrop = (e, idx) => {
+    e.preventDefault()
+    if (dragIdx != null) {
+      let target = insertIdx
+      if (target == null) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        target = e.clientX < rect.left + rect.width / 2 ? idx : idx + 1
+      }
+      const next = [...scopedStrips]
+      const [moved] = next.splice(dragIdx, 1)
+      let at = target > dragIdx ? target - 1 : target
+      at = Math.max(0, Math.min(next.length, at))
+      next.splice(at, 0, moved)
+      reorder(projectId, next.map(s => s.id))
+    }
+    setDragIdx(null)
+    setInsertIdx(null)
+  }
+  const onDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>viñetas</h1>
-        <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
+        <h1 className="ui-h1">viñetas</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span
+            onClick={openGallery}
+            title={hasAnyResult ? 'ver todos los resultados en galería' : 'sin resultados para ver'}
+            style={{
+              fontSize: 12,
+              fontWeight: 500,
+              color: hasAnyResult ? 'var(--color-text)' : 'var(--color-text-muted)',
+              cursor: hasAnyResult ? 'pointer' : 'default',
+              userSelect: 'none',
+            }}
+          >
+            ver
+          </span>
+          <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
+        </div>
       </div>
 
       {scopedStrips.length === 0 ? (
@@ -63,15 +144,32 @@ export default function StripList({ projectId, onNew, onEdit }) {
         </div>
       ) : (
         <div className="strip-grid">
-          {scopedStrips.map(strip => (
+          {scopedStrips.map((strip, idx) => (
             <div
               key={strip.id}
+              draggable
+              onDragStart={e => onDragStart(e, idx)}
+              onDragOver={e => onDragOver(e, idx)}
+              onDrop={e => onDrop(e, idx)}
+              onDragEnd={onDragEnd}
               className="strip-card"
+              style={{
+                position: 'relative',
+                cursor: 'grab',
+                opacity: dragIdx === idx ? 0.4 : 1,
+              }}
               onClick={() => onEdit(strip)}
             >
+              {/* Línea de inserción en el espacio entre tarjetas */}
+              {dragIdx != null && insertIdx === idx && (
+                <span style={{ position: 'absolute', left: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+              )}
+              {dragIdx != null && insertIdx === idx + 1 && (
+                <span style={{ position: 'absolute', right: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+              )}
               <StripCover strip={strip} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div className="ui-h3" style={{ flex: 1, minWidth: 0 }}>
                   {strip.title || 'sin título'}
                 </div>
                 <button
@@ -113,6 +211,9 @@ export default function StripList({ projectId, onNew, onEdit }) {
             </div>
           ))}
         </div>
+      )}
+      {gallery && (
+        <GalleryPreview items={gallery} author={author} onClose={() => setGallery(null)} />
       )}
     </div>
   )

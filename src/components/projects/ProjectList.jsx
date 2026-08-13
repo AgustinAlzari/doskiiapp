@@ -31,7 +31,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
 
   const handleImport = async () => {
     if (!window.api?.dialog || !window.api?.projects) return
-    const result = await window.api.dialog.open({ filters: [{ name: 'Proyecto doski', extensions: ['doski'] }] })
+    const result = await window.api.dialog.open({ filters: [{ name: 'proyecto doski', extensions: ['doski'] }] })
     if (!result.canceled && result.filePaths?.[0]) {
       const proj = await importFromFile(result.filePaths[0])
       if (proj) onOpen(proj.id)
@@ -43,7 +43,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>proyectos</h1>
+        <h1 className="ui-h1">proyectos</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={handleImport}>importar .doski</button>
           <button className="btn btn-primary" onClick={onNew}>nuevo proyecto</button>
@@ -63,7 +63,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
             const c = counts(project.id)
             return (
               <div key={project.id} className="entity-card" onClick={() => onOpen(project.id)}>
-                <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>
+                <div className="ui-h3">
                   {project.name}
                 </div>
                 {project.synopsis && (

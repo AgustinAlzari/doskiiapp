@@ -1,5 +1,14 @@
 import { create } from 'zustand'
 
+export function resolvePaletteColors(project, palettes = []) {
+  if (!project) return []
+  if (project.paletteId) {
+    const lib = (palettes || []).find(p => p.id === project.paletteId)
+    if (lib?.colors?.length) return lib.colors
+  }
+  return project.palette || []
+}
+
 const usePaletteStore = create((set) => ({
   palettes: [],
   loaded: false,
