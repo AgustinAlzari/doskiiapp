@@ -12,8 +12,11 @@ import PanelCanvas from './PanelCanvas'
 import CharacterPropsPanel from './CharacterPropsPanel'
 import BalloonPropsPanel from './BalloonPropsPanel'
 import AutoTextarea from './AutoTextarea'
+import useChatStore from '../../store/chatStore'
+import ChatPanel from '../chat/ChatPanel'
 
 export default function StripEditor({ strip, project, onBack, onEditCharacter, onShowPrompts }) {
+  const chatOpen = useChatStore(s => s.open)
   const save = useStripStore(s => s.save)
   const characters = useCharacterStore(s => s.characters)
   const backgrounds = useBackgroundStore(s => s.backgrounds)
@@ -33,6 +36,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [saveState, setSaveState] = useState(null)
   const [showDescModal, setShowDescModal] = useState(false)
   const [descDraft, setDescDraft] = useState('')
+  const [descSaved, setDescSaved] = useState(false)
   const [gridVisible, setGridVisible] = useState(true)
   const canvasRef = useRef(null)
 
@@ -541,9 +545,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const signatureImageRef = author?.signatureImage?.[0] || null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', marginRight: chatOpen ? 520 : 0 }}>
       {/* Header */}
-      <div className="editor-header" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 28, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--color-border-muted)' }}>
+      <div className="section-header">
         <button className="back-arrow" onClick={onBack}>←</button>
         <input
           className="ui-h2"
@@ -619,7 +623,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="back-arrow" onClick={() => setShowDescModal(false)} title="cerrar">←</button>
-              <button className="btn btn-primary btn-sm" onClick={() => { setData(prev => ({ ...prev, generalStyle: descDraft })); setShowDescModal(false) }}>guardar</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setData(prev => ({ ...prev, generalStyle: descDraft })); setDescSaved(true); setTimeout(() => setDescSaved(false), 2000) }}>
+                {descSaved ? 'guardado ✓' : 'guardar'}
+              </button>
             </div>
           </div>
         </div>
@@ -1145,6 +1151,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
           </div>
         </div>
       </div>
+      {chatOpen && <ChatPanel />}
     </div>
   )
 }

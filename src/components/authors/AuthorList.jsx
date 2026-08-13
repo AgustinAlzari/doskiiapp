@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import useAuthorStore from '../../store/authorStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete } from '../../utils/confirmDelete'
+import ChatLayout from '../chat/ChatLayout'
 
 function SignatureThumb({ signatureImage }) {
   const [preview, setPreview] = useState(null)
@@ -28,11 +29,14 @@ export default function AuthorList({ onNew, onEdit }) {
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="ui-h1">autores</h1>
-        <button className="btn btn-primary" onClick={onNew}>nuevo autor</button>
-      </div>
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between' }}>
+          <h1 className="ui-h1">autores</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-primary" onClick={onNew}>nuevo autor</button>
+          </div>
+        </div>
 
       {authors.length === 0 ? (
         <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
@@ -76,6 +80,7 @@ export default function AuthorList({ onNew, onEdit }) {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

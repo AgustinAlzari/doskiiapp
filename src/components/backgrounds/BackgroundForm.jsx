@@ -4,8 +4,9 @@ import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 import { LANDSCAPE_EXTRACTOR_PROMPT } from '../../data/landscapeExtractorPrompt'
 import { copyToClipboard } from '../../utils/clipboard'
+import ChatLayout from '../chat/ChatLayout'
 
-export default function BackgroundForm({ background, projectId, onSaved, onCancel }) {
+export default function BackgroundForm({ background, projectId, onCancel }) {
   const save = useBackgroundStore(s => s.save)
   const isNew = !background?.id
 
@@ -13,9 +14,11 @@ export default function BackgroundForm({ background, projectId, onSaved, onCance
   const [promptText, setPromptText] = useState(background?.promptText || '')
   const [color, setColor] = useState(background?.color || '#6e6e73')
   const [saving, setSaving] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedId, setSavedId] = useState(background?.id || null)
   const [copied, setCopied] = useState(false)
   const [referenceImages, setReferenceImages] = useState(background?.referenceImages || [])
-  const draftId = background?.id || 'draft-background'
+  const draftId = savedId || background?.id || 'draft-background'
 
   const copyExtractor = async () => {
     await copyToClipboard(LANDSCAPE_EXTRACTOR_PROMPT)
@@ -27,19 +30,22 @@ export default function BackgroundForm({ background, projectId, onSaved, onCance
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    await save({ ...background, id: background?.id || crypto.randomUUID(), projectId: background?.projectId || projectId, name, promptText, color, referenceImages })
+    const updated = await save({ ...background, id: savedId || crypto.randomUUID(), projectId: background?.projectId || projectId, name, promptText, color, referenceImages })
+    setSavedId(updated.id)
     setSaving(false)
-    onSaved()
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 2000)
   }
 
   return (
-    <div style={{ maxWidth: 520 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="back-arrow" onClick={onCancel} title="volver">←</button>
-        <h1 className="ui-h1">
-          {isNew ? 'nuevo fondo' : 'editar fondo'}
-        </h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 520 }}>
+        <div className="section-header">
+          <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+          <h1 className="ui-h1">
+            {isNew ? 'nuevo fondo' : 'editar fondo'}
+          </h1>
+        </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
@@ -100,10 +106,11 @@ export default function BackgroundForm({ background, projectId, onSaved, onCance
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" className="btn btn-primary" disabled={saving || !name.trim()}>
-            {saving ? 'guardando...' : 'guardar'}
+            {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import useAuthorStore from '../../store/authorStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import ChatLayout from '../chat/ChatLayout'
 
-export default function AuthorForm({ author, onSaved, onCancel }) {
+export default function AuthorForm({ author, onCancel }) {
   const save = useAuthorStore(s => s.save)
   const isNew = !author?.id
 
@@ -11,24 +12,30 @@ export default function AuthorForm({ author, onSaved, onCancel }) {
   const [signatureText, setSignatureText] = useState(author?.signatureText || '')
   const [signatureImage, setSignatureImage] = useState(author?.signatureImage || [])
   const [saving, setSaving] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedId, setSavedId] = useState(author?.id || null)
+  const draftId = savedId || author?.id || 'draft-author'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!fullName.trim()) return
     setSaving(true)
-    await save({ ...author, id: author?.id || crypto.randomUUID(), fullName, signatureText, signatureImage })
+    const updated = await save({ ...author, id: savedId || crypto.randomUUID(), fullName, signatureText, signatureImage })
+    setSavedId(updated.id)
     setSaving(false)
-    onSaved()
+    setSavedFlash(true)
+    setTimeout(() => setSavedFlash(false), 2000)
   }
 
   return (
-    <div style={{ maxWidth: 520 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="back-arrow" onClick={onCancel} title="volver">←</button>
-        <h1 className="ui-h1">
-          {isNew ? 'nuevo autor' : 'editar autor'}
-        </h1>
-      </div>
+    <ChatLayout>
+      <div style={{ maxWidth: 520 }}>
+        <div className="section-header">
+          <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+          <h1 className="ui-h1">
+            {isNew ? 'nuevo autor' : 'editar autor'}
+          </h1>
+        </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
@@ -69,10 +76,11 @@ export default function AuthorForm({ author, onSaved, onCancel }) {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" className="btn btn-primary" disabled={saving || !fullName.trim()}>
-            {saving ? 'guardando...' : 'guardar'}
+            {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </ChatLayout>
   )
 }
