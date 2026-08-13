@@ -73,7 +73,12 @@ contextBridge.exposeInMainWorld('api', {
   },
   backup: {
     getStatus: () => ipcRenderer.invoke('backup:get-status'),
+    getConfig: () => ipcRenderer.invoke('backup:get-config'),
+    setMode: (payload) => ipcRenderer.invoke('backup:set-mode', payload),
+    setActiveProject: (payload) => ipcRenderer.invoke('backup:set-active-project', payload),
     syncNow: () => ipcRenderer.invoke('backup:sync-now'),
+    refresh: () => ipcRenderer.invoke('backup:refresh'),
+    deleteRemote: (paths) => ipcRenderer.invoke('backup:delete-remote', paths),
     onStatus: (callback) => {
       const listener = (_event, status) => callback(status)
       ipcRenderer.on('backup:status-changed', listener)

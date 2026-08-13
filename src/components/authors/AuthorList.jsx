@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useAuthorStore from '../../store/authorStore'
 import useProjectStore from '../../store/projectStore'
+import { confirmDelete } from '../../utils/confirmDelete'
 
 function SignatureThumb({ signatureImage }) {
   const [preview, setPreview] = useState(null)
@@ -65,7 +66,7 @@ export default function AuthorList({ onNew, onEdit }) {
                   <span />
                   <button
                     className="btn btn-ghost btn-sm btn-danger"
-                    onClick={(e) => { e.stopPropagation(); if (confirm(`¿Eliminar a "${author.fullName}"?`)) remove(author.id) }}
+                    onClick={(e) => { e.stopPropagation(); if (confirmDelete(author.fullName, true)) remove(author.id) }}
                   >
                     ×
                   </button>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
 import useProjectStore from '../../store/projectStore'
+import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 
 function BackgroundThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -84,7 +85,7 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(bg.id) }}
+                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(bg.name, isInCloud(bg, projects))) remove(bg.id) }}
                 >
                   ×
                 </button>

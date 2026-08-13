@@ -23,6 +23,7 @@ const useBalloonStore = create((set) => ({
       laws: { ...makeDefaultBalloonLaws(), ...(balloon.laws || {}) },
       createdAt: balloon.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api) await window.api.balloons.save(updated)
     set(state => {

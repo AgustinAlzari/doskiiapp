@@ -4,6 +4,8 @@ import useStripStore from './stripStore'
 import useBackgroundStore from './backgroundStore'
 import useObjectStore from './objectStore'
 import useBalloonStore from './balloonStore'
+import useAuthorStore from './authorStore'
+import usePaletteStore from './paletteStore'
 import { ensureWildcards } from '../data/wildcards'
 
 export const PALETTE_ROLES = [
@@ -37,6 +39,7 @@ export const makeDefaultProject = () => ({
   authorId: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
 })
 
 const upsert = (list, item) => {
@@ -76,6 +79,7 @@ const useProjectStore = create((set, get) => ({
       id: project.id || crypto.randomUUID(),
       createdAt: project.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api?.projects) await window.api.projects.save(updated)
     set(state => ({ projects: upsert(state.projects, updated) }))
@@ -133,6 +137,22 @@ const useProjectStore = create((set, get) => ({
         if (!item.projectId) await store.getState().save({ ...item, projectId: defaultId })
       }
     }
+    // Ids robustos: si falta o es inválido, regenerar uuid.
+    const ensureValidIds = async (store, key) => {
+      for (const item of store.getState()[key] || []) {
+        if (!item.id || typeof item.id !== 'string' || item.id.length < 8) {
+          await store.getState().save({ ...item, id: crypto.randomUUID() })
+        }
+      }
+    }
+    await ensureValidIds(useProjectStore, 'projects')
+    await ensureValidIds(useCharacterStore, 'characters')
+    await ensureValidIds(useBackgroundStore, 'backgrounds')
+    await ensureValidIds(useObjectStore, 'objects')
+    await ensureValidIds(useBalloonStore, 'balloons')
+    await ensureValidIds(useStripStore, 'strips')
+    await ensureValidIds(useAuthorStore, 'authors')
+    await ensureValidIds(usePaletteStore, 'palettes')
     await migrate(useCharacterStore, 'characters')
     await migrate(useBackgroundStore, 'backgrounds')
     await migrate(useObjectStore, 'objects')

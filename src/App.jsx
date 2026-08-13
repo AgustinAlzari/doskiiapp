@@ -19,11 +19,15 @@ import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
 import PreviewExport from './components/export/PreviewExport'
 import ModelList from './components/ModelList'
+import ModePrompt from './components/ModePrompt'
 import useProjectStore from './store/projectStore'
 import useStripStore from './store/stripStore'
 import useCharacterStore from './store/characterStore'
 import useBackgroundStore from './store/backgroundStore'
 import useObjectStore from './store/objectStore'
+import useBalloonStore from './store/balloonStore'
+import usePaletteStore from './store/paletteStore'
+import useAuthorStore from './store/authorStore'
 
 const SCOPED_VIEWS = [
   'strips', 'new-strip', 'editor', 'prompts', 'export',
@@ -44,6 +48,56 @@ export default function App() {
   const [editingBalloon, setEditingBalloon] = useState(null)
   const [editingAuthor, setEditingAuthor] = useState(null)
   const [promptData, setPromptData] = useState(null)
+  const [backupConfig, setBackupConfig] = useState(null)
+  const [showModePrompt, setShowModePrompt] = useState(false)
+  const [backupReady, setBackupReady] = useState(false)
+
+  const reloadAllStores = async () => {
+    await useProjectStore.getState().load()
+    await useCharacterStore.getState().load()
+    await useBackgroundStore.getState().load()
+    await useObjectStore.getState().load()
+    await useBalloonStore.getState().load()
+    await useStripStore.getState().load()
+    await usePaletteStore.getState().load()
+    await useAuthorStore.getState().load()
+  }
+
+  const refreshAndReload = async () => {
+    try {
+      if (window.api?.backup?.refresh) await window.api.backup.refresh()
+    } catch (e) { console.error('actualizar desde la nube falló:', e) }
+    await reloadAllStores()
+  }
+
+  const applyMode = async ({ mode, prompted }) => {
+    try {
+      if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode, prompted })
+    } catch {}
+    setBackupConfig({ ...(backupConfig || {}), mode, prompted })
+    setShowModePrompt(false)
+    if (mode === 'online') await refreshAndReload()
+    setBackupReady(true)
+  }
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      let cfg = null
+      try { if (window.api?.backup?.getConfig) cfg = await window.api.backup.getConfig() } catch {}
+      if (!active) return
+      if (!cfg || !cfg.prompted) {
+        setBackupConfig(cfg)
+        setShowModePrompt(true)
+      } else {
+        setBackupConfig(cfg)
+        if (cfg.mode === 'online') await refreshAndReload()
+        setBackupReady(true)
+      }
+    })()
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const projects = useProjectStore(s => s.projects)
   const projectsLoaded = useProjectStore(s => s.loaded)
@@ -54,7 +108,16 @@ export default function App() {
   const backgrounds = useBackgroundStore(s => s.backgrounds)
   const objects = useObjectStore(s => s.objects)
 
-  const openProject = (id) => {
+  const openProject = async (id) => {
+    if (backupConfig?.mode === 'online' && !showModePrompt) {
+      await refreshAndReload()
+    }
+    const proj = projects.find(p => p.id === id)
+    try {
+      if (window.api?.backup?.setActiveProject) {
+        await window.api.backup.setActiveProject({ cloudBackup: proj?.cloudBackup !== false })
+      }
+    } catch {}
     setActiveProjectId(id)
     setSelectedStripId(null)
     setView('strips')
@@ -74,7 +137,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!projectsLoaded) return
+    if (!projectsLoaded || !backupReady) return
     let savedId = null
     try { savedId = localStorage.getItem('doski:lastProject') } catch {}
     const target = savedId && projects.find(p => p.id === savedId)
@@ -84,7 +147,15 @@ export default function App() {
       setView('strips')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectsLoaded])
+  }, [projectsLoaded, backupReady])
+
+  // Informa al backup cuál es el proyecto activo (para la regla "modo Y proyecto").
+  useEffect(() => {
+    if (!window.api?.backup?.setActiveProject) return
+    window.api.backup.setActiveProject({ cloudBackup: activeProject?.cloudBackup !== false })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject?.id, activeProject?.cloudBackup])
 
   const noProject = projectsLoaded && !activeProject
 
@@ -277,8 +348,11 @@ export default function App() {
   }
 
   return (
-    <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject}>
-      <ErrorBoundary>{renderContent()}</ErrorBoundary>
-    </Layout>
+    <>
+      <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject}>
+        <ErrorBoundary>{renderContent()}</ErrorBoundary>
+      </Layout>
+      {showModePrompt && <ModePrompt onChoose={applyMode} />}
+    </>
   )
 }

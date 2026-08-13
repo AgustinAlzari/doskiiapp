@@ -21,6 +21,7 @@ const useObjectStore = create((set) => ({
       id: obj.id || crypto.randomUUID(),
       createdAt: obj.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api) await window.api.objects.save(updated)
     set(state => {

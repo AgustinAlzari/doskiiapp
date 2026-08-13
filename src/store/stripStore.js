@@ -23,7 +23,7 @@ const useStripStore = create((set, get) => ({
   },
 
   save: async (strip) => {
-    const updated = { ...strip, updatedAt: new Date().toISOString() }
+    const updated = { ...strip, updatedAt: new Date().toISOString(), savedAt: new Date().toISOString() }
     if (window.api) await window.api.strips.save(updated)
     set(state => {
       const idx = state.strips.findIndex(s => s.id === updated.id)

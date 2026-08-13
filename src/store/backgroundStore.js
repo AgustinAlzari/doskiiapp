@@ -21,6 +21,7 @@ const useBackgroundStore = create((set) => ({
       id: background.id || crypto.randomUUID(),
       createdAt: background.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api) await window.api.backgrounds.save(updated)
     set(state => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useObjectStore from '../../store/objectStore'
 import useProjectStore from '../../store/projectStore'
+import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 
 function ObjectThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -84,7 +85,7 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(obj.id) }}
+                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(obj.name, isInCloud(obj, projects))) remove(obj.id) }}
                 >
                   ×
                 </button>

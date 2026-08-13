@@ -33,6 +33,28 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     }
   }
 
+  const handleRefresh = async () => {
+    const api = window.api?.backup
+    if (!api || syncing) return
+    setSyncing(true)
+    try {
+      setBackupStatus(await api.refresh())
+    } catch {
+      setBackupStatus({ state: 'error', message: 'no se pudo actualizar' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const toggleMode = async () => {
+    const api = window.api?.backup
+    if (!api) return
+    const next = backupStatus?.mode === 'local' ? 'online' : 'local'
+    try {
+      setBackupStatus(await api.setMode({ mode: next, prompted: true }))
+    } catch {}
+  }
+
   const statusMeta = STATUS_UI[backupStatus?.state] || { label: '...' }
   const navItems = [
     { id: 'strips', label: 'viñetas', active: ['strips', 'new-strip', 'editor', 'prompts'] },
@@ -118,6 +140,17 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
       <div style={{ borderTop: '1px solid var(--color-border-muted)', paddingTop: 8, marginTop: 8 }}>
         <div
           className="sidebar-item"
+          onClick={toggleMode}
+          title="cambiar modo en línea / local"
+          style={{ cursor: 'pointer' }}
+        >
+          {backupStatus?.mode === 'local' ? 'local' : 'en línea'}
+        </div>
+        <div className="sidebar-item" onClick={handleRefresh} style={syncing ? { cursor: 'default', opacity: 0.5 } : undefined}>
+          actualizar
+        </div>
+        <div
+          className="sidebar-item"
           onClick={handleSync}
           style={syncing ? { cursor: 'default', opacity: 0.5 } : undefined}
         >
@@ -125,6 +158,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 12, marginTop: 2 }}>
           {statusMeta.label}
+          {backupStatus?.message && backupStatus.message !== statusMeta.label ? ` · ${backupStatus.message}` : ''}
         </div>
       </div>
     </aside>
