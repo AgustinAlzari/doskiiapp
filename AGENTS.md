@@ -8,6 +8,18 @@
 export PATH="/Users/edicionesalz/.local/node-v20.18.0-darwin-x64/bin:$PATH" && npm run build
 ```
 
+## Subir el código a GitHub (`push.sh`)
+
+En esta máquina **git local NO funciona** (faltan las Xcode Command Line Tools), así que el push se hace **vía la API de GitHub** con el token guardado en `~/.config/doski/gh-token` (fuera del repo, nunca se sube). No instalar Xcode ni git: usar siempre `push.sh`.
+
+```bash
+./push.sh "mensaje del commit"
+```
+
+> **Sube SOLO código** (`src/`, `electron/`, raíz). **NUNCA sube `data/`**, `node_modules/`, `dist/` ni `release/`. Los datos se sincronizan por separado con `./sync.sh`. Si ya existe `dist/` y `release/` locales, no afectan el push (se excluyen por nombre).
+
+Detrás de escena: `push.sh` llama a `node electron/push-script.cjs "<msg>"`, que arma el commit con la API (`git/trees`, `git/commits`, `git/refs/heads/main`) comparando contra el último commit remoto y subiendo solo blobs nuevos/cambiados.
+
 ## Textos de la interfaz (Ley de minúsculas)
 
 Todos los textos visibles de la UI —menús del sidebar, encabezados (`h1`), botones, etiquetas, placeholders y mensajes— van **en minúsculas**, estilo de escritura en español (nunca Title Case ni CamelCase).
@@ -81,12 +93,16 @@ Hay un script `sync.sh` en la raíz que maneja la copia en ambas direcciones:
 ls "$HOME/Library/Application Support/dibuweb/data/projects/"
 ```
 
-### Mantener `data/` actualizada (antes de push)
+### Mantener `data/` sincronizada
+
+Los datos **no se suben con `push.sh`** (que solo sube código). `data/` se respalda en la nube con el autobackup (`electron/backup.js` → Drive) y, si se quiere portabilidad por repo, se copia con:
 
 ```bash
-./sync.sh push
-git add data/ && git commit -m "sync data" && git push
+./sync.sh push     # Electron → repo (copia local en data/)
+./sync.sh status   # compara qué carpetas difieren
 ```
+
+> `sync.sh push` copia los datos a `data/` local; eso no genera un commit de GitHub (el repo de la app solo recibe código vía `push.sh`).
 
 ### Descargar los datos desde el repo (para otra máquina)
 
