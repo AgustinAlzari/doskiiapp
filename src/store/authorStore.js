@@ -21,6 +21,7 @@ const useAuthorStore = create((set) => ({
       id: author.id || crypto.randomUUID(),
       createdAt: author.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api?.authors) await window.api.authors.save(updated)
     set(state => {

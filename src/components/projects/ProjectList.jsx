@@ -3,6 +3,7 @@ import useStripStore from '../../store/stripStore'
 import useCharacterStore from '../../store/characterStore'
 import useBackgroundStore from '../../store/backgroundStore'
 import useObjectStore from '../../store/objectStore'
+import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -92,7 +93,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
                     <button
                       className="btn btn-ghost btn-sm btn-danger"
                       onClick={async () => {
-                        if (confirm(`¿Eliminar "${project.name}" y todo su contenido?`)) { await removeAll(project.id); onEdit(null) }
+                        if (confirmDelete(project.name, isInCloud(project, projects))) { await removeAll(project.id); onEdit(null) }
                       }}
                     >
                       ×

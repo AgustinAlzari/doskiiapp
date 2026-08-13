@@ -21,6 +21,7 @@ const useCharacterStore = create((set, get) => ({
       id: character.id || crypto.randomUUID(),
       createdAt: character.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api) await window.api.characters.save(updated)
     set(state => {

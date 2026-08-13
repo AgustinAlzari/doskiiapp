@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import useStripStore from '../store/stripStore'
 import useAuthorStore from '../store/authorStore'
+import useProjectStore from '../store/projectStore'
+import { confirmDelete, isInCloud } from '../utils/confirmDelete'
 import GalleryPreview from './GalleryPreview'
 
 function formatDate(iso) {
@@ -40,6 +42,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const remove = useStripStore(s => s.remove)
   const reorder = useStripStore(s => s.reorder)
   const authors = useAuthorStore(s => s.authors)
+  const projects = useProjectStore(s => s.projects)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
   const hasAnyResult = scopedStrips.some(s => (s.results || []).length)
   const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
@@ -175,7 +178,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
                   style={{ flexShrink: 0 }}
-                  onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(strip.id) }}
+                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(strip.title || 'viñeta', isInCloud(strip, projects))) remove(strip.id) }}
                 >
                   ×
                 </button>

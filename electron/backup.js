@@ -1,24 +1,25 @@
 // backup.js — autobackup automático de los datos de la app hacia la nube.
 //
-// Por defecto el destino es el repositorio git github.com/AgustinAlzari/doskiiapp
-// (carpeta `data/`). El destino y el comportamiento se pueden personalizar desde
-// el archivo de configuración `backup.json` junto a los datos de la app:
-//   ~/Library/Application Support/dibuweb/backup.json
-//
+// Por defecto el destino es Google Drive vía rclone (carpeta `gdrive:doski-backup`).
+// Config en `~/Library/Application Support/dibuweb/backup.json`:
 //   {
 //     "enabled": true,
-//     "provider": "git",
-//     "git": {
-//       "remote": "https://github.com/AgustinAlzari/doskiiapp.git",
-//       "subfolder": "data",
-//       "branch": "main"
-//     }
+//     "mode": "online",            // "online" | "local"
+//     "prompted": false,           // ¿ya se preguntó el modo al iniciar?
+//     "provider": "rclone",
+//     "rclone": { "remote": "gdrive:doski-backup" }
 //   }
 //
-// Cada escritura/borrado (`markDirty`) dispara una sincronización inmediata:
-// espeja los datos locales (solo el "conjunto nube", ver computeAllowed) en un
-// clone dedicado dentro de appData y hace commit + push. El botón manual de la
-// UI (`syncNow`) fuerza la misma operación.
+// Sincronización BIDIRECCIONAL segura (modo en línea):
+//   - subir: cada cambio (`markDirty`) espeja el "conjunto nube" (excluye
+//     proyectos `cloudBackup:false`) y ejecuta `rclone copy --update`
+//     (más nuevo gana; nunca pisa un archivo más actual, nunca borra en la nube).
+//   - bajar (`refresh`): antes de abrir un proyecto, `rclone copy --update
+//     --files-from=<conjunto permitido>` descarga solo lo más nuevo sin pisar
+//     trabajo local más actual.
+//   - borrados: al borrar algo que está en la nube se registra un "tombstone"
+//     (`.tombstones.json` en la nube) para que el borrado no reviva en otra
+//     máquina; si el trabajo local es más nuevo que el borrado, gana lo local.
 
 const { execFile } = require('child_process');
 const path = require('path');
@@ -26,10 +27,16 @@ const fs = require('fs');
 
 const SUBDIRS = ['authors', 'backgrounds', 'balloons', 'characters', 'objects', 'palettes', 'projects', 'references', 'strips'];
 const OWNED = ['characters', 'backgrounds', 'objects', 'balloons', 'strips'];
+const TOMB_FILE = '.tombstones.json';
 
 const DEFAULTS = {
   enabled: true,
-  provider: 'git',
+  mode: 'online',
+  prompted: false,
+  provider: 'rclone',
+  rclone: {
+    remote: 'gdrive:doski-backup',
+  },
   git: {
     remote: 'https://github.com/AgustinAlzari/doskiiapp.git',
     subfolder: 'data',
@@ -68,28 +75,46 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   const BASE = appDataDir;
   const CONFIG_PATH = path.join(BASE, 'backup.json');
   const STAGING = path.join(BASE, 'backup');
+  const STAGING_R = path.join(BASE, 'backup-rclone');
+  const FILES_LIST = path.join(BASE, 'backup-files.txt');
+  const TOMB_LOCAL = path.join(BASE, TOMB_FILE);
 
   let config = loadConfig();
+  let activeCloud = true; // el proyecto activo sube a la nube (cloudBackup !== false)
   let status = { state: 'pending', lastSync: null, message: 'inicio' };
 
   let running = false;
   let dirty = false;
 
   // --- config ---
+  function writeConfig(cfg) {
+    try {
+      ensureDir(BASE);
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8');
+    } catch { /* best-effort */ }
+  }
+
   function loadConfig() {
     let cfg = { ...DEFAULTS };
     try {
       const parsed = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-      cfg = { ...cfg, ...parsed, git: { ...cfg.git, ...(parsed.git || {}) } };
+      cfg = {
+        ...cfg,
+        ...parsed,
+        git: { ...cfg.git, ...(parsed.git || {}) },
+        rclone: { ...cfg.rclone, ...(parsed.rclone || {}) },
+      };
+      // migración: el backup apuntaba al repo de código (git) → ahora rclone/Google Drive
+      if (cfg.provider === 'git' && cfg.git.remote === 'https://github.com/AgustinAlzari/doskiiapp.git') {
+        cfg = { ...DEFAULTS };
+        writeConfig(cfg);
+      }
     } catch { writeDefaultConfig(); }
     return cfg;
   }
 
   function writeDefaultConfig() {
-    try {
-      ensureDir(BASE);
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULTS, null, 2), 'utf-8');
-    } catch { /* best-effort */ }
+    writeConfig(DEFAULTS);
   }
 
   function reloadConfig() {
@@ -98,7 +123,17 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
 
   // --- estado / broadcast ---
   function setStatus(state, extra = {}) {
-    status = { ...status, ...extra, state, updatedAt: new Date().toISOString() };
+    status = {
+      ...status,
+      ...extra,
+      state,
+      mode: config.mode,
+      prompted: config.prompted,
+      activeCloud,
+      enabled: config.enabled,
+      effective: isEnabled(),
+      updatedAt: new Date().toISOString(),
+    };
     const win = getWindow();
     if (win && !win.isDestroyed() && win.webContents) {
       win.webContents.send('backup:status-changed', status);
@@ -106,7 +141,48 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   function getStatus() {
-    return { ...status };
+    return { ...status, mode: config.mode, prompted: config.prompted, activeCloud, enabled: config.enabled, effective: isEnabled() };
+  }
+
+  function getConfig() {
+    return {
+      enabled: config.enabled,
+      mode: config.mode,
+      prompted: config.prompted,
+      provider: config.provider,
+      remote: config.rclone.remote,
+    };
+  }
+
+  // Autoback efectivo: config.enabled Y modo en línea Y proyecto activo no solo local.
+  function isEnabled() {
+    return config.enabled && config.mode !== 'local' && activeCloud;
+  }
+
+  function setMode({ mode, prompted }) {
+    config = { ...config, mode: mode === 'local' ? 'local' : 'online' };
+    if (typeof prompted === 'boolean') config.prompted = prompted;
+    writeConfig(config);
+    refreshStatus();
+  }
+
+  function setActiveProject({ cloudBackup }) {
+    activeCloud = cloudBackup !== false;
+    refreshStatus();
+  }
+
+  function refreshStatus() {
+    const reason = !config.enabled
+      ? 'backup desactivado en backup.json'
+      : config.mode === 'local'
+        ? 'modo local: autobackup apagado'
+        : !activeCloud
+          ? 'proyecto solo local: autobackup apagado'
+          : null;
+    if (reason) return setStatus('disabled', { message: reason });
+    setStatus(status.state === 'syncing' || status.state === 'error' ? status.state : 'idle', {
+      message: status.state === 'error' ? status.message : 'al día',
+    });
   }
 
   // --- git helpers ---
@@ -117,6 +193,25 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
         resolve(String(stdout).trim());
       });
     });
+  }
+
+  // --- rclone helpers ---
+  function rclone(...args) {
+    return new Promise((resolve, reject) => {
+      execFile('rclone', args, { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+        if (err) { err.stderr = stderr; reject(err); return; }
+        resolve(String(stdout).trim());
+      });
+    });
+  }
+
+  async function rcloneAvailable() {
+    try { await rclone('version'); return true; } catch { return false; }
+  }
+
+  function resetDir(dir) {
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+    ensureDir(dir);
   }
 
   async function ensureClone() {
@@ -177,9 +272,13 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     return allowed;
   }
 
-  // --- espejar los datos permitidos en el staging ---
-  function reconcile(allowed) {
-    const relData = path.join(STAGING, config.git.subfolder);
+  function isCloudPath(sub, name) {
+    const allowed = computeAllowed();
+    return (allowed[sub] || new Set()).has(name);
+  }
+
+  // --- espejar los datos permitidos en el destino (staging) ---
+  function reconcile(allowed, relData) {
     SUBDIRS.forEach(sub => {
       const srcDir = path.join(dataDir, sub);
       const dstDir = path.join(relData, sub);
@@ -196,11 +295,122 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     });
   }
 
-  async function runSync() {
+  function writeFilesFrom(allowed) {
+    const lines = [];
+    SUBDIRS.forEach(sub => {
+      (allowed[sub] || new Set()).forEach(name => lines.push(`${sub}/${name}`));
+    });
+    fs.writeFileSync(FILES_LIST, lines.join('\n'), 'utf-8');
+    return FILES_LIST;
+  }
+
+  // --- tombstones ---
+  function loadTombstones() {
+    try { return JSON.parse(fs.readFileSync(TOMB_LOCAL, 'utf-8')); } catch { return { version: 1, files: [] }; }
+  }
+
+  function saveTombstones(ts) {
+    try { fs.writeFileSync(TOMB_LOCAL, JSON.stringify(ts, null, 2), 'utf-8'); } catch { /* best-effort */ }
+  }
+
+  function addTombstones(paths, deletedAt = new Date().toISOString()) {
+    const ts = loadTombstones();
+    for (const p of paths) {
+      const hit = ts.files.find(t => t.path === p);
+      if (hit) hit.deletedAt = deletedAt;
+      else ts.files.push({ path: p, deletedAt });
+    }
+    saveTombstones(ts);
+  }
+
+  function uploadTombstones() {
+    return rclone('copyto', TOMB_LOCAL, `${config.rclone.remote}/${TOMB_FILE}`).catch(() => {});
+  }
+
+  // Aplica tombstones descargados: borra local salvo que el trabajo local sea más nuevo.
+  function applyTombstones() {
+    const ts = loadTombstones();
+    const keep = [];
+    for (const t of ts.files) {
+      const local = path.join(dataDir, t.path);
+      let exists = false;
+      let mtime = 0;
+      try { mtime = fs.statSync(local).mtimeMs; exists = true; } catch { exists = false; }
+      const delAt = new Date(t.deletedAt).getTime();
+      if (!exists || mtime <= delAt) {
+        if (exists) { try { fs.unlinkSync(local); } catch {} }
+        keep.push(t);
+      }
+      // si el local es más nuevo que el borrado, gana el trabajo local (se descarta el tombstone)
+    }
+    ts.files = keep;
+    saveTombstones(ts);
+  }
+
+  async function deleteRemoteFiles(paths) {
+    const remote = config.rclone.remote;
+    for (const p of paths) {
+      try { await rclone('deletefile', `${remote}/${p}`); } catch { /* el archivo puede no existir */ }
+    }
+  }
+
+  // Se llama desde main cuando se borra un archivo que estaba en la nube.
+  function handleDeleted(paths) {
+    if (!Array.isArray(paths) || paths.length === 0) return;
+    addTombstones(paths);
+    if (config.enabled && config.mode !== 'local') {
+      Promise.resolve()
+        .then(() => deleteRemoteFiles(paths))
+        .then(() => uploadTombstones())
+        .catch(() => {});
+    }
+  }
+
+  // --- subir (autoback) ---
+  async function runRcloneSync() {
+    if (!(await rcloneAvailable())) {
+      setStatus('offline', { message: 'rclone no está instalado (instalá con: brew install rclone)' });
+      return;
+    }
+    setStatus('syncing', { message: 'subiendo datos a la nube...' });
+    try {
+      resetDir(STAGING_R);
+      const allowed = computeAllowed();
+      reconcile(allowed, STAGING_R);
+      await rclone('copy', '--update', STAGING_R, config.rclone.remote, '--transfers', '4', '--stats', '0');
+      await uploadTombstones();
+      setStatus('idle', { message: 'al día', lastSync: new Date().toISOString() });
+    } catch (err) {
+      setStatus('error', { message: `rclone: ${String(err && err.message || err)}` });
+    }
+  }
+
+  // --- bajar (refrescar antes de abrir) ---
+  async function refresh() {
     if (!config.enabled) {
       setStatus('disabled', { message: 'backup desactivado en backup.json' });
       return;
     }
+    if (!(await rcloneAvailable())) {
+      setStatus('offline', { message: 'rclone no está instalado (instalá con: brew install rclone)' });
+      return;
+    }
+    setStatus('syncing', { message: 'actualizando desde la nube...' });
+    try {
+      await rclone('copyto', `${config.rclone.remote}/${TOMB_FILE}`, TOMB_LOCAL).catch(() => {});
+      const allowed = computeAllowed();
+      const list = writeFilesFrom(allowed);
+      if (fs.readFileSync(list, 'utf-8').trim()) {
+        await rclone('copy', '--update', `--files-from=${list}`, config.rclone.remote, dataDir, '--transfers', '4', '--stats', '0');
+      }
+      applyTombstones();
+      setStatus('idle', { message: 'actualizado', lastSync: new Date().toISOString() });
+    } catch (err) {
+      setStatus('error', { message: `rclone: ${String(err && err.message || err)}` });
+    }
+  }
+
+  async function runGitSync() {
     if (!(await ensureClone())) {
       setStatus('offline', { message: 'no se pudo clonar el repositorio (sin conexión o sin permisos)' });
       return;
@@ -209,7 +419,7 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     try {
       const relData = config.git.subfolder;
       const allowed = computeAllowed();
-      reconcile(allowed);
+      reconcile(allowed, path.join(STAGING, relData));
 
       await git('add', '--', relData);
       const changed = await git('status', '--porcelain', '--', relData);
@@ -233,6 +443,16 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     }
   }
 
+  async function runSync() {
+    if (!config.enabled) {
+      setStatus('disabled', { message: 'backup desactivado en backup.json' });
+      return;
+    }
+    if (config.provider === 'rclone') return runRcloneSync();
+    return runGitSync();
+  }
+
+  // Manual (botón "sincronizar"): sube siempre que config.enabled, aunque sea modo local.
   function syncNow() {
     reloadConfig();
     if (running) {
@@ -252,8 +472,9 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
       });
   }
 
+  // Automático: solo si la regla "modo Y proyecto" se cumple.
   function markDirty() {
-    if (!config.enabled) return;
+    if (!isEnabled()) return;
     if (running) {
       dirty = true;
       return;
@@ -271,7 +492,13 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     markDirty,
     syncNow,
     getStatus,
+    getConfig,
     flush,
     setStatus,
+    setMode,
+    setActiveProject,
+    refresh,
+    handleDeleted,
+    isCloudPath,
   };
 };

@@ -168,16 +168,20 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
           <PaletteEditor palette={palette} colorMode={colorMode} onModeChange={setColorMode} onPaletteChange={setPalette} paletteId={paletteId} onPaletteIdChange={setPaletteId} />
         </div>
 
-        <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input
-            type="checkbox"
-            checked={!cloudBackup}
-            onChange={e => setCloudBackup(!e.target.checked)}
-            style={{ width: 16, height: 16, cursor: 'pointer' }}
-          />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>mantener solo local</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>no se sincroniza a la nube (proyecto, personajes, fondos, objetos, globos, viñetas y referencias)</div>
+        <div className="card" style={{ padding: 12 }}>
+          <label className="label" style={{ marginBottom: 8 }}>backup</label>
+          <div className="radio-group">
+            <div className={`radio-pill ${cloudBackup ? 'active' : ''}`} onClick={() => setCloudBackup(true)}>
+              local + nube
+            </div>
+            <div className={`radio-pill ${!cloudBackup ? 'active' : ''}`} onClick={() => setCloudBackup(false)}>
+              solo local
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
+            {cloudBackup
+              ? 'el proyecto y su contenido se suben a la nube y se descargan antes de abrir'
+              : 'no se sincroniza a la nube (proyecto, personajes, fondos, objetos, globos, viñetas y referencias)'}
           </div>
         </div>
 

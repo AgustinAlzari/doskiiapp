@@ -30,6 +30,7 @@ const usePaletteStore = create((set) => ({
       id: palette.id || crypto.randomUUID(),
       createdAt: palette.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
     }
     if (window.api?.palettes) await window.api.palettes.save(updated)
     set(state => {

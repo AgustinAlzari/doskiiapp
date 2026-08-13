@@ -97,3 +97,22 @@ cd doskiiapp && ./sync.sh pull
 
 > Si solo se quieren los datos sin todo el repo, se puede descargar `data/` desde el navegador: https://github.com/AgustinAlzari/doskiiapp/tree/main/data
 
+## Backup automático en la nube (`electron/backup.js`)
+
+El backup automático **no usa git**: sube los datos a **Google Drive vía rclone** (`gdrive:doski-backup`, carpeta única). Config en `~/Library/Application Support/dibuweb/backup.json`:
+
+```json
+{ "enabled": true, "mode": "online", "prompted": false, "provider": "rclone", "rclone": { "remote": "gdrive:doski-backup" } }
+```
+
+- **Modo** (se pregunta al iniciar): `online` (autobackup activo) o `local` (autobackup apagado; se puede subir con "sincronizar").
+- **Regla del autobackup**: ON ⇔ `enabled` Y modo = en línea Y **proyecto activo no es "solo local"**.
+- **Sincronización bidireccional segura** (modo en línea): sube en cada cambio y **descarga antes de abrir un proyecto** (`rclone copy --update`, más nuevo gana, **nunca pisa un archivo más actual**).
+- **Borrados con tombstone**: al borrar algo que está en la nube avisa *"se pierde para siempre"*; registra el borrado en `.tombstones.json` (en la nube) para que no reviva en otra máquina. Si el trabajo local es más nuevo que el borrado, gana lo local.
+- Solo sube el "conjunto nube" (excluye proyectos con `cloudBackup: false`). Los proyectos tienen un switch **"solo local / local + nube"**.
+- `rclone copy` es **aditivo**: nunca borra nada en la nube (salvo borrados confirmados con tombstone).
+- **Configuración una sola vez:** `brew install rclone` y `rclone config` (remoto `gdrive`, OAuth en el navegador). El usuario final no ve nada de esto.
+- El provider `git` queda como respaldo pero no es el default. Los commits "backup" ya no tocan el repo de la app.
+- Cada entidad guarda `savedAt` (fecha de guardado local) y `id` uuid robusto (validado al migrar).
+
+

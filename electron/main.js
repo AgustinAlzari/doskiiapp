@@ -246,8 +246,25 @@ ipcMain.handle('references:open-used-folder', async (_, fileNames) => {
 
 // --- IPC: Backup a la nube ---
 ipcMain.handle('backup:get-status', async () => backup.getStatus());
+ipcMain.handle('backup:get-config', async () => backup.getConfig());
+ipcMain.handle('backup:set-mode', async (_, payload) => {
+  backup.setMode(payload || {});
+  return backup.getStatus();
+});
+ipcMain.handle('backup:set-active-project', async (_, payload) => {
+  backup.setActiveProject(payload || {});
+  return backup.getStatus();
+});
 ipcMain.handle('backup:sync-now', async () => {
   await backup.syncNow();
+  return backup.getStatus();
+});
+ipcMain.handle('backup:refresh', async () => {
+  await backup.refresh();
+  return backup.getStatus();
+});
+ipcMain.handle('backup:delete-remote', async (_, paths) => {
+  backup.handleDeleted(Array.isArray(paths) ? paths : []);
   return backup.getStatus();
 });
 
@@ -267,10 +284,31 @@ ipcMain.handle('characters:save', async (_, character) => {
   return character;
 });
 
-ipcMain.handle('characters:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'characters', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+// Borra un archivo de entidad y, si estaba en la nube, registra el tombstone
+// (el borrado se propaga a la nube y no revive en otras máquinas).
+function deleteEntityCloud(sub, id) {
+  const filePath = path.join(DATA_DIR, sub, `${id}.json`);
+  let cloud = false;
+  if (fs.existsSync(filePath)) {
+    try {
+      const entity = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (sub === 'projects') {
+        cloud = entity.cloudBackup !== false;
+      } else if (entity && entity.projectId) {
+        try {
+          const proj = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'projects', `${entity.projectId}.json`), 'utf-8'));
+          cloud = proj.cloudBackup !== false;
+        } catch {}
+      }
+    } catch {}
+    fs.unlinkSync(filePath);
+  }
+  if (cloud) backup.handleDeleted([`${sub}/${id}.json`]);
   backup.markDirty();
+}
+
+ipcMain.handle('characters:delete', async (_, id) => {
+  deleteEntityCloud('characters', id);
   return true;
 });
 
@@ -291,9 +329,7 @@ ipcMain.handle('strips:save', async (_, strip) => {
 });
 
 ipcMain.handle('strips:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'strips', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('strips', id);
   return true;
 });
 
@@ -324,9 +360,7 @@ ipcMain.handle('backgrounds:save', async (_, background) => {
 });
 
 ipcMain.handle('backgrounds:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'backgrounds', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('backgrounds', id);
   return true;
 });
 
@@ -347,9 +381,7 @@ ipcMain.handle('objects:save', async (_, object) => {
 });
 
 ipcMain.handle('objects:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'objects', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('objects', id);
   return true;
 });
 
@@ -370,9 +402,7 @@ ipcMain.handle('balloons:save', async (_, balloon) => {
 });
 
 ipcMain.handle('balloons:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'balloons', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('balloons', id);
   return true;
 });
 
@@ -393,9 +423,7 @@ ipcMain.handle('palettes:save', async (_, palette) => {
 });
 
 ipcMain.handle('palettes:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'palettes', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('palettes', id);
   return true;
 });
 
@@ -416,9 +444,7 @@ ipcMain.handle('authors:save', async (_, author) => {
 });
 
 ipcMain.handle('authors:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'authors', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('authors', id);
   return true;
 });
 
@@ -443,26 +469,33 @@ ipcMain.handle('projects:save', async (_, project) => {
 });
 
 ipcMain.handle('projects:delete', async (_, id) => {
-  const filePath = path.join(DATA_DIR, 'projects', `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  backup.markDirty();
+  deleteEntityCloud('projects', id);
   return true;
 });
 
 ipcMain.handle('projects:deleteAll', async (_, projectId) => {
-  const deleteOwned = (dir) => {
+  const cloudPaths = [];
+  let projectCloud = false;
+  try {
+    const proj = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'projects', `${projectId}.json`), 'utf-8'));
+    projectCloud = proj.cloudBackup !== false;
+  } catch {}
+  const deleteOwned = (dir, sub) => {
     readJsonDir(dir).filter(e => e.projectId === projectId).forEach(e => {
       const p = path.join(dir, `${e.id}.json`);
       if (fs.existsSync(p)) fs.unlinkSync(p);
+      if (projectCloud) cloudPaths.push(`${sub}/${e.id}.json`);
     });
   };
-  deleteOwned(path.join(DATA_DIR, 'characters'));
-  deleteOwned(path.join(DATA_DIR, 'backgrounds'));
-  deleteOwned(path.join(DATA_DIR, 'objects'));
-  deleteOwned(path.join(DATA_DIR, 'balloons'));
-  deleteOwned(path.join(DATA_DIR, 'strips'));
+  deleteOwned(path.join(DATA_DIR, 'characters'), 'characters');
+  deleteOwned(path.join(DATA_DIR, 'backgrounds'), 'backgrounds');
+  deleteOwned(path.join(DATA_DIR, 'objects'), 'objects');
+  deleteOwned(path.join(DATA_DIR, 'balloons'), 'balloons');
+  deleteOwned(path.join(DATA_DIR, 'strips'), 'strips');
   const p = path.join(DATA_DIR, 'projects', `${projectId}.json`);
   if (fs.existsSync(p)) fs.unlinkSync(p);
+  if (projectCloud) cloudPaths.push(`projects/${projectId}.json`);
+  if (cloudPaths.length) backup.handleDeleted(cloudPaths);
   backup.markDirty();
   return true;
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useBalloonStore from '../../store/balloonStore'
 import useProjectStore from '../../store/projectStore'
+import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 import { BALLOON_LAWS } from '../../data/balloonLaws'
 
 const KIND_LABELS = { speech: 'diálogo', thought: 'pensamiento', narration: 'narración', other: 'globo x' }
@@ -90,7 +91,7 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
                   </div>
                   <button
                     className="btn btn-ghost btn-sm btn-danger"
-                    onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(balloon.id) }}
+                    onClick={(e) => { e.stopPropagation(); if (confirmDelete(balloon.name, isInCloud(balloon, projects))) remove(balloon.id) }}
                   >
                     ×
                   </button>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useCharacterStore from '../../store/characterStore'
 import useProjectStore from '../../store/projectStore'
+import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 
 function CharacterThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -84,7 +85,7 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={(e) => { e.stopPropagation(); if (confirm('¿Eliminar?')) remove(char.id) }}
+                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(char.name, isInCloud(char, projects))) remove(char.id) }}
                 >
                   ×
                 </button>
