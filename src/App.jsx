@@ -28,6 +28,7 @@ import useObjectStore from './store/objectStore'
 import useBalloonStore from './store/balloonStore'
 import usePaletteStore from './store/paletteStore'
 import useAuthorStore from './store/authorStore'
+import ChatPanel from './components/chat/ChatPanel'
 
 const SCOPED_VIEWS = [
   'strips', 'new-strip', 'editor', 'prompts', 'export',
@@ -380,8 +381,13 @@ export default function App() {
   }
 
   return (
-    <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject} onToggleMode={toggleSyncMode}>
-      <ErrorBoundary>{renderContent()}</ErrorBoundary>
-    </Layout>
+    <>
+      <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject} onToggleMode={toggleSyncMode}>
+        <ErrorBoundary>{renderContent()}</ErrorBoundary>
+      </Layout>
+      {/* Chat de IA persistente: vive fuera del contenido que cambia al navegar,
+          así la conversación no se reinicia al cambiar de vista. */}
+      <ChatPanel />
+    </>
   )
 }

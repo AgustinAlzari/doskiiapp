@@ -13,7 +13,6 @@ import CharacterPropsPanel from './CharacterPropsPanel'
 import BalloonPropsPanel from './BalloonPropsPanel'
 import AutoTextarea from './AutoTextarea'
 import useChatStore from '../../store/chatStore'
-import ChatPanel from '../chat/ChatPanel'
 
 export default function StripEditor({ strip, project, onBack, onEditCharacter, onShowPrompts }) {
   const chatOpen = useChatStore(s => s.open)
@@ -188,8 +187,8 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const updateBackground = useCallback((panelIdx, updates) => {
     setData(prev => {
       const panels = [...prev.panels]
+      // El fondo se estira libre (sin forzar proporción) hasta cubrir el cuadro completo.
       const nextBackground = { ...panels[panelIdx].background, ...updates }
-      if (updates.width) nextBackground.height = Math.min(0.8, Math.max(0.12, updates.width * 0.5))
       panels[panelIdx] = { ...panels[panelIdx], background: nextBackground }
       return { ...prev, panels }
     })
@@ -1151,7 +1150,6 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
           </div>
         </div>
       </div>
-      {chatOpen && <ChatPanel />}
     </div>
   )
 }

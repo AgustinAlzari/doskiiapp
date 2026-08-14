@@ -7,7 +7,6 @@ import useAuthorStore from '../../store/authorStore'
 import useChatStore from '../../store/chatStore'
 import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
-import ChatPanel from '../chat/ChatPanel'
 
 const MAX_RESULTS = 2
 import ImagePreview from '../ImagePreview'
@@ -477,9 +476,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
           </div>
         )
       })}
-      {chatOpen && (
-        <ChatPanel />
-      )}
       {preview && (
         <ImagePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />
       )}

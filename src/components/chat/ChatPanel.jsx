@@ -5,6 +5,7 @@ export default function ChatPanel() {
   const models = useChatStore(s => s.models)
   const favoriteModelId = useChatStore(s => s.favoriteModelId)
   const setFavorite = useChatStore(s => s.setFavorite)
+  const chatOpen = useChatStore(s => s.open)
   const model = useChatStore(s => s.favoriteModel())
   const webviewRef = useRef(null)
   const areaRef = useRef(null)
@@ -36,6 +37,10 @@ export default function ChatPanel() {
     return () => ro.disconnect()
   }, [])
 
+  const resetChat = () => {
+    try { webviewRef.current?.reload() } catch {}
+  }
+
   return (
     <div style={{
       position: 'fixed',
@@ -46,7 +51,7 @@ export default function ChatPanel() {
       zIndex: 40,
       background: 'var(--color-bg)',
       borderLeft: '1px solid var(--color-border)',
-      display: 'flex',
+      display: chatOpen ? 'flex' : 'none',
       flexDirection: 'column',
       paddingBottom: 10,
     }}>
@@ -82,6 +87,23 @@ export default function ChatPanel() {
         >
           {models.map(m => <option key={m.id} value={m.id}>{String(m.name).toLowerCase()}</option>)}
         </select>
+        <span style={{ flex: 1 }} />
+        <button
+          onClick={resetChat}
+          title="reiniciar la conversación"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '2px 6px',
+            fontSize: 15,
+            lineHeight: 1,
+            cursor: 'pointer',
+            color: 'var(--color-text-muted)',
+            borderRadius: 4,
+          }}
+        >
+          ⟳
+        </button>
       </div>
 
       {/* Chat embarcado */}
