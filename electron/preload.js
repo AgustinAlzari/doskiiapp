@@ -68,6 +68,9 @@ contextBridge.exposeInMainWorld('api', {
   export: {
     save: (data) => ipcRenderer.invoke('export:save', data),
   },
+  data: {
+    exportAll: (filePath) => ipcRenderer.invoke('data:export-all', filePath),
+  },
   chat: {
     openExternal: (url) => ipcRenderer.invoke('chat:open-external', url),
   },
@@ -79,10 +82,20 @@ contextBridge.exposeInMainWorld('api', {
     syncNow: () => ipcRenderer.invoke('backup:sync-now'),
     refresh: () => ipcRenderer.invoke('backup:refresh'),
     deleteRemote: (paths) => ipcRenderer.invoke('backup:delete-remote', paths),
+    setupStatus: () => ipcRenderer.invoke('backup:setup-status'),
+    downloadRclone: () => ipcRenderer.invoke('backup:download-rclone'),
+    createRemote: () => ipcRenderer.invoke('backup:create-remote'),
+    testConnection: () => ipcRenderer.invoke('backup:test-connection'),
+    openRcloneConfig: () => ipcRenderer.invoke('backup:open-rclone-config'),
     onStatus: (callback) => {
       const listener = (_event, status) => callback(status)
       ipcRenderer.on('backup:status-changed', listener)
       return () => ipcRenderer.removeListener('backup:status-changed', listener)
+    },
+    onSetupProgress: (callback) => {
+      const listener = (_event, msg) => callback(msg)
+      ipcRenderer.on('backup:setup-progress', listener)
+      return () => ipcRenderer.removeListener('backup:setup-progress', listener)
     },
   },
 });

@@ -42,6 +42,7 @@
       "package.json"
     ],
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.graphics-design",
       "target": [
         {

@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, clipboard, net 
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 const initBackup = require('./backup');
 
 const isDev = !app.isPackaged;
@@ -69,7 +70,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: '@doski',
+    title: 'doskii',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -266,6 +267,30 @@ ipcMain.handle('backup:refresh', async () => {
 ipcMain.handle('backup:delete-remote', async (_, paths) => {
   backup.handleDeleted(Array.isArray(paths) ? paths : []);
   return backup.getStatus();
+});
+
+// --- IPC: wizard de sincronización ---
+ipcMain.handle('backup:setup-status', async () => backup.setupStatus());
+ipcMain.handle('backup:download-rclone', async () => {
+  const res = await backup.downloadRclone();
+  return { ...res, ...(await backup.setupStatus()) };
+});
+ipcMain.handle('backup:create-remote', async () => {
+  const res = await backup.createRemote();
+  return { ...res, ...(await backup.setupStatus()) };
+});
+ipcMain.handle('backup:test-connection', async () => {
+  const res = await backup.testConnection();
+  return { ...res, ...(await backup.setupStatus()) };
+});
+// Fallback: si el OAuth de rclone no pudo completarse desde la app, abre una
+// terminal con `rclone config` para que el usuario lo termine a mano.
+ipcMain.handle('backup:open-rclone-config', async () => {
+  try {
+    const script = 'tell application "Terminal" to activate\rdo script "rclone config" in front window';
+    execFile('osascript', ['-e', script], (err) => { if (err) console.error(err); });
+  } catch {}
+  return { ok: true };
 });
 
 // --- IPC: Characters ---
@@ -579,6 +604,34 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
     backgrounds,
     objects,
     balloons,
+    references,
+  };
+  fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');
+  return { ok: true, filePath };
+});
+
+// --- IPC: Export de TODO doski (respaldo completo) ---
+ipcMain.handle('data:export-all', async (_, filePath) => {
+  ensureDataDirs();
+  const readDir = (sub) => readJsonDir(path.join(DATA_DIR, sub));
+  const references = {};
+  fs.readdirSync(path.join(DATA_DIR, 'references')).forEach(name => {
+    if (name === '.DS_Store') return;
+    const p = path.join(DATA_DIR, 'references', name);
+    try { if (fs.statSync(p).isFile()) references[name] = fs.readFileSync(p).toString('base64'); } catch {}
+  });
+  const bundle = {
+    format: 'doski-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    authors: readDir('authors'),
+    backgrounds: readDir('backgrounds'),
+    balloons: readDir('balloons'),
+    characters: readDir('characters'),
+    objects: readDir('objects'),
+    palettes: readDir('palettes'),
+    projects: readDir('projects'),
+    strips: readDir('strips'),
     references,
   };
   fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');

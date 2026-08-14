@@ -191,9 +191,16 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   // --- rclone helpers ---
+  // Binario: si existe el descargado por el wizard (bin/rclone) se usa ese;
+  // si no, rclone del PATH del sistema.
+  function getRclonePath() {
+    const bundled = path.join(BASE, 'bin', 'rclone');
+    return fs.existsSync(bundled) ? bundled : 'rclone';
+  }
+
   function rclone(...args) {
     return new Promise((resolve, reject) => {
-      execFile('rclone', args, { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      execFile(getRclonePath(), args, { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
         if (err) { err.stderr = stderr; reject(err); return; }
         resolve(String(stdout).trim());
       });
@@ -207,6 +214,106 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   function resetDir(dir) {
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
     ensureDir(dir);
+  }
+
+  // --- wizard de sincronización (paso a paso) ---
+  function emitSetup(msg) {
+    const win = getWindow();
+    if (win && !win.isDestroyed() && win.webContents) {
+      win.webContents.send('backup:setup-progress', String(msg));
+    }
+  }
+
+  // Diagnóstico del estado de cada paso (para el wizard y para auto-abrirlo).
+  async function setupStatus() {
+    const remoteName = config.rclone.remote.split(':')[0];
+    let rcloneInstalled = false;
+    let remotes = [];
+    try {
+      await rclone('version');
+      rcloneInstalled = true;
+      const out = await rclone('listremotes');
+      remotes = String(out).split('\n').map(s => s.trim().replace(/:$/, '')).filter(Boolean);
+    } catch {}
+    return {
+      rcloneInstalled,
+      rclonePath: rcloneInstalled ? getRclonePath() : null,
+      remotes,
+      remoteName,
+      remoteExists: remotes.includes(remoteName),
+      mode: config.mode,
+      enabled: config.enabled,
+      lastSync: status.lastSync,
+    };
+  }
+
+  // Descarga el binario de rclone (rclone.org) a bin/rclone si no está.
+  async function downloadRclone() {
+    const binDir = path.join(BASE, 'bin');
+    ensureDir(binDir);
+    const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
+    const osName = process.platform === 'darwin' ? 'osx' : process.platform === 'win32' ? 'windows' : process.platform === 'linux' ? 'linux' : null;
+    if (!osName) throw new Error(`plataforma no soportada: ${process.platform}`);
+    const url = `https://downloads.rclone.org/rclone-current-${osName}-${arch}.zip`;
+    const zipPath = path.join(binDir, 'rclone.zip');
+    const tmpDir = path.join(binDir, 'tmp');
+
+    emitSetup('descargando rclone...');
+    await new Promise((resolve, reject) => {
+      execFile('curl', ['-L', '-sS', '--fail', '-o', zipPath, url], { maxBuffer: 32 * 1024 * 1024 }, (err) => err ? reject(err) : resolve());
+    });
+    emitSetup('descomprimiendo...');
+    resetDir(tmpDir);
+    await new Promise((resolve, reject) => {
+      execFile('unzip', ['-q', zipPath, '-d', tmpDir], (err) => err ? reject(err) : resolve());
+    });
+    const found = [];
+    const scan = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) scan(p);
+        else if (e.name === 'rclone' || e.name === 'rclone.exe') found.push(p);
+      }
+    };
+    scan(tmpDir);
+    if (found.length === 0) throw new Error('no se encontró el binario de rclone en la descarga');
+    const dest = path.join(binDir, process.platform === 'win32' ? 'rclone.exe' : 'rclone');
+    fs.copyFileSync(found[0], dest);
+    try { fs.chmodSync(dest, 0o755); } catch {}
+    fs.rmSync(zipPath, { force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    emitSetup('rclone instalado');
+    return { ok: true, rclonePath: getRclonePath() };
+  }
+
+  // Crea el remoto (si falta) y abre el navegador para conectar la cuenta de google.
+  async function createRemote() {
+    if (!(await rcloneAvailable())) throw new Error('rclone no está instalado');
+    const remoteName = config.rclone.remote.split(':')[0];
+    emitSetup('autorización abierta en el navegador');
+    // `config create` abre el navegador y completa el OAuth solo.
+    try {
+      await rclone('config', 'create', remoteName, 'drive');
+    } catch {
+      // el remoto ya existe: reconectar para (re)autorizar la cuenta
+      await new Promise((resolve, reject) => {
+        execFile(getRclonePath(), ['config', 'reconnect', `${remoteName}:`], { maxBuffer: 32 * 1024 * 1024 }, (err) => err ? reject(err) : resolve());
+      });
+    }
+    emitSetup('cuenta conectada');
+    return { ok: true, remoteName };
+  }
+
+  // Prueba la conexión contra la raíz del remoto (valida credenciales sin tocar datos).
+  async function testConnection() {
+    if (!(await rcloneAvailable())) return { ok: false, error: 'rclone no está instalado' };
+    const remoteName = config.rclone.remote.split(':')[0];
+    try {
+      await rclone('lsd', `${remoteName}:`);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err && err.message || err) };
+    }
   }
 
   async function ensureClone() {
@@ -549,5 +656,9 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     refresh,
     handleDeleted,
     isCloudPath,
+    setupStatus,
+    downloadRclone,
+    createRemote,
+    testConnection,
   };
 };
