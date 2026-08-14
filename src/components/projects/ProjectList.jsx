@@ -40,6 +40,18 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
     }
   }
 
+  const handleExportAll = async () => {
+    if (!window.api?.dialog || !window.api?.data) return
+    const date = new Date().toISOString().slice(0, 10)
+    const result = await window.api.dialog.save({
+      defaultPath: `doski-backup-${date}.doski`,
+      filters: [{ name: 'respaldo doski', extensions: ['doski'] }],
+    })
+    if (!result.canceled && result.filePath) {
+      await window.api.data.exportAll(result.filePath)
+    }
+  }
+
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
@@ -49,6 +61,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
           <h1 className="ui-h1">proyectos</h1>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={handleImport}>importar .doski</button>
+            <button className="btn" onClick={handleExportAll} title="respaldo completo de todos los proyectos">exportar doski</button>
             <button className="btn btn-primary" onClick={onNew}>nuevo proyecto</button>
           </div>
         </div>

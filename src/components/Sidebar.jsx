@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useChatStore from '../store/chatStore'
+import doskiiIcon from '../assets/doskii_icon.png'
 
 const STATUS_UI = {
   idle: { label: 'hecho' },
@@ -12,6 +13,8 @@ const STATUS_UI = {
 
 export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject, onToggleMode }) {
   const [backupStatus, setBackupStatus] = useState(null)
+  const [logoWidth, setLogoWidth] = useState(0)
+  const boxRef = useRef(null)
   const chatOpen = useChatStore(s => s.open)
   const toggleChat = useChatStore(s => s.toggle)
 
@@ -20,6 +23,11 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     if (!api) return
     api.getStatus().then(setBackupStatus).catch(() => {})
     return api.onStatus(setBackupStatus)
+  }, [])
+
+  // El ícono va centrado y un 40% más chico que el ancho del título.
+  useEffect(() => {
+    if (boxRef.current) setLogoWidth(Math.round(boxRef.current.offsetWidth * 0.6))
   }, [])
 
   const statusMeta = STATUS_UI[backupStatus?.state] || { label: '...' }
@@ -33,6 +41,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     { id: 'authors', label: 'autores', active: ['authors', 'new-author', 'edit-author'], divider: true },
     { id: 'projects', label: 'proyectos', active: ['projects'] },
     { id: 'modelo', label: 'modelos', active: ['modelo'], divider: true },
+    { id: 'sync', label: 'sincronización', active: ['sync'], divider: true },
   ]
 
   const isActive = (item) => item.active.includes(currentView)
@@ -53,33 +62,53 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
       paddingRight: 12,
       flexShrink: 0,
     }}>
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          marginBottom: 8,
-          paddingLeft: 12,
-          color: 'var(--color-title)',
-        }}
-      >
-        @doski
+      <div ref={boxRef} style={{ marginBottom: 8 }}>
+        <div style={{ paddingLeft: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <img
+              src={doskiiIcon}
+              alt=""
+              draggable={false}
+              style={{
+                width: logoWidth,
+                height: logoWidth,
+                display: 'block',
+                objectFit: 'contain',
+              }}
+            />
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--color-title)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              doskii
+            </div>
+          </div>
+        </div>
       </div>
 
       {activeProject && (
-        <div
-          className="sidebar-item"
-          style={{ fontSize: 12, color: 'var(--color-text-muted)', justifyContent: 'space-between' }}
-          onClick={() => onNavigate('edit-project')}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeProject.name}</span>
-          <span style={{ color: 'var(--color-accent)' }}>✎</span>
-        </div>
+        <>
+          <div style={{ height: 1, background: 'var(--color-border-muted)', margin: '8px 4px 8px' }} />
+          <div
+            className="sidebar-item"
+            style={{ fontSize: 12, color: 'var(--color-text-muted)', justifyContent: 'space-between' }}
+            onClick={() => onNavigate('edit-project')}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeProject.name}</span>
+            <span style={{ color: 'var(--color-accent)' }}>✎</span>
+          </div>
+          <div style={{ height: 1, background: 'var(--color-border-muted)', margin: '8px 4px 8px' }} />
+        </>
       )}
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: activeProject ? 12 : 12 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 0 }}>
         {navItems.map((item, idx) => {
-          const scoped = item.id !== 'projects' && item.id !== 'modelo'
+          const scoped = item.id !== 'projects' && item.id !== 'modelo' && item.id !== 'sync'
           const disabled = scoped && !activeProject
           return (
             <div key={item.id}>

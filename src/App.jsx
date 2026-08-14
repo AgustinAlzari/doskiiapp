@@ -19,6 +19,7 @@ import ProjectForm from './components/projects/ProjectForm'
 import PromptExporter from './components/export/PromptExporter'
 import PreviewExport from './components/export/PreviewExport'
 import ModelList from './components/ModelList'
+import SyncWizard from './components/SyncWizard'
 import useProjectStore from './store/projectStore'
 import useStripStore from './store/stripStore'
 import useCharacterStore from './store/characterStore'
@@ -68,12 +69,22 @@ export default function App() {
     await reloadAllStores()
   }
 
+  // Aplica un modo (online/local) al backup y a la UI.
+  const applyMode = async (mode) => {
+    try { if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode }) } catch {}
+    setBackupConfig(c => ({ ...c, mode }))
+  }
+
+  // Memoriza el modo en que se cierra un proyecto (campo syncMode persistido).
+  const persistMode = async (project, mode) => {
+    if (!project?.id || project.syncMode === mode) return
+    try { await useProjectStore.getState().save({ ...project, syncMode: mode }) } catch {}
+  }
+
   // Switch maestro del sidebar: encender = sincronizar ya (sube local + baja nube).
   const toggleSyncMode = async (nextMode) => {
-    try {
-      if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode: nextMode })
-    } catch {}
-    setBackupConfig(c => ({ ...c, mode: nextMode }))
+    await applyMode(nextMode)
+    await persistMode(activeProject, nextMode)
     if (nextMode === 'online') {
       try { if (window.api?.backup?.syncNow) await window.api.backup.syncNow() } catch {}
       await refreshAndReload()
@@ -104,10 +115,15 @@ export default function App() {
   const objects = useObjectStore(s => s.objects)
 
   const openProject = async (id) => {
-    if (backupConfig?.mode === 'online') {
+    const globalMode = backupConfig?.mode || 'online'
+    if (activeProject) await persistMode(activeProject, globalMode)
+    const proj = projects.find(p => p.id === id)
+    // Cada proyecto recuerda el modo del switch en que se cerró; sin memoria, hereda el global.
+    const memorized = proj?.syncMode || globalMode
+    await applyMode(memorized)
+    if (memorized === 'online') {
       await refreshAndReload()
     }
-    const proj = projects.find(p => p.id === id)
     try {
       if (window.api?.backup?.setActiveProject) {
         await window.api.backup.setActiveProject({ cloudBackup: proj?.cloudBackup !== false })
@@ -131,18 +147,36 @@ export default function App() {
     setView(section)
   }
 
+  // Al abrir: si la nube está encendida pero falta rclone o la cuenta, se abre el
+  // paso a paso en lugar de abrir directamente el último proyecto.
   useEffect(() => {
     if (!projectsLoaded || !backupReady) return
-    let savedId = null
-    try { savedId = localStorage.getItem('doski:lastProject') } catch {}
-    const target = savedId && projects.find(p => p.id === savedId)
-    if (target) {
-      setActiveProjectId(target.id)
-      setSelectedStripId(null)
-      setView('strips')
-    }
+    let active = true
+    ;(async () => {
+      let blocker = false
+      if (backupConfig?.mode === 'online' && window.api?.backup?.setupStatus) {
+        try {
+          const diag = await window.api.backup.setupStatus()
+          blocker = !diag.rcloneInstalled || !diag.remoteExists
+        } catch {}
+      }
+      if (!active) return
+      if (blocker) { setView('sync'); return }
+      let savedId = null
+      try { savedId = localStorage.getItem('doski:lastProject') } catch {}
+      const target = savedId && projects.find(p => p.id === savedId)
+      if (target) {
+        openProject(target.id)
+      }
+    })()
+    return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectsLoaded, backupReady])
+
+  const closeSyncWizard = async () => {
+    await applyMode('online')
+    setView('projects')
+  }
 
   // Informa al backup cuál es el proyecto activo (para la regla "modo Y proyecto").
   useEffect(() => {
@@ -331,6 +365,14 @@ export default function App() {
 
       case 'modelo':
         return <ModelList />
+
+      case 'sync':
+        return (
+          <SyncWizard
+            onBack={() => setView('projects')}
+            onDone={closeSyncWizard}
+          />
+        )
 
       default:
         return renderProjectList()
