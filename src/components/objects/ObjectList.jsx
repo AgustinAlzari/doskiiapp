@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import useObjectStore from '../../store/objectStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
+import { askConfirm } from '../../store/confirmStore'
+import EntityImport from '../EntityImport'
 import ChatLayout from '../chat/ChatLayout'
 
 function ObjectThumb({ referenceImages }) {
@@ -30,6 +32,30 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
   const projects = useProjectStore(s => s.projects)
   const scoped = objects.filter(o => o.projectId === projectId && !o.comodin)
 
+  const [importing, setImporting] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const flash = (msg) => { setFeedback(msg); setTimeout(() => setFeedback(''), 2500) }
+
+  const candidates = projects
+    .filter(p => p.id !== projectId)
+    .map(p => ({ id: p.id, name: p.name, count: objects.filter(o => o.projectId === p.id && !o.comodin).length }))
+    .filter(p => p.count > 0)
+
+  const importFrom = async (source) => {
+    const sourceItems = objects.filter(o => o.projectId === source.id && !o.comodin)
+    const currentItems = scoped
+    const ok = await askConfirm(`¿sobreescribir los ${currentItems.length} objetos actuales con los ${sourceItems.length} objetos de "${source.name}"?`, { confirmLabel: "sobreescribir" })
+    if (!ok) { setImporting(false); return }
+    for (const item of currentItems) await remove(item.id)
+    for (const item of sourceItems) {
+      const { id, ...rest } = item
+      await save({ ...rest, id: crypto.randomUUID(), projectId })
+    }
+    setImporting(false)
+    flash(`importados ${sourceItems.length} objetos de "${source.name}"`)
+  }
+
   const copyToProject = async (obj, targetId) => {
     await save({
       ...obj,
@@ -47,7 +73,9 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
         <div className="section-header" style={{ justifyContent: 'space-between' }}>
           <h1 className="ui-h1">objetos</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {feedback && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{feedback}</span>}
             <button className="btn btn-primary" onClick={onNew}>nuevo objeto</button>
+            <button className="btn" onClick={() => setImporting(true)} title="traer los objetos de otro proyecto">importar</button>
           </div>
         </div>
 
@@ -89,7 +117,7 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(obj.name, isInCloud(obj, projects))) remove(obj.id) }}
+                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(obj.name, isInCloud(obj, projects))) remove(obj.id) }}
                 >
                   ×
                 </button>
@@ -97,6 +125,9 @@ export default function ObjectList({ projectId, onNew, onEdit }) {
             </div>
           ))}
         </div>
+      )}
+      {importing && (
+        <EntityImport kindLabel="objetos" candidates={candidates} onImport={importFrom} onClose={() => setImporting(false)} />
       )}
       </div>
     </ChatLayout>

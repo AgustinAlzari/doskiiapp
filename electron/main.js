@@ -125,6 +125,7 @@ function ensureDataDirs() {
   ensureDir(path.join(DATA_DIR, 'backgrounds'));
   ensureDir(path.join(DATA_DIR, 'objects'));
   ensureDir(path.join(DATA_DIR, 'balloons'));
+  ensureDir(path.join(DATA_DIR, 'referenceDefs'));
   ensureDir(path.join(DATA_DIR, 'palettes'));
   ensureDir(path.join(DATA_DIR, 'authors'));
   ensureDir(path.join(DATA_DIR, 'references'));
@@ -431,6 +432,27 @@ ipcMain.handle('balloons:delete', async (_, id) => {
   return true;
 });
 
+// --- IPC: Reference definitions (categoría "referencias", como fondo) ---
+ipcMain.handle('referenceDefs:list', async () => {
+  ensureDataDirs();
+  const dir = path.join(DATA_DIR, 'referenceDefs');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+});
+
+ipcMain.handle('referenceDefs:save', async (_, ref) => {
+  ensureDataDirs();
+  const filePath = path.join(DATA_DIR, 'referenceDefs', `${ref.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(ref, null, 2), 'utf-8');
+  backup.markDirty();
+  return ref;
+});
+
+ipcMain.handle('referenceDefs:delete', async (_, id) => {
+  deleteEntityCloud('referenceDefs', id);
+  return true;
+});
+
 // --- IPC: Palettes ---
 ipcMain.handle('palettes:list', async () => {
   ensureDataDirs();
@@ -516,6 +538,7 @@ ipcMain.handle('projects:deleteAll', async (_, projectId) => {
   deleteOwned(path.join(DATA_DIR, 'backgrounds'), 'backgrounds');
   deleteOwned(path.join(DATA_DIR, 'objects'), 'objects');
   deleteOwned(path.join(DATA_DIR, 'balloons'), 'balloons');
+  deleteOwned(path.join(DATA_DIR, 'referenceDefs'), 'referenceDefs');
   deleteOwned(path.join(DATA_DIR, 'strips'), 'strips');
   const p = path.join(DATA_DIR, 'projects', `${projectId}.json`);
   if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -557,6 +580,7 @@ ipcMain.handle('projects:duplicate', async (_, projectId) => {
   cloneEntities(path.join(DATA_DIR, 'backgrounds'));
   cloneEntities(path.join(DATA_DIR, 'objects'));
   cloneEntities(path.join(DATA_DIR, 'balloons'));
+  cloneEntities(path.join(DATA_DIR, 'referenceDefs'));
 
   readJsonDir(path.join(DATA_DIR, 'strips')).filter(s => s.projectId === projectId).forEach(strip => {
     const newId = crypto.randomUUID();
@@ -581,9 +605,10 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
   const backgrounds = readJsonDir(path.join(DATA_DIR, 'backgrounds')).filter(b => b.projectId === projectId);
   const objects = readJsonDir(path.join(DATA_DIR, 'objects')).filter(o => o.projectId === projectId);
   const balloons = readJsonDir(path.join(DATA_DIR, 'balloons')).filter(b => b.projectId === projectId);
+  const referenceDefs = readJsonDir(path.join(DATA_DIR, 'referenceDefs')).filter(r => r.projectId === projectId);
 
   const refNames = new Set();
-  [...characters, ...backgrounds, ...objects, ...balloons].forEach(e => (e.referenceImages || []).forEach(r => {
+  [...characters, ...backgrounds, ...objects, ...balloons, ...referenceDefs].forEach(e => (e.referenceImages || []).forEach(r => {
     const name = safeRefName(e, r);
     if (name) refNames.add(name);
   }));
@@ -604,6 +629,7 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
     backgrounds,
     objects,
     balloons,
+    referenceDefs,
     references,
   };
   fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');
@@ -631,6 +657,7 @@ ipcMain.handle('data:export-all', async (_, filePath) => {
     objects: readDir('objects'),
     palettes: readDir('palettes'),
     projects: readDir('projects'),
+    referenceDefs: readDir('referenceDefs'),
     strips: readDir('strips'),
     references,
   };
@@ -665,6 +692,7 @@ ipcMain.handle('projects:import', async (_, filePath) => {
   importEntities(path.join(DATA_DIR, 'backgrounds'), bundle.backgrounds);
   importEntities(path.join(DATA_DIR, 'objects'), bundle.objects);
   importEntities(path.join(DATA_DIR, 'balloons'), bundle.balloons);
+  importEntities(path.join(DATA_DIR, 'referenceDefs'), bundle.referenceDefs);
 
   (bundle.strips || []).forEach(s => {
     const newId = crypto.randomUUID();

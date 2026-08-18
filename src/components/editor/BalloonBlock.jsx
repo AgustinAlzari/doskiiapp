@@ -23,8 +23,8 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - balloon.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - balloon.height, dragStart.current.y + dy))
+        Math.max(-0.6, Math.min(1.6 - balloon.width, dragStart.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - balloon.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -79,6 +79,7 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
         top: `${balloon.y * 100}%`,
         width: `${balloon.width * 100}%`,
         height: `${balloon.height * 100}%`,
+        zIndex: 14 + (balloon.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
       title={`${balloon.label} — globo ${balloon.number}`}

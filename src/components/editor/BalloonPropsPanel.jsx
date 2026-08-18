@@ -1,4 +1,4 @@
-import AutoTextarea from './AutoTextarea'
+import SpellCheckedTextarea from '../SpellCheckedTextarea'
 
 const ANCHOR_DIRECTIONS = ['bottom', 'left', 'right', 'top']
 
@@ -11,6 +11,7 @@ export default function BalloonPropsPanel({
   const anchorType = anchor?.type || 'none'
   const effectiveId = balloonId || defaultBalloon?.id || ''
   const effective = balloons.find(b => b.id === effectiveId)
+  const isImageBalloon = effective?.kind === 'image'
 
   const charName = (id) => {
     const pc = (panelCharacters || []).find(c => c.characterId === id)
@@ -34,11 +35,13 @@ export default function BalloonPropsPanel({
       </div>
 
       <div>
-        <label className="label">texto</label>
-        <AutoTextarea
+        <label className="label">{isImageBalloon ? 'describe la imagen del globo' : 'texto'}</label>
+        <SpellCheckedTextarea
           value={text}
           onChange={e => onText(e.target.value)}
-          placeholder={kind === 'dialogue' ? 'qué dice o piensa...' : 'texto de este globo...'}
+          placeholder={isImageBalloon
+            ? 'describí la escena que va dentro del globo (en vez de texto)...'
+            : (kind === 'dialogue' ? 'qué dice o piensa...' : 'texto de este globo...')}
           minRows={2}
         />
       </div>
@@ -58,7 +61,9 @@ export default function BalloonPropsPanel({
           {balloons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-          {effective ? `define el globo: ${effective.name}. Si es de pensamiento, se dibuja como nube.` : 'elegí un globo de la sección "globos".'}
+          {isImageBalloon
+            ? `globo de imagen: ${effective.name}. Lleva una imagen en su interior, no texto.`
+            : (effective ? `define el globo: ${effective.name}. Si es de pensamiento, se dibuja como nube.` : 'elegí un globo de la sección "globos".')}
         </div>
       </div>
 

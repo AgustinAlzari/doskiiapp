@@ -97,11 +97,20 @@ export const SHOT_TYPES = [
 ]
 
 export const ASPECT_RATIOS = [
-  { id: 'hd',        label: 'HD',        ratio: '16:9', desc: 'widescreen horizontal format', css: '16/9' },
-  { id: 'square',    label: 'Square',    ratio: '1:1',  desc: 'square format', css: '1/1' },
-  { id: 'vertical',  label: 'Vertical',  ratio: '9:16', desc: 'tall vertical format', css: '9/16' },
-  { id: 'portrait-hd', label: 'Vertical HD', ratio: '9:16', desc: 'vertical widescreen format', css: '9/16' },
+  { id: 'hd',        label: 'HD',          ratio: '16:9',   desc: 'widescreen horizontal format', css: '16/9', group: 'formato' },
+  { id: 'square',    label: 'Square',      ratio: '1:1',    desc: 'square format', css: '1/1', group: 'formato' },
+  { id: 'vertical',  label: 'Vertical',    ratio: '9:16',   desc: 'tall vertical format', css: '9/16', group: 'formato' },
+  { id: 'portrait-hd', label: 'Vertical HD', ratio: '9:16', desc: 'vertical widescreen format', css: '9/16', group: 'formato' },
+  { id: 'ig-45',  label: 'IG 4:5',     ratio: '4:5',    desc: 'feed — máxima visibilidad', css: '4/5', group: 'ig' },
+  { id: 'ig-11',  label: 'IG 1:1',     ratio: '1:1',    desc: 'feed — ordenar grilla', css: '1/1', group: 'ig' },
+  { id: 'ig-916', label: 'IG 9:16',    ratio: '9:16',   desc: 'historias y reels — pantalla completa', css: '9/16', group: 'ig' },
+  { id: 'ig-191', label: 'IG 1.91:1',  ratio: '1.91:1', desc: 'feed — fotos panorámicas', css: '191/100', group: 'ig' },
 ]
+
+export function aspectLabel(ar) {
+  if (!ar) return ''
+  return ar.label.includes(ar.ratio) ? ar.label : `${ar.label} ${ar.ratio}`
+}
 
 export const ACTION_TARGET_HINTS = {
   throwing:            { preferType: 'object' },

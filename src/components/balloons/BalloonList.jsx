@@ -3,9 +3,11 @@ import useBalloonStore from '../../store/balloonStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 import { BALLOON_LAWS } from '../../data/balloonLaws'
+import { askConfirm } from '../../store/confirmStore'
+import EntityImport from '../EntityImport'
 import ChatLayout from '../chat/ChatLayout'
 
-const KIND_LABELS = { speech: 'diálogo', thought: 'pensamiento', narration: 'narración', other: 'globo x' }
+const KIND_LABELS = { speech: 'diálogo', thought: 'pensamiento', narration: 'narración', other: 'globo x', image: 'globo de imagen' }
 
 function BalloonThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
@@ -33,6 +35,30 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
   const projects = useProjectStore(s => s.projects)
   const scoped = balloons.filter(b => b.projectId === projectId)
 
+  const [importing, setImporting] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const flash = (msg) => { setFeedback(msg); setTimeout(() => setFeedback(''), 2500) }
+
+  const candidates = projects
+    .filter(p => p.id !== projectId)
+    .map(p => ({ id: p.id, name: p.name, count: balloons.filter(b => b.projectId === p.id && !b.comodin).length }))
+    .filter(p => p.count > 0)
+
+  const importFrom = async (source) => {
+    const sourceItems = balloons.filter(b => b.projectId === source.id && !b.comodin)
+    const currentItems = scoped.filter(b => !b.comodin)
+    const ok = await askConfirm(`¿sobreescribir los ${currentItems.length} globos actuales con los ${sourceItems.length} globos de "${source.name}"?`, { confirmLabel: "sobreescribir" })
+    if (!ok) { setImporting(false); return }
+    for (const item of currentItems) await remove(item.id)
+    for (const item of sourceItems) {
+      const { id, ...rest } = item
+      await save({ ...rest, id: crypto.randomUUID(), projectId })
+    }
+    setImporting(false)
+    flash(`importados ${sourceItems.length} globos de "${source.name}"`)
+  }
+
   const copyToProject = async (balloon, targetId) => {
     await save({
       ...balloon,
@@ -50,7 +76,9 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
         <div className="section-header" style={{ justifyContent: 'space-between' }}>
           <h1 className="ui-h1">globos</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {feedback && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{feedback}</span>}
             <button className="btn btn-primary" onClick={onNew}>nuevo globo</button>
+            <button className="btn" onClick={() => setImporting(true)} title="traer los globos de otro proyecto">importar</button>
           </div>
       </div>
 
@@ -95,7 +123,7 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
                   </div>
                   <button
                     className="btn btn-ghost btn-sm btn-danger"
-                    onClick={(e) => { e.stopPropagation(); if (confirmDelete(balloon.name, isInCloud(balloon, projects))) remove(balloon.id) }}
+                    onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(balloon.name, isInCloud(balloon, projects))) remove(balloon.id) }}
                   >
                     ×
                   </button>
@@ -104,6 +132,9 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
             )
           })}
         </div>
+      )}
+      {importing && (
+        <EntityImport kindLabel="globos" candidates={candidates} onImport={importFrom} onClose={() => setImporting(false)} />
       )}
       </div>
     </ChatLayout>

@@ -22,8 +22,8 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - sfx.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - sfx.height, dragStart.current.y + dy))
+        Math.max(-0.6, Math.min(1.6 - sfx.width, dragStart.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - sfx.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -81,6 +81,7 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
         top: `${sfx.y * 100}%`,
         width: `${sfx.width * 100}%`,
         height: `${sfx.height * 100}%`,
+        zIndex: 14 + (sfx.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >

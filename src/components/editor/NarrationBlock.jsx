@@ -23,8 +23,8 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - panelNarr.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - panelNarr.height, dragStart.current.y + dy))
+        Math.max(-0.6, Math.min(1.6 - panelNarr.width, dragStart.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - panelNarr.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -79,6 +79,7 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         top: `${panelNarr.y * 100}%`,
         width: `${panelNarr.width * 100}%`,
         height: `${panelNarr.height * 100}%`,
+        zIndex: 2 + (panelNarr.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >

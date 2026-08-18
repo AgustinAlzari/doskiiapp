@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import useCharacterStore from '../../store/characterStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
+import { askConfirm } from '../../store/confirmStore'
+import EntityImport from '../EntityImport'
 import ChatLayout from '../chat/ChatLayout'
 
 function CharacterThumb({ referenceImages }) {
@@ -30,6 +32,30 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
   const projects = useProjectStore(s => s.projects)
   const scoped = characters.filter(c => c.projectId === projectId && !c.comodin)
 
+  const [importing, setImporting] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const flash = (msg) => { setFeedback(msg); setTimeout(() => setFeedback(''), 2500) }
+
+  const candidates = projects
+    .filter(p => p.id !== projectId)
+    .map(p => ({ id: p.id, name: p.name, count: characters.filter(c => c.projectId === p.id && !c.comodin).length }))
+    .filter(p => p.count > 0)
+
+  const importFrom = async (source) => {
+    const sourceItems = characters.filter(c => c.projectId === source.id && !c.comodin)
+    const currentItems = scoped
+    const ok = await askConfirm(`¿sobreescribir los ${currentItems.length} personajes actuales con los ${sourceItems.length} personajes de "${source.name}"?`, { confirmLabel: "sobreescribir" })
+    if (!ok) { setImporting(false); return }
+    for (const item of currentItems) await remove(item.id)
+    for (const item of sourceItems) {
+      const { id, ...rest } = item
+      await save({ ...rest, id: crypto.randomUUID(), projectId })
+    }
+    setImporting(false)
+    flash(`importados ${sourceItems.length} personajes de "${source.name}"`)
+  }
+
   const copyToProject = async (char, targetId) => {
     await save({
       ...char,
@@ -47,7 +73,9 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
         <div className="section-header" style={{ justifyContent: 'space-between' }}>
           <h1 className="ui-h1">personajes</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {feedback && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{feedback}</span>}
             <button className="btn btn-primary" onClick={onNew}>nuevo personaje</button>
+            <button className="btn" onClick={() => setImporting(true)} title="traer los personajes de otro proyecto">importar</button>
           </div>
         </div>
 
@@ -89,7 +117,7 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(char.name, isInCloud(char, projects))) remove(char.id) }}
+                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(char.name, isInCloud(char, projects))) remove(char.id) }}
                 >
                   ×
                 </button>
@@ -97,6 +125,9 @@ export default function CharacterList({ projectId, onNew, onEdit }) {
             </div>
           ))}
         </div>
+      )}
+      {importing && (
+        <EntityImport kindLabel="personajes" candidates={candidates} onImport={importFrom} onClose={() => setImporting(false)} />
       )}
       </div>
     </ChatLayout>

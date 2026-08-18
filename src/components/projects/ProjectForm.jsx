@@ -3,13 +3,17 @@ import useProjectStore from '../../store/projectStore'
 import useAuthorStore from '../../store/authorStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import PaletteEditor from './PaletteEditor'
-import { ASPECT_RATIOS } from '../../data/actionPresets'
+import { ASPECT_RATIOS, aspectLabel } from '../../data/actionPresets'
+import useAutoSaveBack from '../../utils/useAutoSaveBack'
+import { askConfirm } from '../../store/confirmStore'
+import FormShade from '../FormShade'
 import ChatLayout from '../chat/ChatLayout'
 
 export default function ProjectForm({ project, onBack, onProjectChanged, onDeleted }) {
   const save = useProjectStore(s => s.save)
-  const duplicate = useProjectStore(s => s.duplicate)
   const removeAll = useProjectStore(s => s.removeAll)
+  const projects = useProjectStore(s => s.projects)
+  const duplicate = useProjectStore(s => s.duplicate)
   const isNew = !project?.id
 
   const [name, setName] = useState(project?.name || '')
@@ -19,7 +23,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [world, setWorld] = useState(project?.world || '')
   const [styleNotes, setStyleNotes] = useState(project?.styleNotes || '')
   const [defaultAspectRatio, setDefaultAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
-  const [defaultPanelCount, setDefaultPanelCount] = useState(project?.defaultPanelCount || 3)
+  const [defaultPanelCount, setDefaultPanelCount] = useState(project?.defaultPanelCount || 1)
   const [colorMode, setColorMode] = useState(project?.colorMode || 'bw')
   const [palette, setPalette] = useState(project?.palette || [])
   const [paletteId, setPaletteId] = useState(project?.paletteId || null)
@@ -59,6 +63,16 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     setTimeout(() => setSavedFlash(false), 2000)
   }
 
+  const { goBack } = useAutoSaveBack({
+    save,
+    remove: removeAll,
+    payload: collect,
+    fields: ['name', 'synopsis', 'genre', 'drawingStyle', 'world', 'styleNotes', 'defaultAspectRatio', 'defaultPanelCount', 'colorMode', 'palette', 'paletteId', 'authorId', 'cloudBackup'],
+    hasContent: !!name.trim(),
+    getStored: (id) => projects.find(p => p.id === id) || null,
+    onBack,
+  })
+
   const handleDuplicate = async () => {
     if (!project?.id) return
     setSaving(true)
@@ -83,7 +97,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
   const handleDelete = async () => {
     if (!project?.id) return
-    if (!confirm(`¿Eliminar el proyecto "${name}" y TODO su contenido (viñetas, personajes, fondos, objetos)?`)) return
+    if (!await askConfirm(`¿eliminar el proyecto "${name}" y todo su contenido (viñetas, personajes, fondos, objetos)?`, { confirmLabel: 'borrar' })) return
     await removeAll(project.id)
     onDeleted()
   }
@@ -92,7 +106,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     <ChatLayout>
       <div style={{ maxWidth: 560 }}>
         <div className="section-header">
-          <button className="back-arrow" onClick={onBack} title="volver">←</button>
+          <button className="back-arrow" onClick={goBack} title="volver">←</button>
           <h1 className="ui-h1">
             {isNew ? 'nuevo proyecto' : 'proyecto'}
           </h1>
@@ -104,6 +118,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
           <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="La rana y la lluvia" autoFocus />
         </div>
 
+        <FormShade active={!!name.trim()} hint="colocá un nombre para poder editar el resto">
         <div>
           <label className="label">autor</label>
           <select
@@ -152,7 +167,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
           <div>
             <label className="label">proporción por defecto</label>
             <select className="input" value={defaultAspectRatio} onChange={e => setDefaultAspectRatio(e.target.value)} style={{ cursor: 'pointer' }}>
-              {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
+              {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{aspectLabel(ar)}</option>)}
             </select>
           </div>
           <div>
@@ -171,7 +186,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
         <div className="card" style={{ padding: 12 }}>
           <label className="label" style={{ marginBottom: 8 }}>paleta de colores</label>
-          <PaletteEditor palette={palette} colorMode={colorMode} onModeChange={setColorMode} onPaletteChange={setPalette} paletteId={paletteId} onPaletteIdChange={setPaletteId} />
+          <PaletteEditor colors={palette} colorMode={colorMode} onModeChange={setColorMode} onColorsChange={setPalette} paletteId={paletteId} onPaletteIdChange={setPaletteId} />
         </div>
 
         <div className="card" style={{ padding: 12 }}>
@@ -201,6 +216,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
             <button className="btn btn-ghost btn-danger" onClick={handleDelete} style={{ marginLeft: 'auto' }}>eliminar proyecto</button>
           )}
         </div>
+        </FormShade>
       </div>
       </div>
     </ChatLayout>

@@ -26,8 +26,8 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - panelChar.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - panelChar.height, dragStart.current.y + dy))
+        Math.max(-0.6, Math.min(1.6 - panelChar.width, dragStart.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - panelChar.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -104,7 +104,7 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
         top: `${panelChar.y * 100}%`,
         width: `${panelChar.width * 100}%`,
         height: `${panelChar.height * 100}%`,
-        borderColor: charDef.color || 'var(--color-border)',
+        zIndex: 2 + (panelChar.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >
