@@ -404,3 +404,44 @@ export async function exportCleanImage({ sourcePath, title, author, format = 'pn
   const canvas = await renderToCanvas(dataUrl, { jpeg: format === 'jpeg' })
   return exportCleanCanvas({ canvas, title, author, format, quality, defaultName })
 }
+
+// Export por lotes a una carpeta elegida UNA sola vez: se guardan todos los
+// ítems automáticamente con el nombre `numero-titulo.ext` (sin re-preguntar
+// por archivo). Si el entorno no soporta el picker de carpeta, cae al diálogo
+// individual por archivo (comportamiento anterior).
+export async function exportCleanImages({ items, author, format = 'png', quality = 1 }) {
+  const build = async (it) => {
+    const dataUrl = await window.api.references.read(it.sourcePath)
+    if (!dataUrl) throw new Error('no se pudo leer la imagen de origen')
+    const canvas = await renderToCanvas(dataUrl, { jpeg: format === 'jpeg' })
+    const meta = buildExportMetadata({ author, title: it.title })
+    const bytes = await canvasToBytes(canvas, format, format === 'png' ? undefined : quality)
+    const injected = injectMetadata(bytes, format, meta)
+    return { data: bytesToBase64(injected), meta }
+  }
+
+  if (!window.api?.dialog?.openDirectory || !window.api?.export?.saveToDir) {
+    const files = []
+    for (const it of items) {
+      const res = await exportCleanImage({ sourcePath: it.sourcePath, title: it.title, author, format, quality, defaultName: it.fileName })
+      if (!res) return { canceled: true, files }
+      files.push(res)
+    }
+    return { files, canceled: false }
+  }
+
+  const dlg = await window.api.dialog.openDirectory()
+  if (dlg.canceled || !dlg.filePaths?.[0]) return { canceled: true, files: [] }
+  const dirPath = dlg.filePaths[0]
+  const files = []
+  for (const it of items) {
+    try {
+      const { data } = await build(it)
+      const res = await window.api.export.saveToDir({ dirPath, fileName: it.fileName, data })
+      if (res?.ok) files.push({ filePath: res.filePath })
+    } catch (e) {
+      console.error('export por lotes falló en un ítem:', e)
+    }
+  }
+  return { dirPath, files, canceled: false }
+}

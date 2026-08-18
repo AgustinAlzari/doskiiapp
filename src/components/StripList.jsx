@@ -1,41 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useStripStore from '../store/stripStore'
+import useTiraStore from '../store/tiraStore'
+import useClipboardStore from '../store/clipboardStore'
 import useAuthorStore from '../store/authorStore'
 import useProjectStore from '../store/projectStore'
 import { confirmDelete, isInCloud } from '../utils/confirmDelete'
 import GalleryPreview from './GalleryPreview'
 import ChatLayout from './chat/ChatLayout'
-
-function formatDate(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-  const day = d.getDate()
-  const month = months[d.getMonth()]
-  const year = d.getFullYear()
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${day} ${month} ${year}, ${h}:${m}`
-}
-
-function StripCover({ strip }) {
-  const [src, setSrc] = useState(null)
-  const result = strip.results?.[strip.resultCoverIndex]
-  useEffect(() => {
-    let active = true
-    if (result?.path && window.api?.references) {
-      window.api.references.read(result.path).then(url => { if (active) setSrc(url) })
-    } else setSrc(null)
-    return () => { active = false }
-  }, [result?.path])
-
-  if (!src) return null
-  return (
-    <div style={{ height: 120, border: '1px solid var(--color-border)', borderRadius: 6, overflow: 'hidden', marginBottom: 8, background: 'white' }}>
-      <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-    </div>
-  )
-}
+import StripCard from './StripCard'
+import TiraCard from './tiras/TiraCard'
+import TiraView from './tiras/TiraView'
 
 export default function StripList({ project, projectId, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
@@ -43,21 +17,55 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const remove = useStripStore(s => s.remove)
   const reorder = useStripStore(s => s.reorder)
   const duplicate = useStripStore(s => s.duplicate)
+  const tiras = useTiraStore(s => s.tiras)
+  const saveTira = useTiraStore(s => s.save)
+  const removeTira = useTiraStore(s => s.remove)
+  const createTira = useTiraStore(s => s.create)
+  const copyStrip = useClipboardStore(s => s.copy)
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
+  const scopedTiras = tiras.filter(t => t.projectId === projectId)
+  // Viñetas dentro de alguna tira: "movidas" a subcarpeta → se ocultan de la lista
+  // general (madre); solo se ven sueltas las libres.
+  const inTiraIds = new Set(scopedTiras.flatMap(t => t.stripIds || []))
+  const looseStrips = scopedStrips.filter(s => !inTiraIds.has(s.id))
   const hasAnyResult = scopedStrips.some(s => (s.results || []).length)
   const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
 
   const [dragIdx, setDragIdx] = useState(null)
   const [insertIdx, setInsertIdx] = useState(null)
   const [gallery, setGallery] = useState(null)
+  const [openTiraId, setOpenTiraId] = useState(null)
+  const [editingTiraId, setEditingTiraId] = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
+  const dragOriginRef = useRef(null)
+  const openTira = openTiraId ? scopedTiras.find(t => t.id === openTiraId) || null : null
+
+  const addStripToTira = (tiraId, stripId) => {
+    const t = tiras.find(x => x.id === tiraId)
+    if (!t) return
+    if ((t.stripIds || []).includes(stripId)) return
+    saveTira({ ...t, stripIds: [...(t.stripIds || []), stripId] })
+  }
+
+  const newTira = async () => {
+    const n = scopedTiras.length + 1
+    const t = await createTira(projectId, `tira ${n}`)
+    setEditingTiraId(t.id)
+  }
+
+  const doCopy = (id) => {
+    copyStrip(id)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 1500)
+  }
 
   // Galería de todos los resultados del proyecto en el orden de la lista de viñetas.
   const openGallery = async () => {
     if (!window.api?.references) return
     const items = []
-    for (const s of scopedStrips) {
+    for (const s of looseStrips) {
       const results = s.results || []
       for (let ri = 0; ri < results.length; ri++) {
         const src = await window.api.references.read(results[ri].path)
@@ -76,9 +84,16 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   }
 
   const onDragStart = (e, idx) => {
+    // Si el arrastre empieza sobre un control (duplicar/copiar/eliminar),
+    // cancelarlo para que el clic funcione aunque haya algo de movimiento.
+    if (dragOriginRef.current?.closest?.('[data-no-drag]')) {
+      e.preventDefault()
+      return
+    }
     setDragIdx(idx)
     setInsertIdx(null)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-doski-strip', looseStrips[idx].id)
   }
   const onDragOver = (e, idx) => {
     e.preventDefault()
@@ -97,7 +112,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
         const rect = e.currentTarget.getBoundingClientRect()
         target = e.clientX < rect.left + rect.width / 2 ? idx : idx + 1
       }
-      const next = [...scopedStrips]
+      const next = [...looseStrips]
       const [moved] = next.splice(dragIdx, 1)
       let at = target > dragIdx ? target - 1 : target
       at = Math.max(0, Math.min(next.length, at))
@@ -110,6 +125,20 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const onDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
+
+  if (openTira) {
+    return (
+      <TiraView
+        tira={openTira}
+        strips={scopedStrips}
+        project={project}
+        authors={authors}
+        onBack={() => setOpenTiraId(null)}
+        onOpenStrip={(strip) => onEdit(strip)}
+        asCards
+      />
+    )
+  }
 
   return (
     <ChatLayout>
@@ -131,10 +160,40 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
               ver
             </span>
             <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
+            <button className="btn" onClick={newTira} title="crear una tira: carpeta que reúne viñetas">nueva tira</button>
           </div>
         </div>
 
-      {scopedStrips.length === 0 ? (
+      {/* Sección de tiras (carpetas de viñetas) */}
+      {scopedTiras.length > 0 && (
+        <div style={{ margin: '0 0 24px' }}>
+          <div className="label" style={{ marginBottom: 8 }}>tiras</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+            {scopedTiras.map(t => (
+              <div key={t.id} style={{ position: 'relative' }}>
+                <TiraCard
+                  tira={t}
+                  strips={scopedStrips}
+                  onOpen={() => setOpenTiraId(t.id)}
+                  onAddStrip={(stripId) => addStripToTira(t.id, stripId)}
+                  editing={editingTiraId === t.id}
+                  onDone={(title) => { saveTira({ ...t, title }); setEditingTiraId(null) }}
+                />
+                <button
+                  className="btn btn-ghost btn-sm btn-danger"
+                  style={{ position: 'absolute', top: 4, right: 4, zIndex: 2, background: '#fff' }}
+                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(t.title || 'tira', false)) removeTira(t.id) }}
+                  title="eliminar tira"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {looseStrips.length === 0 ? (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -144,81 +203,32 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
           gap: 16,
         }}>
           <div style={{ color: 'var(--color-text-muted)', fontSize: 14, textAlign: 'center' }}>
-            sin viñetas aún. creá una para empezar.
+            {scopedStrips.length === 0 ? 'sin viñetas aún. creá una para empezar.' : 'todas las viñetas están en tiras. quitá una de su tira para volver a verla acá.'}
           </div>
           <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
         </div>
       ) : (
         <div className="strip-grid">
-          {scopedStrips.map((strip, idx) => (
-            <div
+          {looseStrips.map((strip, idx) => (
+            <StripCard
               key={strip.id}
+              strip={strip}
+              idx={idx}
               draggable
-              onDragStart={e => onDragStart(e, idx)}
-              onDragOver={e => onDragOver(e, idx)}
-              onDrop={e => onDrop(e, idx)}
+              dragging={dragIdx === idx}
+              insertBefore={dragIdx != null && insertIdx === idx}
+              insertAfter={dragIdx != null && insertIdx === idx + 1}
+              onMouseDown={(e) => { dragOriginRef.current = e.target }}
+              onDragStart={(e) => onDragStart(e, idx)}
+              onDragOver={(e) => onDragOver(e, idx)}
+              onDrop={(e) => onDrop(e, idx)}
               onDragEnd={onDragEnd}
-              className="strip-card"
-              style={{
-                position: 'relative',
-                cursor: 'grab',
-                opacity: dragIdx === idx ? 0.4 : 1,
-              }}
-              onClick={() => onEdit(strip)}
-            >
-              {/* Línea de inserción en el espacio entre tarjetas */}
-              {dragIdx != null && insertIdx === idx && (
-                <span style={{ position: 'absolute', left: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
-              )}
-              {dragIdx != null && insertIdx === idx + 1 && (
-                <span style={{ position: 'absolute', right: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
-              )}
-              <StripCover strip={strip} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div className="ui-h3" style={{ flex: 1, minWidth: 0 }}>
-                  {strip.title || 'sin título'}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    style={{ flexShrink: 0, fontSize: 11 }}
-                    title="duplicar viñeta"
-                    onClick={async (e) => { e.stopPropagation(); await duplicate(strip) }}
-                  >
-                    ⧉
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm btn-danger"
-                    style={{ flexShrink: 0 }}
-                    onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(strip.title || 'viñeta', isInCloud(strip, projects))) remove(strip.id) }}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: 2 }}>
-                {strip.createdAt && <span>creada {formatDate(strip.createdAt)}</span>}
-                {strip.updatedAt && strip.updatedAt !== strip.createdAt && (
-                  <span> · modif. {formatDate(strip.updatedAt)}</span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 8 }}>
-                <div className="strip-card-dots">
-                  {(strip.panels || []).slice(0, 10).map((p, i) => (
-                    <div
-                      key={p.id || i}
-                      className={`strip-card-dot ${p.scene ? 'has-scene' : ''}`}
-                      title={`cuadro ${i + 1}${p.scene ? ': ' + p.scene : ''}`}
-                    />
-                  ))}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                  {strip.panels?.length || 0} cuadros
-                </div>
-              </div>
-            </div>
+              onOpen={(s) => onEdit(s)}
+              onDuplicate={duplicate}
+              onCopy={doCopy}
+              copied={copiedId === strip.id}
+              onRemove={async (s) => { if (await confirmDelete(s.title || 'viñeta', isInCloud(s, projects))) remove(s.id) }}
+            />
           ))}
         </div>
       )}

@@ -24,8 +24,8 @@ const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const SUBDIRS = ['authors', 'backgrounds', 'balloons', 'characters', 'objects', 'palettes', 'projects', 'referenceDefs', 'references', 'strips'];
-const OWNED = ['characters', 'backgrounds', 'objects', 'balloons', 'referenceDefs', 'strips'];
+const SUBDIRS = ['authors', 'backgrounds', 'balloons', 'characters', 'objects', 'palettes', 'projects', 'referenceDefs', 'references', 'strips', 'tiras'];
+const OWNED = ['characters', 'backgrounds', 'objects', 'balloons', 'referenceDefs', 'strips', 'tiras'];
 const TOMB_FILE = '.tombstones.json';
 
 const DEFAULTS = {

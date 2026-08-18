@@ -16,7 +16,7 @@ set -euo pipefail
 REPO_DATA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/data"
 APP_DATA="${APP_DATA:-$HOME/Library/Application Support/dibuweb/data}"
 # Solo copiamos estas carpetas (excluye refs-usadas/, cache/, .DS_Store y .sync-backup)
-SUBDIRS="authors backgrounds balloons characters objects palettes projects references strips"
+SUBDIRS="authors backgrounds balloons characters objects palettes projects references strips tiras"
 BACKUP_NAME=".sync-backup"
 
 ensure_app_dirs() {
