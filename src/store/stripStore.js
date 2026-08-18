@@ -42,6 +42,21 @@ const useStripStore = create((set, get) => ({
     set(state => ({ strips: state.strips.filter(s => s.id !== id) }))
   },
 
+  duplicate: async (strip) => {
+    const copy = {
+      ...strip,
+      id: crypto.randomUUID(),
+      title: strip.title ? `${strip.title} copia` : 'viñeta copia',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      savedAt: new Date().toISOString(),
+      position: null,
+    }
+    if (window.api) await window.api.strips.save(copy)
+    set(state => ({ strips: [copy, ...state.strips] }))
+    return copy
+  },
+
   // Persiste el orden de las viñetas de un proyecto (no toca updatedAt).
   reorder: async (projectId, orderedIds) => {
     const updated = get().strips.map(s =>

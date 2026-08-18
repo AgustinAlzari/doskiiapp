@@ -192,9 +192,11 @@ export function makeDefaultBalloonLaws() {
   return laws
 }
 
-export function balloonLawsToPrompt(laws = {}) {
+export function balloonLawsToPrompt(laws = {}, opts = {}) {
+  const excludeGroups = opts.excludeGroups || []
   const sentences = []
   for (const law of BALLOON_LAWS) {
+    if (excludeGroups.includes(law.group)) continue
     const value = laws[law.id] ?? law.default
     if (law.control === 'check') {
       if (value) sentences.push(law.promptEN)
@@ -211,11 +213,13 @@ export function balloonLawsToPrompt(laws = {}) {
   return sentences
 }
 
-export function balloonLawDiffSentences(laws = {}) {
+export function balloonLawDiffSentences(laws = {}, opts = {}) {
+  const excludeGroups = opts.excludeGroups || []
   const defaultLaws = makeDefaultBalloonLaws()
   const additions = []
   const exemptions = []
   for (const law of BALLOON_LAWS) {
+    if (excludeGroups.includes(law.group)) continue
     const value = laws[law.id] ?? defaultLaws[law.id]
     const def = defaultLaws[law.id]
     if (law.control === 'check') {

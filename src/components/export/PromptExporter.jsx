@@ -4,6 +4,7 @@ import useObjectStore from '../../store/objectStore'
 import useStripStore from '../../store/stripStore'
 import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
 import useAuthorStore from '../../store/authorStore'
+import useReferenceStore from '../../store/referenceStore'
 import useChatStore from '../../store/chatStore'
 import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
@@ -16,6 +17,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const objects = useObjectStore(s => s.objects)
   const palettes = usePaletteStore(s => s.palettes)
   const authors = useAuthorStore(s => s.authors)
+  const references = useReferenceStore(s => s.references)
   const saveStrip = useStripStore(s => s.save)
   const liveStrip = useStripStore(s => s.strips.find(st => st.id === strip?.id)) || strip
   const [copied, setCopied] = useState(null)
@@ -23,11 +25,13 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const [generating, setGenerating] = useState(false)
   const [results, setResults] = useState([])
   const [coverIndex, setCoverIndex] = useState(-1)
+  const [showRefs, setShowRefs] = useState(false)
   const chatOpen = useChatStore(s => s.open)
 
   const chars = characters || []
   const bgs = backgrounds || []
   const objs = objects || []
+  const projectRefs = references.filter(r => r.projectId === project?.id)
   const resolvedPalette = resolvePaletteColors(project, palettes)
   const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
 
@@ -197,7 +201,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
       return
     }
     const next = [...(results || []), { id: crypto.randomUUID(), fileName: imported.fileName, path: imported.path, observations: '', pasted: true }]
-    persistResults(next, coverIndex < 0 ? 0 : coverIndex)
+    persistResults(next, next.length - 1)
   }
 
   const updateObservation = (id, observations) => {
@@ -289,6 +293,9 @@ export default function PromptExporter({ strip, characters, project, balloons })
         <button className="btn btn-sm" onClick={generateVectors} disabled={generating}>
           {generating ? 'generando vectores...' : 'regenerar vectores'}
         </button>
+        <button className="btn btn-sm" onClick={() => setShowRefs(true)} title="sumar imágenes de referencia al prompt (arrastralas al chat)">
+          sumar referencia
+        </button>
       </div>
 
       {/* Resultados: imágenes solas sobre fondo blanco */}
@@ -326,6 +333,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
             todavía no pegaste resultados: copiá la imagen del chat de IA (⌘C) y usá "+ pegar resultado".
           </div>
         ) : (
+          <>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {(results || []).map((r, idx) => (
               <div key={r.id} style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
@@ -341,6 +349,32 @@ export default function PromptExporter({ strip, characters, project, balloons })
                     style={{ position: 'absolute', top: 0, right: 4, fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', lineHeight: 1 }}
                   >
                     ×
+                  </span>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); selectCover(idx) }}
+                    title={coverIndex === idx ? 'elegida: se muestra en preview y export' : 'elegir para preview y export'}
+                    style={{
+                      position: 'absolute',
+                      bottom: 6,
+                      left: 6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      border: '1.5px solid var(--color-text-muted)',
+                      background: coverIndex === idx ? 'var(--color-text)' : 'transparent',
+                      color: coverIndex === idx ? '#fff' : 'transparent',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      lineHeight: 1,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    ✓
                   </span>
                 </div>
                 <textarea
@@ -366,6 +400,12 @@ export default function PromptExporter({ strip, characters, project, balloons })
               </div>
             ))}
           </div>
+          {(results || []).length > 1 && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
+              la imagen con ✓ es la que se muestra en preview y export.
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -375,7 +415,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
         let letteringPrompt = ''
         try {
           scenePrompt = generateScenePrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, sceneLayoutFileNameFor(strip, i), resolvedPalette, author)
-          letteringPrompt = generateLetteringPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, letteringLayoutFileNameFor(strip, i), balloons)
+          letteringPrompt = generateLetteringPrompt(panel, chars, strip.generalStyle, bgs, objs, strip.aspectRatio, i, strip, project, letteringLayoutFileNameFor(strip, i), balloons, resolvedPalette)
         } catch (err) {
           console.error(`Error generando prompt cuadro ${i}:`, err)
           scenePrompt = `Error generando prompt: ${err.message}`
@@ -478,6 +518,48 @@ export default function PromptExporter({ strip, characters, project, balloons })
       })}
       {preview && (
         <ImagePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />
+      )}
+      {showRefs && (
+        <div style={{ position: 'fixed', inset: 0, background: '#fff', zIndex: 10000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--color-border-muted)', flexShrink: 0 }}>
+            <button className="back-arrow" onClick={() => setShowRefs(false)} title="volver (Esc)">←</button>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>referencias</span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>arrastralas al chat para sumarlas al prompt</span>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-sm" onClick={() => setShowRefs(false)}>cerrar</button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', flexWrap: 'wrap', gap: 20, alignContent: 'flex-start' }}>
+            {projectRefs.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: 40 }}>
+                todavía no cargaste referencias en este proyecto.
+              </div>
+            ) : projectRefs.map(ref => {
+              const imgs = (ref.referenceImages || []).filter(i => i.path)
+              return (
+                <div key={ref.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 300 }}>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{ref.name}</div>
+                  {imgs.length === 0 ? (
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', border: '1px dashed var(--color-border)', borderRadius: 6, padding: '20px 8px', textAlign: 'center' }}>
+                      sin imágenes
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {imgs.map(img => (
+                        <div
+                          key={img.path}
+                          title="arrastrala al chat"
+                          style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 4, background: 'white', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          {window.api?.references?.read && <ReferenceThumbnail reference={img} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

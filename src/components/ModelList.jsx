@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useChatStore from '../store/chatStore'
+import { askConfirm } from '../store/confirmStore'
 import ChatLayout from './chat/ChatLayout'
 
 export default function ModelList() {
@@ -82,7 +83,7 @@ export default function ModelList() {
               <div style={{ flex: 1 }} />
               <button
                 className="btn btn-ghost btn-sm btn-danger"
-                onClick={() => { if (confirm(`¿Eliminar "${String(m.name).toLowerCase()}"?`)) removeModel(m.id) }}
+                onClick={async () => { if (await askConfirm(`¿eliminar "${String(m.name).toLowerCase()}"?`, { confirmLabel: 'borrar' })) removeModel(m.id) }}
                 disabled={models.length <= 1}
                 style={{ fontSize: 12 }}
                 title={models.length <= 1 ? 'no se puede eliminar el último modelo' : 'eliminar'}

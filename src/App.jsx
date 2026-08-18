@@ -12,6 +12,8 @@ import ObjectList from './components/objects/ObjectList'
 import ObjectForm from './components/objects/ObjectForm'
 import BalloonList from './components/balloons/BalloonList'
 import BalloonForm from './components/balloons/BalloonForm'
+import ReferenceList from './components/references/ReferenceList'
+import ReferenceForm from './components/references/ReferenceForm'
 import AuthorList from './components/authors/AuthorList'
 import AuthorForm from './components/authors/AuthorForm'
 import ProjectList from './components/projects/ProjectList'
@@ -26,9 +28,13 @@ import useCharacterStore from './store/characterStore'
 import useBackgroundStore from './store/backgroundStore'
 import useObjectStore from './store/objectStore'
 import useBalloonStore from './store/balloonStore'
+import useReferenceStore from './store/referenceStore'
 import usePaletteStore from './store/paletteStore'
 import useAuthorStore from './store/authorStore'
 import ChatPanel from './components/chat/ChatPanel'
+import AutoSaveToast from './components/AutoSaveToast'
+import ConfirmDialog from './components/ConfirmDialog'
+import useChatStore from './store/chatStore'
 
 const SCOPED_VIEWS = [
   'strips', 'new-strip', 'editor', 'prompts', 'export',
@@ -36,6 +42,7 @@ const SCOPED_VIEWS = [
   'backgrounds', 'new-background', 'edit-background',
   'objects', 'new-object', 'edit-object',
   'balloons', 'new-balloon', 'edit-balloon',
+  'references', 'new-reference', 'edit-reference',
   'authors', 'new-author', 'edit-author',
 ]
 
@@ -47,10 +54,12 @@ export default function App() {
   const [editingBackground, setEditingBackground] = useState(null)
   const [editingObject, setEditingObject] = useState(null)
   const [editingBalloon, setEditingBalloon] = useState(null)
+  const [editingReference, setEditingReference] = useState(null)
   const [editingAuthor, setEditingAuthor] = useState(null)
   const [promptData, setPromptData] = useState(null)
   const [backupConfig, setBackupConfig] = useState(null)
   const [backupReady, setBackupReady] = useState(false)
+  const setChatOpen = useChatStore(s => s.setOpen)
 
   const reloadAllStores = async () => {
     await useProjectStore.getState().load()
@@ -58,6 +67,7 @@ export default function App() {
     await useBackgroundStore.getState().load()
     await useObjectStore.getState().load()
     await useBalloonStore.getState().load()
+    await useReferenceStore.getState().load()
     await useStripStore.getState().load()
     await usePaletteStore.getState().load()
     await useAuthorStore.getState().load()
@@ -223,7 +233,7 @@ export default function App() {
             project={activeProject}
             projectId={activeProjectId}
             onNew={() => setView('new-strip')}
-            onEdit={(strip) => { setSelectedStripId(strip.id); setView('editor') }}
+            onEdit={(strip) => { setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
           />
         )
 
@@ -231,7 +241,7 @@ export default function App() {
         return (
           <StripCreator
             project={activeProject}
-            onCreated={(strip) => { setSelectedStripId(strip.id); setView('editor') }}
+            onCreated={(strip) => { setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
             onBack={() => setView('strips')}
           />
         )
@@ -244,7 +254,7 @@ export default function App() {
             project={activeProject}
             onBack={() => setView('strips')}
             onEditCharacter={(char) => { setEditingCharacter(char); setView('edit-character') }}
-            onShowPrompts={(strip, characters, balloons) => { setPromptData({ strip, characters, balloons }); setView('prompts') }}
+            onShowPrompts={(strip, characters, balloons) => { setPromptData({ strip, characters, balloons }); setView('prompts'); setChatOpen(true) }}
           />
         )
 
@@ -252,7 +262,7 @@ export default function App() {
         return promptData && (
           <>
             <div className="section-header">
-              <button className="back-arrow" onClick={() => { setPromptData(null); setView('editor') }}>←</button>
+              <button className="back-arrow" onClick={() => { setPromptData(null); setView('editor'); setChatOpen(false) }}>←</button>
               <span className="ui-h2">prompts — {promptData.strip?.title || 'viñeta'}</span>
             </div>
             <PromptExporter strip={promptData.strip} characters={promptData.characters} project={activeProject} balloons={promptData.balloons || []} />
@@ -347,6 +357,25 @@ export default function App() {
           />
         )
 
+      case 'references':
+        return (
+          <ReferenceList
+            projectId={activeProjectId}
+            onNew={() => { setEditingReference(null); setView('edit-reference') }}
+            onEdit={(ref) => { setEditingReference(ref); setView('edit-reference') }}
+          />
+        )
+
+      case 'edit-reference':
+      case 'new-reference':
+        return (
+          <ReferenceForm
+            reference={editingReference}
+            projectId={activeProjectId}
+            onCancel={() => { setEditingReference(null); setView('references') }}
+          />
+        )
+
       case 'authors':
         return (
           <AuthorList
@@ -388,6 +417,8 @@ export default function App() {
       {/* Chat de IA persistente: vive fuera del contenido que cambia al navegar,
           así la conversación no se reinicia al cambiar de vista. */}
       <ChatPanel />
+      <AutoSaveToast />
+      <ConfirmDialog />
     </>
   )
 }

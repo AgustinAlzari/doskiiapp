@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld('api', {
     save: (b) => ipcRenderer.invoke('balloons:save', b),
     delete: (id) => ipcRenderer.invoke('balloons:delete', id),
   },
+  referenceDefs: {
+    list: () => ipcRenderer.invoke('referenceDefs:list'),
+    save: (r) => ipcRenderer.invoke('referenceDefs:save', r),
+    delete: (id) => ipcRenderer.invoke('referenceDefs:delete', id),
+  },
   palettes: {
     list: () => ipcRenderer.invoke('palettes:list'),
     save: (p) => ipcRenderer.invoke('palettes:save', p),

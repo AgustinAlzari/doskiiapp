@@ -8,8 +8,96 @@ import ConnectionArrows from './ConnectionArrows'
 import CompositionGuides from './CompositionGuides'
 import SignatureBlock from './SignatureBlock'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
+import { ASPECT_RATIOS } from '../../data/actionPresets'
 
-export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onMoveGloboX, onResizeGloboX, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
+function OffFrameTab({ tab }) {
+  const start = useRef(null)
+
+  const onDown = (e) => {
+    e.stopPropagation()
+    tab.onSelect?.()
+    const canvas = e.currentTarget.parentElement
+    start.current = { mx: e.clientX, my: e.clientY, x: tab.el.x, y: tab.el.y }
+    const move = (ev) => {
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const dx = (ev.clientX - start.current.mx) / rect.width
+      const dy = (ev.clientY - start.current.my) / rect.height
+      tab.onMove?.(
+        Math.max(-0.6, Math.min(1.6 - tab.el.width, start.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - tab.el.height, start.current.y + dy))
+      )
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  const base = { position: 'absolute', zIndex: 70, pointerEvents: 'auto', cursor: 'grab', background: 'var(--color-elevated)', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 9, padding: '2px 6px', color: 'var(--color-text-2)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis' }
+  const style =
+    tab.edge === 'left' ? { left: 3, top: `calc(${tab.pos * 100}% - 10px)` }
+    : tab.edge === 'right' ? { right: 3, top: `calc(${tab.pos * 100}% - 10px)` }
+    : tab.edge === 'top' ? { top: 3, left: `calc(${tab.pos * 100}% - 40px)` }
+    : { bottom: 3, left: `calc(${tab.pos * 100}% - 40px)` }
+
+  return (
+    <div onMouseDown={onDown} style={{ ...base, ...style }} title={`${tab.name} — fuera de campo (arrastrá para volver al lienzo)`}>
+      {tab.name} <span style={{ opacity: 0.6 }}>⇢</span>
+    </div>
+  )
+}
+
+function BehindOutline({ el, onSelect, onMove }) {
+  const start = useRef(null)
+
+  const onDown = (e) => {
+    e.stopPropagation()
+    onSelect?.()
+    const canvas = e.currentTarget.parentElement
+    start.current = { mx: e.clientX, my: e.clientY, x: el.x, y: el.y }
+    const move = (ev) => {
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const dx = (ev.clientX - start.current.mx) / rect.width
+      const dy = (ev.clientY - start.current.my) / rect.height
+      onMove?.(
+        Math.max(-0.6, Math.min(1.6 - el.width, start.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - el.height, start.current.y + dy))
+      )
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  return (
+    <div
+      onMouseDown={onDown}
+      title="elemento detrás de otro: arrastralo"
+      style={{
+        position: 'absolute',
+        left: `${el.x * 100}%`,
+        top: `${el.y * 100}%`,
+        width: `${el.width * 100}%`,
+        height: `${el.height * 100}%`,
+        border: '1.5px dashed var(--color-text-muted)',
+        borderRadius: 4,
+        opacity: 0.7,
+        pointerEvents: 'auto',
+        cursor: 'grab',
+        zIndex: 60,
+      }}
+    />
+  )
+}
+
+export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, selectedBackground, onSelectBackground, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onMoveGloboX, onResizeGloboX, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
   const [connDrag, setConnDrag] = useState(null)
   const canvasRef2 = useRef(null)
   const wrapperRef = useRef(null)
@@ -28,8 +116,10 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
     return () => ro.disconnect()
   }, [])
 
-  const aspectW = aspectRatio === 'square' ? 1 : aspectRatio === 'vertical' || aspectRatio === 'portrait-hd' ? 9 : 16
-  const aspectH = aspectRatio === 'square' ? 1 : aspectRatio === 'vertical' || aspectRatio === 'portrait-hd' ? 16 : 9
+  const ar = ASPECT_RATIOS.find(a => a.id === aspectRatio)
+  const ratioParts = (ar?.ratio || '16:9').split(':').map(Number)
+  const aspectW = ratioParts[0] || 16
+  const aspectH = ratioParts[1] || 9
   const maxW = Math.min(containerSize.width || 820, 820)
   const maxH = containerSize.height || 9999
   let canvasW = maxW
@@ -46,6 +136,43 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
   const panelBackground = panel.background || (panel.backgroundId ? { x: 0.05, y: 0.1, width: 0.9, height: 0.45 } : null)
   const backgroundDef = backgrounds?.find(bg => bg.id === panel.backgroundId)
   const balloons = orderedPanelDialogues(panel, characters || [])
+
+  const overlap = (a, b) => !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y)
+  const BASE = { obj: 1000, char: 2000, sfx: 3000, gx: 4000 }
+  const charName = (id) => characters?.find(c => c.id === id)?.name || '?'
+  const objName = (id) => objects?.find(o => o.id === id)?.name || '?'
+  const blocks = [
+    ...panelObjects.map((o, i) => ({ key: `obj-${i}`, el: o, name: objName(o.objectId), prio: (o.z ?? 0) * 10000 + BASE.obj + i, onSelect: () => onSelectObj?.(i), onMove: (x, y) => onUpdateObj?.(i, { x, y }) })),
+    ...panel.characters.map((c, i) => ({ key: `char-${i}`, el: c, name: charName(c.characterId), prio: (c.z ?? 0) * 10000 + BASE.char + i, onSelect: () => onSelectChar?.(i), onMove: (x, y) => onUpdateChar?.(i, { x, y }) })),
+    ...panelSfx.map((s, i) => ({ key: `sfx-${i}`, el: s, name: s.text?.trim() ? `"${s.text.trim()}"` : 'onomatopeya', prio: (s.z ?? 0) * 10000 + BASE.sfx + i, onSelect: () => onSelectSfx?.(i), onMove: (x, y) => onUpdateSfx?.(i, { x, y }) })),
+    ...(panel.globosX || []).map((g, i) => ({ key: `gx-${i}`, el: g, name: `X${i + 1}`, prio: (g.z ?? 0) * 10000 + BASE.gx + i, onSelect: () => onSelectGloboX?.(i), onMove: (x, y) => onMoveGloboX?.(i, { x, y }) })),
+  ]
+  const behindRects = blocks.filter(b => blocks.some(o => o !== b && o.prio > b.prio && overlap(b.el, o.el)))
+  const offFrameTabs = (() => {
+    const tabs = []
+    for (const b of blocks) {
+      const e = b.el
+      const fullyLeft = e.x + e.width <= 0
+      const fullyRight = e.x >= 1
+      const fullyTop = e.y + e.height <= 0
+      const fullyBottom = e.y >= 1
+      if (!fullyLeft && !fullyRight && !fullyTop && !fullyBottom) continue
+      const outLeft = fullyLeft ? -(e.x + e.width) : 0
+      const outRight = fullyRight ? e.x - 1 : 0
+      const outTop = fullyTop ? -(e.y + e.height) : 0
+      const outBottom = fullyBottom ? e.y - 1 : 0
+      const max = Math.max(outLeft, outRight, outTop, outBottom)
+      const cy = Math.max(0.05, Math.min(0.95, e.y + e.height / 2))
+      const cx = Math.max(0.05, Math.min(0.95, e.x + e.width / 2))
+      let edge, pos
+      if (max === outRight) { edge = 'right'; pos = cy }
+      else if (max === outLeft) { edge = 'left'; pos = cy }
+      else if (max === outBottom) { edge = 'bottom'; pos = cx }
+      else { edge = 'top'; pos = cx }
+      tabs.push({ key: b.key, el: e, edge, pos, name: b.name, onSelect: b.onSelect, onMove: b.onMove })
+    }
+    return tabs
+  })()
 
   const { linkSegments, tailSegments } = (() => {
     const byInstance = {}
@@ -178,8 +305,9 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             panelObj={panelBackground}
             objDef={backgroundDef}
             isBackground
+            isSelected={selectedBackground}
             showInputPort={true}
-            onSelect={() => {}}
+            onSelect={() => onSelectBackground?.()}
             onMove={(x, y) => onUpdateBackground({ x, y })}
             onResize={(updates) => onUpdateBackground(updates)}
             onRemove={() => onRemoveBackground?.()}
@@ -388,6 +516,16 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             onRemove={() => onRemoveSignature?.()}
           />
         )}
+
+        {/* Contornos punteados de elementos que quedan detrás de otro */}
+        {behindRects.map(r => (
+          <BehindOutline key={r.key} el={r.el} onSelect={r.onSelect} onMove={r.onMove} />
+        ))}
+
+        {/* Solapas para elementos 100% fuera de campo */}
+        {offFrameTabs.map(t => (
+          <OffFrameTab key={t.key} tab={t} />
+        ))}
       </div>
     </div>
   )

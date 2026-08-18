@@ -42,6 +42,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const loaded = useStripStore(s => s.loaded)
   const remove = useStripStore(s => s.remove)
   const reorder = useStripStore(s => s.reorder)
+  const duplicate = useStripStore(s => s.duplicate)
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
@@ -177,20 +178,24 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
                 <div className="ui-h3" style={{ flex: 1, minWidth: 0 }}>
                   {strip.title || 'sin título'}
                 </div>
-                <button
-                  className="btn btn-ghost btn-sm btn-danger"
-                  style={{ flexShrink: 0 }}
-                  onClick={(e) => { e.stopPropagation(); if (confirmDelete(strip.title || 'viñeta', isInCloud(strip, projects))) remove(strip.id) }}
-                >
-                  ×
-                </button>
-              </div>
-
-              {strip.generalStyle && (
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-                  {strip.generalStyle}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ flexShrink: 0, fontSize: 11 }}
+                    title="duplicar viñeta"
+                    onClick={async (e) => { e.stopPropagation(); await duplicate(strip) }}
+                  >
+                    ⧉
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm btn-danger"
+                    style={{ flexShrink: 0 }}
+                    onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(strip.title || 'viñeta', isInCloud(strip, projects))) remove(strip.id) }}
+                  >
+                    ×
+                  </button>
                 </div>
-              )}
+              </div>
 
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: 2 }}>
                 {strip.createdAt && <span>creada {formatDate(strip.createdAt)}</span>}

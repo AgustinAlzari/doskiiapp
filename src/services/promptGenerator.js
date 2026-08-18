@@ -35,6 +35,40 @@ function coordinates(item) {
   return `x ${Math.round(item.x * 100)}%, y ${Math.round(item.y * 100)}%, w ${Math.round(item.width * 100)}%, h ${Math.round(item.height * 100)}%`
 }
 
+function framePlacementText(item) {
+  const { x = 0, y = 0, width = 0, height = 0 } = item
+  const fullyLeft = x + width <= 0
+  const fullyRight = x >= 1
+  const fullyTop = y + height <= 0
+  const fullyBottom = y >= 1
+  const partially = x < 0 || y < 0 || x + width > 1 || y + height > 1
+  const centerX = Math.round((x + width / 2) * 100)
+  const centerY = Math.round((y + height / 2) * 100)
+
+  if (fullyLeft || fullyRight || fullyTop || fullyBottom) {
+    const outLeft = fullyLeft ? -(x + width) : 0
+    const outRight = fullyRight ? x - 1 : 0
+    const outTop = fullyTop ? -(y + height) : 0
+    const outBottom = fullyBottom ? y - 1 : 0
+    const max = Math.max(outLeft, outRight, outTop, outBottom)
+    let edge
+    if (max === outRight) edge = 'RIGHT'
+    else if (max === outLeft) edge = 'LEFT'
+    else if (max === outBottom) edge = 'BOTTOM'
+    else edge = 'TOP'
+    return `OFF-PANEL (entirely outside the frame). Positioned to the ${edge} of the panel: center at x ${centerX}%, y ${centerY}%. Draw it completely out of the frame, as if it continues beyond the panel edge.`
+  }
+  if (partially) {
+    let edge
+    if (x < 0) edge = 'LEFT'
+    else if (x + width > 1) edge = 'RIGHT'
+    else if (y < 0) edge = 'TOP'
+    else edge = 'BOTTOM'
+    return `PARTIALLY OFF-PANEL: enters from the ${edge} edge, partly outside the frame; only the visible part inside the panel edge is drawn. Center at x ${centerX}%, y ${centerY}%.`
+  }
+  return ''
+}
+
 function connectionTargetName(connection, characters, objects, backgrounds = []) {
   if ((connection.toType || 'character') === 'object') {
     return objects.find(item => item.id === connection.to)?.name
@@ -94,6 +128,7 @@ const BALLOON_LABELS = {
   speech: 'diálogo',
   thought: 'pensamiento',
   other: 'globo x',
+  image: 'imagen',
 }
 
 const DIALOGUE_TYPE_LABELS = {
@@ -108,6 +143,13 @@ function dialoguePlacementText(d) {
   const cy = Math.round((d.y + d.height / 2) * 100)
   const zone = cy < 33 ? 'in the upper area' : cy > 66 ? 'in the lower area' : 'in the middle area'
   return `${zone} (balloon center at x ${cx}%, y ${cy}%)`
+}
+
+function bubbleSideFromHead(balloon, ch) {
+  if (!ch || !balloon) return ''
+  const bx = balloon.x + (balloon.width || 0) / 2
+  const hx = ch.x + (ch.width || 0) / 2
+  return bx < hx ? 'UPPER-LEFT' : 'UPPER-RIGHT'
 }
 
 function channelStyleText(type) {
@@ -235,7 +277,7 @@ export function usedBalloonTypes(panel) {
     ;(char.extraDialogues || []).forEach(extra => check(extra.text, extra.type))
   })
   ;(panel?.globosX || []).forEach(g => {
-    if (g.text) types.add('other')
+    if (g.text || g.balloonId) types.add('other')
   })
   return types
 }
@@ -275,6 +317,20 @@ const BALLOON_LETTERING_RULES = [
 ]
 
 function entityDescPieces(entity) {
+  if (entity?.kind === 'image') {
+    const pieces = []
+    pieces.push('IMAGE BALLOON (an image/picture balloon, NOT a text balloon)')
+    if (entity.promptText?.trim()) pieces.push(`Balloon frame/outline: ${cleanPromptText(entity.promptText)}`)
+    if (entity.imageStyle?.trim()) pieces.push(`Image style: ${entity.imageStyle.trim()}`)
+    const pal = (entity.imagePalette || []).filter(c => c.hex)
+    if (pal.length) {
+      const mode = entity.imageColorMode || 'full'
+      const modeLabel = mode === 'bw' ? 'BLACK & WHITE' : mode === 'duotone' ? 'DUOTONE' : mode === 'limited' ? 'LIMITED COLOR' : 'COLOR'
+      pieces.push(`${modeLabel} image palette: ${pal.map(c => c.hex).join(', ')}`)
+    }
+    if (entity.referenceImages?.length) pieces.push(`use the attached reference image "${entity.referenceImages[0].fileName}" as the balloon graphic (frame)`)
+    return pieces
+  }
   const pieces = []
   if (entity.promptText?.trim()) pieces.push(entity.promptText.trim().replace(/[.\s]+$/, ''))
   if (entity.text?.trim()) pieces.push(`Default text: "${entity.text.trim()}" (used only when the panel text is empty)`)
@@ -338,15 +394,20 @@ function balloonGraphicsText(panel, project, balloonDefs = []) {
   })
 
   lines.push('')
+  const hasImage = usedEntities.some(e => e.kind === 'image')
+  const excludeGroups = hasImage ? ['tipografia'] : []
+
   lines.push('RULES:')
   lines.push(`- BASE (apply to every balloon): ${BALLOON_LETTERING_RULES.join(' ')}`)
-  lines.push(`- DEFAULT STYLE (apply to every balloon unless an override below states otherwise): ${balloonLawsToPrompt(defaultLaws).join(' ')}`)
+  lines.push(`- DEFAULT STYLE (apply to every balloon unless an override below states otherwise): ${balloonLawsToPrompt(defaultLaws, { excludeGroups }).join(' ')}`)
+  if (hasImage) lines.push('- IMAGE BALLOONS: they contain a drawn image/picture, NEVER text. All typography rules are void for image balloons. Their inner image is described in the DIALOGUE SEQUENCE below.')
   const seen = new Set()
   usedEntities.forEach(e => {
     if (seen.has(e.id)) return
     seen.add(e.id)
+    if (e.kind === 'image') return
     if (lawsEqual(e.laws, defaultLaws)) return
-    const diff = balloonLawDiffSentences(e.laws)
+    const diff = balloonLawDiffSentences(e.laws, { excludeGroups })
     if (!diff.additions.length && !diff.exemptions.length) return
     lines.push(`- OVERRIDE "${e.name}": ${[...diff.additions, ...diff.exemptions].join(' ')}`)
   })
@@ -373,12 +434,31 @@ function computeContext(panel, characters = [], backgrounds = [], objects = [], 
   return { chars, bgs, objs, panelCharacters, panelObjects, panelConnections, resolvedAspect, ratioLabel }
 }
 
-function headerLines(ctx, layoutFileName) {
-  const shape = ctx.resolvedAspect === 'square' ? 'square' : ctx.resolvedAspect === 'hd' ? 'widescreen rectangle' : 'tall vertical rectangle'
+function chatTitleLines(strip) {
+  const title = (strip?.title || '').trim()
+  if (!title) return []
+  return [
+    `CHAT TITLE: Name this conversation "${title}" — it is the title of the comic strip set by its author. Rename this chat now, and keep that name for every message in this chat.`,
+    '',
+  ]
+}
+
+function shapeFromRatio(ratio) {
+  const parts = String(ratio || '').split(':').map(Number)
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return 'rectangle'
+  const w = parts[0] / parts[1]
+  if (Math.abs(w - 1) < 0.08) return 'square'
+  if (w > 1) return 'widescreen rectangle'
+  return 'tall vertical rectangle'
+}
+
+function headerLines(ctx, layoutFileName, strip = null) {
+  const shape = shapeFromRatio(ctx.ratioLabel)
   return [
     `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this ${shape}.`,
     `POSITIONAL LAYOUT: The file "${layoutFileName}" is a layout reference image showing exact element sizes, positions, and spatial relationships. Use it as a precise compositional guide.`,
     '',
+    ...chatTitleLines(strip),
   ]
 }
 
@@ -442,10 +522,11 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
       const definition = ctx.objs.find(object => object.id === item.objectId)
       if (!definition) return
       const { size } = describePosition(item.x, item.y, item.width, item.height)
+      const framePos = framePlacementText(item)
       const prompt = definition.comodin
         ? `ONE-OFF OBJECT — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
         : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''}`
-      lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
+      lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${framePos ? ` ${framePos}` : ''}`)
     })
   }
 
@@ -459,10 +540,11 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
     characterOccurrences.set(item.characterId, occurrence)
     const instanceName = `${definition.name} ${occurrence}`
     const { size } = describePosition(item.x, item.y, item.width, item.height)
+    const framePos = framePlacementText(item)
     const prompt = definition.comodin
       ? `ONE-OFF CHARACTER — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
       : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}`
-    lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.`)
+    lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${framePos ? ` ${framePos}` : ''}`)
     if (item.expression) lines.push(`  Expression: ${item.expression}.`)
     if (item.framing) {
       const shot = SHOT_TYPES.find(s => s.id === item.framing)
@@ -556,7 +638,27 @@ function globoXAnchorText(gx, ctx) {
   }
 }
 
-function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
+function imageBalloonContent(entity, text, project, generalStyle, paletteColors) {
+  const sceneText = (text?.trim() || '').trim()
+  let content = sceneText
+    ? `inside the balloon, draw this scene: "${sceneText}". `
+    : `inside the balloon, draw the scene the author described for this balloon in the panel editor. `
+  content += `The scene MUST be drawn STRICTLY INSIDE the balloon, filling its interior; nothing may break out of the balloon outline. Do NOT place any text, letters, or typography inside or around this balloon.`
+  const imgStyle = entity.imageStyle?.trim() || combineStyleText(projectStyleText(project), generalStyle) || ''
+  if (imgStyle) content += ` Image style: ${imgStyle}.`
+  const imgPal = (entity.imagePalette || []).filter(c => c.hex)
+  if (imgPal.length) {
+    const mode = entity.imageColorMode || 'full'
+    const modeLabel = mode === 'bw' ? 'BLACK & WHITE' : mode === 'duotone' ? 'DUOTONE' : mode === 'limited' ? 'LIMITED COLOR' : 'COLOR'
+    content += ` ${modeLabel} image palette: ${imgPal.map(c => c.hex).join(', ')}.`
+  } else {
+    const projPal = paletteText(project, paletteColors)
+    if (projPal) content += ` ${projPal}`
+  }
+  return `contains an IMAGE, not text: ${content}`
+}
+
+function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], generalStyle = '', paletteColors = null) {
   const lines = []
   const balloons = balloonGraphicsText(panel, project, balloonDefs)
   if (balloons) {
@@ -610,44 +712,112 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = []) {
     lines.push('DIALOGUE SEQUENCE — STRICT, MUST BE REPRODUCED EXACTLY (verbatim, in this logical order):')
     lines.push(`PHYSICAL PLACEMENT: follow "${layoutFileName}" for each balloon's exact position, size, and order on canvas (highest priority). The sequence below is the logical reading order only.`)
     const lastByChar = {}
+    let anyImage = false
     orderedDialogues.forEach((d, idx) => {
       const placement = dialoguePlacementText(d)
-      const typeLabel = DIALOGUE_TYPE_LABELS[d.type] || d.type
+      const entity = d.balloonId ? (balloonDefs || []).find(b => b.id === d.balloonId) : null
+      const isImage = entity?.kind === 'image'
+      if (isImage) anyImage = true
+      const typeLabel = isImage ? 'image balloon' : (DIALOGUE_TYPE_LABELS[d.type] || d.type)
       const prev = lastByChar[d.name]
       const linked = prev != null
         ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. Connect them with a thin DASHED line (the comic "air" connector); only the LAST balloon of the speaker carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon from another speaker.`
         : ''
       lastByChar[d.name] = d.number
       let styleRef = ''
-      if (d.balloonId) {
-        const override = (balloonDefs || []).find(b => b.id === d.balloonId)
-        if (override) styleRef = ` Balloon style entity: "${override.name}".`
-      }
+      if (entity) styleRef = ` Balloon style entity: "${entity.name}".`
+      const content = isImage
+        ? imageBalloonContent(entity, d.text, project, generalStyle, paletteColors)
+        : `contains exactly: "${d.text}".`
+      const anchor = (isImage || d.type === 'thought')
+        ? (() => {
+            const ch = (ctx.panelCharacters || [])[d.charIdx]
+            const side = bubbleSideFromHead(d, ch) || 'UPPER'
+            return ` It is joined to the head of the speaker (${d.name}) by a trail of THREE small bubbles decreasing in size. The bubbles must emerge from the ${side} side of the character's head and point from the balloon down toward their head, following the connector in the layout. They must always stay visibly connected to the head — NEVER hanging loose or disconnected.`
+          })()
+        : ` Its tail must point to the head of the speaker (${d.name}).`
       if (idx === 0) {
-        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${channelStyleText(d.type)}${styleRef}`)
+        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${anchor}`)
       } else {
-        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and contains exactly: "${d.text}". Balloon type: ${typeLabel}.${channelStyleText(d.type)}${linked}${styleRef}`)
+        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linked}${styleRef}${anchor}`)
       }
     })
 
-    lines.push('BALLOON STYLE AND LETTERING: strictly follow the balloon style defined in BALLOON GRAPHICS above; do not alter the wording, the lettering, or the balloon shape.')
+    lines.push(`BALLOON STYLE AND LETTERING: strictly follow the balloon style defined in BALLOON GRAPHICS above; do not alter the wording, the lettering, or the balloon shape.${anyImage ? ' IMAGE balloons contain a drawn image and NO text: their lettering and typography rules are void.' : ''}`)
   }
 
-  const globosX = (panel.globosX || []).filter(g => g.text)
+  const globosX = (panel.globosX || []).filter(g => g.text || ((balloonDefs || []).find(b => b.id === g.balloonId)?.kind === 'image'))
   if (globosX.length > 0) {
     lines.push('')
     lines.push('CAPTIONS AND FREE BALLOONS (GLOBO X) — SEPARATE from the dialogue sequence; place each one exactly as shown in the layout image:')
     globosX.forEach((g, i) => {
       const placement = dialoguePlacementText(g)
-      const channel = DIALOGUE_TYPE_LABELS[g.channel] || g.channel || 'speech'
-      const anchor = globoXAnchorText(g, ctx)
       const entity = g.balloonId ? (balloonDefs || []).find(b => b.id === g.balloonId) : null
+      const isImage = entity?.kind === 'image'
+      const channel = isImage ? 'image' : (DIALOGUE_TYPE_LABELS[g.channel] || g.channel || 'speech')
+      const anchor = globoXAnchorText(g, ctx)
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
-      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and contains exactly: "${g.text}". Channel: ${channel}.${channelStyleText(g.channel)} Its ${anchor}.${styleRef}`)
+      const content = isImage
+        ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors)
+        : `contains exactly: "${g.text}".`
+      const bubbleTrail = (isImage || channel === 'thought')
+        ? (() => {
+            const a = g.anchor || {}
+            const ch = a.type === 'character'
+              ? (ctx.panelCharacters || []).find(c => c.characterId === a.id)
+              : null
+            const side = bubbleSideFromHead(g, ch)
+            return side
+              ? ` Connect it to the head by a trail of THREE small bubbles decreasing in size. The bubbles must emerge from the ${side} side of the character's head and stay visibly connected to it — NEVER hanging loose or disconnected.`
+              : ` Connect it to its anchor by a trail of THREE small bubbles decreasing in size, pointing directly at the anchor, always visibly connected — NEVER hanging loose or disconnected.`
+          })()
+        : ''
+      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and ${content} Channel: ${channel}.${isImage ? '' : channelStyleText(g.channel)} Its ${anchor}.${bubbleTrail}${styleRef}`)
     })
   }
 
   return lines
+}
+
+function panelUsesImageBalloon(panel, balloonDefs = []) {
+  const ids = new Set()
+  ;(panel?.characters || []).forEach(c => {
+    if (c.balloonId) ids.add(c.balloonId)
+    ;(c.extraDialogues || []).forEach(e => { if (e.balloonId) ids.add(e.balloonId) })
+  })
+  ;(panel?.globosX || []).forEach(g => { if (g.balloonId) ids.add(g.balloonId) })
+  return (balloonDefs || []).some(b => ids.has(b.id) && b.kind === 'image')
+}
+
+function panelHasBubbleAnchored(panel, balloonDefs = []) {
+  const defs = balloonDefs || []
+  for (const c of (panel?.characters || [])) {
+    if (c.dialogueType === 'thought') return true
+    if ((c.extraDialogues || []).some(e => e.type === 'thought')) return true
+    const ids = [c.balloonId, ...(c.extraDialogues || []).map(e => e.balloonId)]
+    if (defs.some(b => ids.includes(b.id) && b.kind === 'image')) return true
+  }
+  for (const g of (panel?.globosX || [])) {
+    if (g.channel === 'thought') return true
+    if (defs.some(b => b.id === g.balloonId && b.kind === 'image')) return true
+  }
+  return false
+}
+
+function letteringFinalCheck(hasImageBalloon, hasBubbleAnchor = false) {
+  const bubbleCheck = hasBubbleAnchor
+    ? ' Also verify that every thought and image balloon is visibly connected to its speaker\'s head by its three bubbles — NEVER left hanging or disconnected.'
+    : ''
+  if (hasImageBalloon) {
+    return 'FINAL CHECK: Before finishing, verify every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector. IMAGE balloons must contain the described scene drawn STRICTLY inside them, with NO text, letters, or typography.' + bubbleCheck
+  }
+  return 'FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.' + bubbleCheck
+}
+
+const LEGAL_NOTICE = 'IMPORTANT: I certify that I am the sole author and rightful owner of all images attached to this request and of the content of the prompt itself, and that I hold the rights to use them. I take full responsibility for any legal issue that may arise from this generation.'
+
+function withLegalNotice(lines) {
+  return [...lines, '', LEGAL_NOTICE]
 }
 
 export function generateScenePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, paletteColors = null, author = null) {
@@ -656,7 +826,7 @@ export function generateScenePrompt(panel, characters = [], generalStyle, backgr
   const projectStyle = projectStyleText(project)
   const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
-    ...headerLines(ctx, layoutName),
+    ...headerLines(ctx, layoutName, strip),
     ...stylePaletteLines(project, generalStyle, paletteColors),
     'LETTERING LOCK: This prompt describes the SCENE layer only, WITHOUT any dialogue or lettering. Do NOT draw any speech balloons, thought bubbles, narration boxes, captions, or sound-effect words. Do not write any text, letters, or typography anywhere in the image. Do not leave blank outlines, circles, or box placeholders hinting at future balloons. The scene must stand alone as a text-free panel; lettering is added later in a separate step.',
     '',
@@ -664,24 +834,27 @@ export function generateScenePrompt(panel, characters = [], generalStyle, backgr
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved, and with NO text, lettering, or balloons of any kind. Use "${layoutName}" strictly as a spatial guide for where each scene element sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
   ]
-  return lines.join('\n')
+  return withLegalNotice(lines).join('\n')
 }
 
-export function generateLetteringPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, balloons = []) {
+export function generateLetteringPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, balloons = [], paletteColors = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
   const lines = [
     `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate.`,
     `POSITIONAL LAYOUT: The file "${layoutName}" is a layout reference image showing the exact positions, sizes, and order of the lettering elements (balloons, narration, sound effects) on the canvas. Use it as a precise guide.`,
     '',
+    ...chatTitleLines(strip),
     'SCENE LOCK: You are given the finished scene image generated in the previous step (attach it as the input image). Keep EVERYTHING in that scene EXACTLY as it is — do NOT redraw, recolor, move, resize, or alter any character, object, background, lighting, expression, line style, or detail. Do NOT change the composition or the aspect ratio. ONLY add the lettering elements described below, placed precisely where indicated.',
     '',
-    ...letteringLines(ctx, panel, project, layoutName, balloons),
+    ...letteringLines(ctx, panel, project, layoutName, balloons, generalStyle, paletteColors),
     '',
-    `FINAL REMINDER — LETTERING ONLY: Keep the scene image unchanged and add ONLY the lettering specified above (balloons, narration, sound effects, captions), at the exact coordinates given and following "${layoutName}" for placement. Do not modify anything else. DO NOT CHANGE THE ASPECT RATIO.`,
-    `FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`,
+    ...(panelUsesImageBalloon(panel, balloons)
+      ? []
+      : [`FINAL REMINDER — LETTERING ONLY: Keep the scene image unchanged and add ONLY the lettering specified above (balloons, narration, sound effects, captions), at the exact coordinates given and following "${layoutName}" for placement. Do not modify anything else. DO NOT CHANGE THE ASPECT RATIO.`]),
+    letteringFinalCheck(panelUsesImageBalloon(panel, balloons)),
   ]
-  return lines.join('\n')
+  return withLegalNotice(lines).join('\n')
 }
 
 export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = [], paletteColors = null, author = null) {
@@ -690,15 +863,15 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   const projectStyle = projectStyleText(project)
   const styleText = combineStyleText(projectStyle, generalStyle)
   const lines = [
-    ...headerLines(ctx, layoutName),
+    ...headerLines(ctx, layoutName, strip),
     ...stylePaletteLines(project, generalStyle, paletteColors),
     ...sceneBodyLines(ctx, panel, styleText, paletteColors, author),
-    ...letteringLines(ctx, panel, project, layoutName, balloons),
+    ...letteringLines(ctx, panel, project, layoutName, balloons, generalStyle, paletteColors),
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
-    `FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.`,
+    letteringFinalCheck(panelUsesImageBalloon(panel, balloons), panelHasBubbleAnchored(panel, balloons)),
   ]
-  return lines.join('\n')
+  return withLegalNotice(lines).join('\n')
 }
 
 export function generateAllPanelsPrompt(strip, characters = [], backgrounds = [], objects = [], project = null, balloons = [], paletteColors = null, author = null) {

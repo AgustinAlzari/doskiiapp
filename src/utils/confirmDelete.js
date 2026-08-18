@@ -1,3 +1,5 @@
+import useConfirmStore from '../store/confirmStore'
+
 // Si la entidad pertenece a un proyecto que sube a la nube (cloudBackup !== false).
 export function isInCloud(entity, projects) {
   if (!entity) return false
@@ -6,10 +8,11 @@ export function isInCloud(entity, projects) {
   return proj ? proj.cloudBackup !== false : false
 }
 
-// Confirmación de borrado: si está en la nube, avisa que se pierde para siempre.
+// Confirmación de borrado (modal propio, respeta la estética de la app):
+// si está en la nube, avisa que se pierde para siempre. Resuelve true si confirma.
 export function confirmDelete(label, inCloud) {
-  if (inCloud) {
-    return window.confirm(`"${label}" está en la nube. si lo borrás, se pierde para siempre en local y en la nube. ¿borrar de todos modos?`)
-  }
-  return window.confirm(`¿eliminar "${label}"?`)
+  const message = inCloud
+    ? `"${label}" está en la nube. si lo borrás, se pierde para siempre en local y en la nube. ¿borrar de todos modos?`
+    : `¿eliminar "${label}"?`
+  return useConfirmStore.getState().ask(message, { confirmLabel: 'borrar' })
 }

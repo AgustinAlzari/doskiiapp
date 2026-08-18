@@ -22,8 +22,8 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
       const dx = (ev.clientX - dragStart.current.mx) / rect.width
       const dy = (ev.clientY - dragStart.current.my) / rect.height
       onMove(
-        Math.max(0, Math.min(1 - panelObj.width, dragStart.current.x + dx)),
-        Math.max(0, Math.min(1 - panelObj.height, dragStart.current.y + dy))
+        Math.max(-0.6, Math.min(1.6 - panelObj.width, dragStart.current.x + dx)),
+        Math.max(-0.6, Math.min(1.6 - panelObj.height, dragStart.current.y + dy))
       )
     }
     const handleUp = () => {
@@ -66,7 +66,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
   }, [panelObj, onResize])
 
   const resizeHandle = (corner, style) => (
-    <div onPointerDown={e => handleResizeDown(e, corner)} style={{ position: 'absolute', width: 12, height: 12, cursor: corner === 'top-left' || corner === 'bottom-right' ? 'nwse-resize' : 'nesw-resize', background: 'var(--color-border)', opacity: 0.65, zIndex: 21, ...style }} />
+    <div onPointerDown={e => handleResizeDown(e, corner)} style={{ position: 'absolute', width: 12, height: 12, cursor: corner === 'top-left' || corner === 'bottom-right' ? 'nwse-resize' : 'nesw-resize', background: 'var(--color-border)', opacity: 0.65, zIndex: 21, pointerEvents: isBackground ? 'auto' : undefined, ...style }} />
   )
 
   return (
@@ -79,16 +79,23 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
         width: `${panelObj.width * 100}%`,
         height: `${panelObj.height * 100}%`,
         borderColor: objDef.color || 'var(--color-border)',
+        zIndex: isBackground ? 0 : 2 + (panelObj.z ?? 0),
+        pointerEvents: isBackground ? 'none' : 'auto',
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={isBackground ? undefined : handleMouseDown}
     >
       {showInputPort && <div
         className="conn-port obj-port-in"
         data-label="IN"
         onPointerUp={(e) => { e.stopPropagation(); onConnInEnd?.(panelObj.objectId) }}
         title="soltar para recibir conexion"
+        style={{ pointerEvents: isBackground ? 'auto' : undefined }}
       />}
-      <div className="char-block-header" style={{ borderColor: objDef.color || 'var(--color-border-muted)' }}>
+      <div
+        className="char-block-header"
+        style={{ borderColor: objDef.color || 'var(--color-border-muted)', pointerEvents: isBackground ? 'auto' : undefined }}
+        onMouseDown={isBackground ? handleMouseDown : undefined}
+      >
         <span style={{ color: objDef.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>
           {objDef.name}
         </span>
@@ -101,7 +108,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
         <span style={{ fontSize: 9, color: 'var(--color-text-muted)', opacity: 0.6 }}>{'\u25C6'}</span>
       </div>
 
-      {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title={isBackground ? 'borrar fondo' : 'borrar objeto'}>{'\u00D7'}</button>}
+      {onRemove && <button className="block-remove-btn" style={{ pointerEvents: isBackground ? 'auto' : undefined }} onClick={e => { e.stopPropagation(); onRemove(); }} title={isBackground ? 'borrar fondo' : 'borrar objeto'}>{'\u00D7'}</button>}
 
       {resizeHandle('top-left', { top: 0, left: 0 })}
       {resizeHandle('top-right', { top: 0, right: 0 })}

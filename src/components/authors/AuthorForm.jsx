@@ -2,10 +2,14 @@ import { useState } from 'react'
 import useAuthorStore from '../../store/authorStore'
 import AutoTextarea from '../editor/AutoTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
+import useAutoSaveBack from '../../utils/useAutoSaveBack'
+import FormShade from '../FormShade'
 import ChatLayout from '../chat/ChatLayout'
 
 export default function AuthorForm({ author, onCancel }) {
   const save = useAuthorStore(s => s.save)
+  const remove = useAuthorStore(s => s.remove)
+  const authors = useAuthorStore(s => s.authors)
   const isNew = !author?.id
 
   const [fullName, setFullName] = useState(author?.fullName || '')
@@ -27,11 +31,22 @@ export default function AuthorForm({ author, onCancel }) {
     setTimeout(() => setSavedFlash(false), 2000)
   }
 
+  const payload = () => ({ ...author, id: savedId || crypto.randomUUID(), fullName, signatureText, signatureImage })
+  const { goBack } = useAutoSaveBack({
+    save,
+    remove,
+    payload,
+    fields: ['fullName', 'signatureText', 'signatureImage'],
+    hasContent: !!fullName.trim(),
+    getStored: (id) => authors.find(a => a.id === id) || null,
+    onBack: onCancel,
+  })
+
   return (
     <ChatLayout>
       <div style={{ maxWidth: 520 }}>
         <div className="section-header">
-          <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+          <button className="back-arrow" onClick={goBack} title="volver">←</button>
           <h1 className="ui-h1">
             {isNew ? 'nuevo autor' : 'editar autor'}
           </h1>
@@ -49,6 +64,7 @@ export default function AuthorForm({ author, onCancel }) {
           />
         </div>
 
+        <FormShade active={!!fullName.trim()} hint="colocá el nombre para poder editar el resto">
         <div>
           <label className="label">firma en texto</label>
           <AutoTextarea
@@ -79,6 +95,7 @@ export default function AuthorForm({ author, onCancel }) {
             {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
         </div>
+        </FormShade>
       </form>
       </div>
     </ChatLayout>

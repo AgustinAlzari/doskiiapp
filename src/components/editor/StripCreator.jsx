@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import useStripStore from '../../store/stripStore'
 import ChatLayout from '../chat/ChatLayout'
-import AutoTextarea from './AutoTextarea'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
-
 export default function StripCreator({ project, onCreated, onBack }) {
   const save = useStripStore(s => s.save)
   const [title, setTitle] = useState('')
-  const [generalStyle, setGeneralStyle] = useState('')
-  const [panelCount, setPanelCount] = useState(project?.defaultPanelCount || 3)
+  const [panelCount, setPanelCount] = useState(project?.defaultPanelCount || 1)
   const [aspectRatio, setAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
 
   const handleCreate = async () => {
@@ -25,7 +22,6 @@ export default function StripCreator({ project, onCreated, onBack }) {
       id: crypto.randomUUID(),
       projectId: project?.id,
       title,
-      generalStyle,
       panelCount,
       aspectRatio,
       panels,
@@ -56,22 +52,6 @@ export default function StripCreator({ project, onCreated, onBack }) {
         </div>
 
         <div>
-          <label className="label">estilo general</label>
-          <AutoTextarea
-            value={generalStyle}
-            onChange={e => setGeneralStyle(e.target.value)}
-            placeholder="describe el estilo visual: Estilo Sempé, línea fina B&N, humor nórdico..."
-            minRows={3}
-          />
-          {project && (project.styleNotes || project.drawingStyle || project.genre) && (
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              hereda del proyecto: {[project.drawingStyle, project.genre, project.styleNotes].filter(Boolean).join(' · ')}
-              {generalStyle.trim() ? ' (este campo agrega o reemplaza)' : ''}
-            </div>
-          )}
-        </div>
-
-        <div>
           <label className="label">cantidad de cuadros</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
@@ -89,44 +69,59 @@ export default function StripCreator({ project, onCreated, onBack }) {
 
         <div>
           <label className="label">proporción</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {ASPECT_RATIOS.map(ar => {
-              const [w, h] = ar.css.split('/').map(Number)
-              const previewW = 40
-              const previewH = previewW * (h / w)
-              return (
-                <div
-                  key={ar.id}
-                  onClick={() => setAspectRatio(ar.id)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    cursor: 'pointer',
-                    padding: 8,
-                    borderRadius: 'var(--radius-md)',
-                    border: aspectRatio === ar.id ? '2px solid var(--color-accent)' : '2px solid var(--color-border)',
-                    transition: 'all 0.1s ease',
-                    minWidth: 72,
-                  }}
-                >
-                  <div style={{
-                    width: previewW,
-                    height: Math.min(previewH, 48),
-                    border: '1.5px solid var(--color-text-muted)',
-                    borderRadius: 3,
-                    background: aspectRatio === ar.id ? 'var(--color-accent)' : 'transparent',
-                    borderColor: aspectRatio === ar.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  }} />
-                  <span style={{ fontSize: 11, fontWeight: aspectRatio === ar.id ? 600 : 400, color: aspectRatio === ar.id ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
-                    {ar.label}
-                  </span>
-                  <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{ar.ratio}</span>
+          {['formato', 'ig'].map(group => {
+            const items = ASPECT_RATIOS.filter(ar => (ar.group || 'formato') === group)
+            if (!items.length) return null
+            return (
+              <div key={group} style={{ marginBottom: 10 }}>
+                {group === 'ig' && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                    instagram
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {items.map(ar => {
+                    const [w, h] = ar.css.split('/').map(Number)
+                    const previewW = 40
+                    const previewH = previewW * (h / w)
+                    const hasRatio = ar.label.includes(ar.ratio)
+                    return (
+                      <div
+                        key={ar.id}
+                        onClick={() => setAspectRatio(ar.id)}
+                        title={ar.desc}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                          padding: 8,
+                          borderRadius: 'var(--radius-md)',
+                          border: aspectRatio === ar.id ? '2px solid var(--color-accent)' : '2px solid var(--color-border)',
+                          transition: 'all 0.1s ease',
+                          minWidth: 72,
+                        }}
+                      >
+                        <div style={{
+                          width: previewW,
+                          height: Math.min(previewH, 48),
+                          border: '1.5px solid var(--color-text-muted)',
+                          borderRadius: 3,
+                          background: aspectRatio === ar.id ? 'var(--color-accent)' : 'transparent',
+                          borderColor: aspectRatio === ar.id ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                        }} />
+                        <span style={{ fontSize: 11, fontWeight: aspectRatio === ar.id ? 600 : 400, color: aspectRatio === ar.id ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+                          {ar.label}
+                        </span>
+                        {!hasRatio && <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{ar.ratio}</span>}
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
         </div>
 
         <button className="btn btn-primary" onClick={handleCreate} disabled={!title.trim()}>

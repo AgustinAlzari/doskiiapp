@@ -6,12 +6,13 @@ import useObjectStore from '../../store/objectStore'
 import useBalloonStore from '../../store/balloonStore'
 import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
 import useAuthorStore from '../../store/authorStore'
-import { SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, SFX_STYLES, ASPECT_RATIOS } from '../../data/actionPresets'
+import { SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, SFX_STYLES, ASPECT_RATIOS, aspectLabel } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
 import PanelCanvas from './PanelCanvas'
 import CharacterPropsPanel from './CharacterPropsPanel'
 import BalloonPropsPanel from './BalloonPropsPanel'
-import AutoTextarea from './AutoTextarea'
+import SpellCheckedTextarea from '../SpellCheckedTextarea'
+import SpellCheckedInput from '../SpellCheckedInput'
 import useChatStore from '../../store/chatStore'
 
 export default function StripEditor({ strip, project, onBack, onEditCharacter, onShowPrompts }) {
@@ -32,10 +33,8 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [selectedBalloon, setSelectedBalloon] = useState(null)
   const [selectedGloboXIdx, setSelectedGloboXIdx] = useState(null)
   const [selectedSignature, setSelectedSignature] = useState(false)
+  const [selectedBackground, setSelectedBackground] = useState(false)
   const [saveState, setSaveState] = useState(null)
-  const [showDescModal, setShowDescModal] = useState(false)
-  const [descDraft, setDescDraft] = useState('')
-  const [descSaved, setDescSaved] = useState(false)
   const [gridVisible, setGridVisible] = useState(true)
   const canvasRef = useRef(null)
 
@@ -68,6 +67,18 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   }, [])
 
   const deselectAll = useCallback(() => {
+    setSelectedCharIdx(null)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedNarr(false)
+    setSelectedBalloon(null)
+    setSelectedGloboXIdx(null)
+    setSelectedSignature(false)
+    setSelectedBackground(false)
+  }, [])
+
+  const selectBackground = useCallback(() => {
+    setSelectedBackground(true)
     setSelectedCharIdx(null)
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
@@ -131,6 +142,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setData(prev => {
       const panels = [...prev.panels]
       const characters = [...panels[panelIdx].characters]
+      const zCounter = panels[panelIdx].zCounter || 0
       characters.push({
         characterId,
         x: 0.3,
@@ -147,8 +159,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         actions: [],
         actionNotes: '',
         gazeTarget: null,
+        z: zCounter,
       })
-      panels[panelIdx] = { ...panels[panelIdx], characters }
+      panels[panelIdx] = { ...panels[panelIdx], characters, zCounter: zCounter + 1 }
       return { ...prev, panels }
     })
   }, [wildcardBalloon])
@@ -198,14 +211,16 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setData(prev => {
       const panels = [...prev.panels]
       const currentObjects = panels[panelIdx].objects || []
+      const zCounter = panels[panelIdx].zCounter || 0
       const nextObjects = [...currentObjects, {
         objectId,
         x: 0.35 + (currentObjects.length % 3) * 0.08,
         y: 0.3 + (currentObjects.length % 2) * 0.08,
         width: 0.15,
         height: 0.15,
+        z: zCounter,
       }]
-      panels[panelIdx] = { ...panels[panelIdx], objects: nextObjects }
+      panels[panelIdx] = { ...panels[panelIdx], objects: nextObjects, zCounter: zCounter + 1 }
       return { ...prev, panels }
     })
   }, [])
@@ -240,6 +255,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setData(prev => {
       const panels = [...prev.panels]
       const sfx = [...(panels[panelIdx].sfx || [])]
+      const zCounter = panels[panelIdx].zCounter || 0
       sfx.push({
         text: '',
         x: 0.6,
@@ -247,8 +263,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         width: 0.15,
         height: 0.1,
         style: 'default',
+        z: zCounter,
       })
-      panels[panelIdx] = { ...panels[panelIdx], sfx }
+      panels[panelIdx] = { ...panels[panelIdx], sfx, zCounter: zCounter + 1 }
       return { ...prev, panels }
     })
   }, [])
@@ -278,9 +295,11 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const addNarrationToPanel = useCallback((panelIdx) => {
     setData(prev => {
       const panels = [...prev.panels]
+      const zCounter = panels[panelIdx].zCounter || 0
       panels[panelIdx] = {
         ...panels[panelIdx],
-        narration: { text: '', x: 0.05, y: 0.02, width: 0.4, height: 0.12, framed: true },
+        narration: { text: '', x: 0.05, y: 0.02, width: 0.4, height: 0.12, framed: true, z: zCounter },
+        zCounter: zCounter + 1,
       }
       return { ...prev, panels }
     })
@@ -324,10 +343,11 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     if (panel?.signature) {
       removeSignatureFromPanel(selectedPanelIdx)
     } else {
-      updatePanel(selectedPanelIdx, { signature: { x: 0.7, y: 0.85, width: 0.25, height: 0.1, colorId: null } })
+      const zCounter = panel?.zCounter || 0
+      updatePanel(selectedPanelIdx, { signature: { x: 0.7, y: 0.85, width: 0.25, height: 0.1, colorId: null, z: zCounter }, zCounter: zCounter + 1 })
       setSelectedSignature(true)
     }
-  }, [panel?.signature, selectedPanelIdx, updatePanel, removeSignatureFromPanel])
+  }, [panel?.signature, panel?.zCounter, selectedPanelIdx, updatePanel, removeSignatureFromPanel])
 
   const selectSignature = useCallback(() => {
     setSelectedSignature(true)
@@ -337,7 +357,10 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedNarr(false)
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
+    setSelectedBackground(false)
   }, [])
+
+  //XX
 
   // Balloons (dialogue positions on canvas)
   const updateDialoguePos = useCallback((panelIdx, characterId, isExtra, extraIdx, updates) => {
@@ -374,6 +397,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
     setSelectedGloboXIdx(null)
+    setSelectedBackground(false)
     setSelectedBalloon({ characterId: balloon.characterId, isExtra: balloon.isExtra, extraIdx: balloon.extraIdx })
   }, [])
 
@@ -384,6 +408,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
     setSelectedBalloon(null)
+    setSelectedBackground(false)
   }, [])
 
   const applyDialogueBalloonUpdate = useCallback((updates) => {
@@ -407,6 +432,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setData(prev => {
       const panels = [...prev.panels]
       const globosX = [...(panels[panelIdx].globosX || [])]
+      const zCounter = panels[panelIdx].zCounter || 0
       globosX.push({
         id: crypto.randomUUID(),
         text: '',
@@ -417,8 +443,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         width: 0.3,
         height: 0.1,
         anchor: { type: 'none' },
+        z: zCounter,
       })
-      panels[panelIdx] = { ...panels[panelIdx], globosX }
+      panels[panelIdx] = { ...panels[panelIdx], globosX, zCounter: zCounter + 1 }
       return { ...prev, panels }
     })
     setSelectedGloboXIdx(idx)
@@ -578,7 +605,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
           title="proporción del cuadro"
           style={{ flexShrink: 0, cursor: 'pointer' }}
         >
-          {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{ar.label} {ar.ratio}</option>)}
+          {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{aspectLabel(ar)}</option>)}
         </select>
         <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters, balloons)}>
           prompts
@@ -587,48 +614,6 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
           {saveState === 'saving' ? 'guardando...' : saveState === 'saved' ? 'guardado ✓' : 'guardar'}
         </button>
       </div>
-
-      {/* Estilo general - Ficha Descripción */}
-      <div style={{ marginBottom: 16, maxWidth: 820 }}>
-        <label className="label">descripción</label>
-        <div className="desc-card" onClick={() => { setDescDraft(data.generalStyle || ''); setShowDescModal(true) }}>
-          <div className="desc-card-text">
-            {data.generalStyle || 'describe el estilo visual de la viñeta...'}
-          </div>
-          <div className="desc-card-dots">···</div>
-        </div>
-        {project && (project.styleNotes || project.drawingStyle || project.genre) && (
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-            hereda del proyecto: {[project.drawingStyle, project.genre, project.styleNotes].filter(Boolean).join(' · ')}
-            {data.generalStyle?.trim() ? ' (la descripción de la viñeta agrega o reemplaza)' : ' (vacío = usar estilo del proyecto)'}
-          </div>
-        )}
-      </div>
-
-      {/* Modal overlay de descripción */}
-      {showDescModal && (
-        <div className="desc-overlay" onClick={() => setShowDescModal(false)}>
-          <div className="desc-modal" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>descripción de la viñeta</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowDescModal(false)} style={{ fontSize: 16, padding: '2px 8px' }}>×</button>
-            </div>
-            <AutoTextarea
-              value={descDraft}
-              onChange={e => setDescDraft(e.target.value)}
-              placeholder="describe el estilo visual: Sempé, línea fina B&N, humor nórdico..."
-              minRows={6}
-              maxRows={16}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="back-arrow" onClick={() => setShowDescModal(false)} title="cerrar">←</button>
-              <button className="btn btn-primary btn-sm" onClick={() => { setData(prev => ({ ...prev, generalStyle: descDraft })); setDescSaved(true); setTimeout(() => setDescSaved(false), 2000) }}>
-                {descSaved ? 'guardado ✓' : 'guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Editor content */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
@@ -663,7 +648,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 <div
                   className={`sidebar-item ${i === selectedPanelIdx ? 'active' : ''}`}
                   style={{ justifyContent: 'center', fontSize: 12 }}
-                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedNarr(false); setSelectedSignature(false) }}
+                  onClick={() => { setSelectedPanelIdx(i); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedNarr(false); setSelectedSignature(false); setSelectedBackground(false) }}
                 >
                   cuadro {i + 1}
                 </div>
@@ -690,11 +675,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 selectedSfxIdx={selectedSfxIdx}
                 selectedBalloon={selectedBalloon}
                 selectedGloboXIdx={selectedGloboXIdx}
-                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
-                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
-                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
+                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
                 selectedNarr={selectedNarr}
-                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null) }}
+                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                selectedBackground={selectedBackground}
+                onSelectBackground={selectBackground}
                 onSelectBalloon={selectBalloon}
                 onSelectGloboX={selectGloboX}
                 onMoveBalloon={moveBalloon}
@@ -734,7 +721,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               style={{ width: 360, flexShrink: 0, alignSelf: 'stretch', position: 'relative', overflow: 'hidden' }}
             >
               {/* Properties overlay — absolute, covers sidebar when active */}
-              {(selectedDialogueBalloon) || (selectedGloboXData) || (selectedCharData && selectedCharDef) || (selectedObjData && selectedObjDef) || (selectedSfxData && selectedSfxIdx !== null) ? (
+              {(selectedDialogueBalloon) || (selectedGloboXData) || (selectedCharData && selectedCharDef) || (selectedObjData && selectedObjDef) || (selectedSfxData && selectedSfxIdx !== null) || selectedBackground ? (
                 <div className="editor-sidebar" style={{ position: 'absolute', inset: 0, overflow: 'auto', zIndex: 5, background: 'var(--color-bg)' }}>
                   {selectedDialogueBalloon && (
                     <BalloonPropsPanel
@@ -802,7 +789,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                         {selectedObjDef.comodin && (
                           <div style={{ marginBottom: 12 }}>
                             <label className="label">qué es este objeto</label>
-                            <AutoTextarea
+                            <SpellCheckedTextarea
                               value={selectedObjData.comodinDesc || ''}
                               onChange={e => updateObjectInPanel(selectedPanelIdx, selectedObjIdx, { comodinDesc: e.target.value })}
                               placeholder="ej. 'un microondas abandonado lleno de moscas'..."
@@ -811,7 +798,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                           </div>
                         )}
                         <label className="label">sobre el objeto</label>
-                        <AutoTextarea
+                        <SpellCheckedTextarea
                           value={selectedObjData.note || ''}
                           onChange={e => updateObjectInPanel(selectedPanelIdx, selectedObjIdx, { note: e.target.value })}
                           placeholder="qué ocurre sobre este objeto, qué contiene o qué relación tiene con la escena..."
@@ -820,6 +807,47 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       </div>
                     </div>
                   )}
+                  {selectedBackground && (() => {
+                    const bgDef = panel?.backgroundId ? backgrounds.find(b => b.id === panel.backgroundId) : null
+                    return (
+                      <div style={{ padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="color-dot" style={{ background: bgDef?.color || 'var(--color-border)' }} />
+                          <span style={{ fontWeight: 500, fontSize: 14 }}>{bgDef?.name || 'fondo'}</span>
+                          <div style={{ flex: 1 }} />
+                          <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setSelectedBackground(false)}>×</button>
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                          <label className="label">fondo</label>
+                          <select
+                            className="input"
+                            value={panel?.backgroundId || ''}
+                            onChange={e => setBackgroundForPanel(selectedPanelIdx, e.target.value || null)}
+                            style={{ fontSize: 12, cursor: 'pointer' }}
+                          >
+                            <option value="">fondo...</option>
+                            {projectBackgrounds.map(bg => (
+                              <option key={bg.id} value={bg.id}>{bg.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {bgDef?.comodin && (
+                          <div style={{ marginTop: 12 }}>
+                            <label className="label">qué es este fondo</label>
+                            <SpellCheckedTextarea
+                              value={panel?.comodinDesc || ''}
+                              onChange={e => updatePanel(selectedPanelIdx, { comodinDesc: e.target.value })}
+                              placeholder="qué es este fondo: ej. 'un baldío detrás de un supermercado'..."
+                              minRows={3}
+                            />
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
+                          arrastrá para mover el fondo; usá las esquinas para redimensionarlo.
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {selectedSfxData && selectedSfxIdx !== null && (
                     <div style={{ padding: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -829,8 +857,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       </div>
                       <div style={{ marginTop: 12 }}>
                         <label className="label">texto</label>
-                        <input
-                          className="input"
+                        <SpellCheckedInput
                           value={selectedSfxData.text}
                           onChange={e => updateSfxInPanel(selectedPanelIdx, selectedSfxIdx, { text: e.target.value })}
                           placeholder="BAM, WHOOSH..."
@@ -923,11 +950,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
               {/* Scene */}
               <div>
                 <label className="label">escena</label>
-                <input
+                <textarea
                   className="input"
+                  rows={4}
                   value={panel?.scene || ''}
                   onChange={e => updatePanel(selectedPanelIdx, { scene: e.target.value })}
                   placeholder="describe la escena..."
+                  style={{ height: 'auto', minHeight: 84, overflowY: 'auto', resize: 'none', lineHeight: 1.5, paddingTop: 6, paddingBottom: 6 }}
                 />
               </div>
 
@@ -990,7 +1019,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                             key={idx}
                             className="radio-pill"
                             style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: char.color, color: char.color }}
-                            onClick={() => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedBalloon(null) }}
+                            onClick={() => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedBalloon(null); setSelectedBackground(false) }}
                           >
                             <span className="color-dot" style={{ background: char.color || '#999' }} />
                             {char.name}
@@ -1017,7 +1046,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     const bgDef = panel?.backgroundId ? backgrounds.find(b => b.id === panel.backgroundId) : null
                     if (!bgDef?.comodin) return null
                     return (
-                      <AutoTextarea
+                      <SpellCheckedTextarea
                         value={panel?.comodinDesc || ''}
                         onChange={e => updatePanel(selectedPanelIdx, { comodinDesc: e.target.value })}
                         placeholder="qué es este fondo: ej. 'un baldío detrás de un supermercado'..."
@@ -1047,7 +1076,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                             key={idx}
                             className="radio-pill"
                             style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: obj.color, color: obj.color }}
-                            onClick={() => setSelectedObjIdx(idx)}
+                            onClick={() => { setSelectedObjIdx(idx); setSelectedBackground(false) }}
                           >
                             <span className="color-dot" style={{ background: obj.color || '#999' }} />
                             {obj.name}
@@ -1079,7 +1108,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                             key={item.id}
                             className={`radio-pill ${selectedGloboXIdx === idx ? 'active' : ''}`}
                             style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                            onClick={() => setSelectedGloboXIdx(selectedGloboXIdx === idx ? null : idx)}
+                            onClick={() => { setSelectedGloboXIdx(selectedGloboXIdx === idx ? null : idx); setSelectedBackground(false) }}
                           >
                             X{textIdx || idx + 1}{item.text ? `: ${item.text.slice(0, 12)}` : ''}
                             <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeGloboXFromPanel(selectedPanelIdx, idx) }}>x</span>
@@ -1104,7 +1133,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                         key={i}
                         className={`radio-pill ${selectedSfxIdx === i ? 'active' : ''}`}
                         style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                        onClick={() => setSelectedSfxIdx(selectedSfxIdx === i ? null : i)}
+                        onClick={() => { setSelectedSfxIdx(selectedSfxIdx === i ? null : i); setSelectedBackground(false) }}
                       >
                         {s.text || '(vacío)'}
                         <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={(e) => { e.stopPropagation(); removeSfxFromPanel(selectedPanelIdx, i) }}>×</span>
@@ -1122,13 +1151,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 <label className="check-item" style={{ marginBottom: 6 }}>
                   <div
                     className={`check-box ${panel?.narration ? 'checked' : ''}`}
-                    onClick={() => panel?.narration ? removeNarrationFromPanel(selectedPanelIdx) : addNarrationToPanel(selectedPanelIdx)}
+                    onClick={() => { if (panel?.narration) removeNarrationFromPanel(selectedPanelIdx); else addNarrationToPanel(selectedPanelIdx); setSelectedNarr(true); setSelectedBackground(false) }}
                   />
                   <span style={{ fontSize: 12 }}>poner</span>
                 </label>
                 {panel?.narration && (
                   <>
-                    <AutoTextarea
+                    <SpellCheckedTextarea
                       value={panel.narration.text || ''}
                       onChange={e => updateNarrationInPanel(selectedPanelIdx, { text: e.target.value })}
                       placeholder="texto del narrador..."

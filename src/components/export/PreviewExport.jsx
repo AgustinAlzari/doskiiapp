@@ -31,7 +31,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     [strips, stripsState]
   )
 
-  const defaultItems = useMemo(
+  const allItems = useMemo(
     () => liveStrips.flatMap(s =>
       (s.results || []).map((r, idx) => ({
         key: keyOf(s.id, r.id),
@@ -43,6 +43,25 @@ export default function PreviewExport({ project, strips, characters, backgrounds
         pasted: r.pasted,
       }))
     ),
+    [liveStrips]
+  )
+
+  const defaultItems = useMemo(
+    () => liveStrips.flatMap(s => {
+      const results = s.results || []
+      if (results.length === 0) return []
+      const idx = Math.min(Math.max(0, s.resultCoverIndex ?? results.length - 1), results.length - 1)
+      const r = results[idx]
+      return [{
+        key: keyOf(s.id, r.id),
+        stripId: s.id,
+        stripTitle: s.title || 'sin título',
+        resultId: r.id,
+        resultIdx: idx,
+        path: r.path,
+        pasted: r.pasted,
+      }]
+    }),
     [liveStrips]
   )
 
@@ -62,7 +81,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     let active = true
     const load = async () => {
       const next = {}
-      for (const it of items) {
+      for (const it of allItems) {
         if (!it.path || !window.api?.references) continue
         try {
           const url = await window.api.references.read(it.path)
@@ -73,7 +92,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     }
     load()
     return () => { active = false }
-  }, [items])
+  }, [allItems])
 
   const [previewIdx, setPreviewIdx] = useState(null)
   const [format, setFormat] = useState('png')
@@ -149,8 +168,8 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   const exportAll = async () => {
     setExportingAll(true)
     try {
-      for (let i = 0; i < items.length; i++) {
-        const res = await exportItem(items[i])
+      for (let i = 0; i < allItems.length; i++) {
+        const res = await exportItem(allItems[i])
         if (!res) break // el usuario canceló el diálogo
       }
     } catch (e) {
@@ -191,8 +210,13 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     return (strip.resultCoverIndex ?? -1) === rIdx
   }
 
-  const previewItem = items[previewIdx]
-  const previewGallery = items
+  const openPreview = (key) => {
+    const i = allItems.findIndex(it => it.key === key)
+    if (i >= 0) setPreviewIdx(i)
+  }
+
+  const previewItem = allItems[previewIdx]
+  const previewGallery = allItems
     .filter(it => srcs[it.key])
     .map(it => ({ src: srcs[it.key], title: `${it.stripTitle} · resultado ${it.resultIdx + 1}` }))
 
@@ -208,7 +232,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span>
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{allItems.length} {allItems.length === 1 ? 'resultado' : 'resultados'}</span>
           <select className="input" style={{ width: 'auto', fontSize: 12, cursor: 'pointer' }} value={format} onChange={e => setFormat(e.target.value)} title="PNG = lossless (máxima calidad)">
             {FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
           </select>
@@ -225,7 +249,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
               {exportingAll ? 'exportando...' : `exportar seleccionadas (${selected.size})`}
             </button>
           ) : (
-            <button className="btn btn-sm" onClick={exportAll} disabled={exportingAll || items.length === 0}>
+            <button className="btn btn-sm" onClick={exportAll} disabled={exportingAll || allItems.length === 0}>
               {exportingAll ? 'exportando...' : 'exportar todas'}
             </button>
           )}
@@ -261,7 +285,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
               onDragOver={e => onDragOver(e, idx)}
               onDrop={e => onDrop(e, idx)}
               onDragEnd={onDragEnd}
-              onClick={() => selectMode ? toggleSelect(it.key) : setPreviewIdx(idx)}
+              onClick={() => selectMode ? toggleSelect(it.key) : openPreview(it.key)}
               style={{
                 position: 'relative',
                 opacity: dragIdx === idx ? 0.4 : 1,
@@ -329,7 +353,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           actions={[
             {
               label: isCover(previewItem) ? 'portada ✓' : 'portada',
-              title: 'usar como portada de la viñeta',
+              title: 'elegir como imagen de preview y export',
               active: isCover(previewItem),
               onClick: () => toggleCover(previewItem),
             },

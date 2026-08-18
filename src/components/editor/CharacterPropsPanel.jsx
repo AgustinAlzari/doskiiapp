@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ACTION_PRESETS, DIRECTIONS, DIRECTION_MODES, SHOT_TYPES } from '../../data/actionPresets'
 import { orderedPanelDialogues } from '../../services/promptGenerator'
-import AutoTextarea from './AutoTextarea'
+import SpellCheckedTextarea from '../SpellCheckedTextarea'
 
 export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, panelConnections, allCharacters, allObjects, defaultBalloonId, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
@@ -85,7 +85,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             <span className="color-dot" style={{ background: character.color }} />
             <span style={{ fontSize: 12, fontWeight: 600 }}>comodín — aparición única</span>
           </div>
-          <AutoTextarea
+          <SpellCheckedTextarea
             value={panelChar.comodinDesc || ''}
             onChange={e => onUpdate({ comodinDesc: e.target.value })}
             placeholder="qué es este personaje en este cuadro: ej. 'una laucha que habla'..."
@@ -224,7 +224,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             </button>
           </div>
         </div>
-        <AutoTextarea
+        <SpellCheckedTextarea
           value={panelChar.dialogue || ''}
           onChange={e => onUpdate({ dialogue: e.target.value })}
           placeholder="qué dice o piensa..."
@@ -247,7 +247,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
                 </span>
                 <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeExtraDialogue(idx)} style={{ fontSize: 10 }}>×</button>
               </div>
-              <AutoTextarea
+              <SpellCheckedTextarea
                 value={extra.text}
                 onChange={e => updateExtraDialogue(idx, { text: e.target.value })}
                 placeholder="siguiente línea de diálogo..."
@@ -285,7 +285,7 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             </label>
           ))}
         </div>
-        <AutoTextarea
+        <SpellCheckedTextarea
           value={panelChar.actionNotes || ''}
           onChange={e => onUpdate({ actionNotes: e.target.value })}
           placeholder="descripción detallada de la acción..."

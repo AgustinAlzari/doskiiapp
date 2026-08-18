@@ -70,7 +70,7 @@ export default function AuthorList({ onNew, onEdit }) {
                   <span />
                   <button
                     className="btn btn-ghost btn-sm btn-danger"
-                    onClick={(e) => { e.stopPropagation(); if (confirmDelete(author.fullName, true)) remove(author.id) }}
+                    onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(author.fullName, true)) remove(author.id) }}
                   >
                     ×
                   </button>

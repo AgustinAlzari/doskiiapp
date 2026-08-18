@@ -32,7 +32,7 @@ export const makeDefaultProject = () => ({
   world: '',
   styleNotes: '',
   defaultAspectRatio: 'hd',
-  defaultPanelCount: 3,
+  defaultPanelCount: 1,
   colorMode: 'bw',
   palette: [],
   paletteId: null,

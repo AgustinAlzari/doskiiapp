@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLOR_MODES, PALETTE_ROLES } from '../../store/projectStore'
 import usePaletteStore from '../../store/paletteStore'
+import { askConfirm } from '../../store/confirmStore'
 
 function normalizeHex(raw) {
   const t = String(raw || '').trim().replace(/^#/, '')
@@ -153,7 +154,7 @@ export default function PaletteEditor({ colors, colorMode, onModeChange, onColor
 
   const deleteFromLibrary = async () => {
     if (!paletteId) return
-    if (!confirm(`¿Eliminar la paleta "${name}" de la biblioteca?`)) return
+    if (!await askConfirm(`¿eliminar la paleta "${name}" de la biblioteca?`, { confirmLabel: 'borrar' })) return
     await removePalette(paletteId)
     onPaletteIdChange?.(null)
     setName('')

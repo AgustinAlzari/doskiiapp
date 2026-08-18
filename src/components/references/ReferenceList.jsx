@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import useBackgroundStore from '../../store/backgroundStore'
+import useReferenceStore from '../../store/referenceStore'
 import useProjectStore from '../../store/projectStore'
 import { confirmDelete, isInCloud } from '../../utils/confirmDelete'
 import { askConfirm } from '../../store/confirmStore'
 import EntityImport from '../EntityImport'
 import ChatLayout from '../chat/ChatLayout'
 
-function BackgroundThumb({ referenceImages }) {
+function ReferenceThumb({ referenceImages }) {
   const [preview, setPreview] = useState(null)
   const ref = referenceImages?.[0]
 
@@ -24,13 +24,13 @@ function BackgroundThumb({ referenceImages }) {
   return <div className="entity-card-thumb entity-card-thumb-empty" />
 }
 
-export default function BackgroundList({ projectId, onNew, onEdit }) {
-  const backgrounds = useBackgroundStore(s => s.backgrounds)
-  const loaded = useBackgroundStore(s => s.loaded)
-  const remove = useBackgroundStore(s => s.remove)
-  const save = useBackgroundStore(s => s.save)
+export default function ReferenceList({ projectId, onNew, onEdit }) {
+  const references = useReferenceStore(s => s.references)
+  const loaded = useReferenceStore(s => s.loaded)
+  const remove = useReferenceStore(s => s.remove)
+  const save = useReferenceStore(s => s.save)
   const projects = useProjectStore(s => s.projects)
-  const scoped = backgrounds.filter(b => b.projectId === projectId && !b.comodin)
+  const scoped = references.filter(r => r.projectId === projectId)
 
   const [importing, setImporting] = useState(false)
   const [feedback, setFeedback] = useState('')
@@ -39,13 +39,13 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
 
   const candidates = projects
     .filter(p => p.id !== projectId)
-    .map(p => ({ id: p.id, name: p.name, count: backgrounds.filter(b => b.projectId === p.id && !b.comodin).length }))
+    .map(p => ({ id: p.id, name: p.name, count: references.filter(r => r.projectId === p.id).length }))
     .filter(p => p.count > 0)
 
   const importFrom = async (source) => {
-    const sourceItems = backgrounds.filter(b => b.projectId === source.id && !b.comodin)
+    const sourceItems = references.filter(r => r.projectId === source.id)
     const currentItems = scoped
-    const ok = await askConfirm(`¿sobreescribir los ${currentItems.length} fondos actuales con los ${sourceItems.length} fondos de "${source.name}"?`, { confirmLabel: "sobreescribir" })
+    const ok = await askConfirm(`¿sobreescribir las ${currentItems.length} referencias actuales con las ${sourceItems.length} de "${source.name}"?`, { confirmLabel: 'sobreescribir' })
     if (!ok) { setImporting(false); return }
     for (const item of currentItems) await remove(item.id)
     for (const item of sourceItems) {
@@ -53,16 +53,7 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
       await save({ ...rest, id: crypto.randomUUID(), projectId })
     }
     setImporting(false)
-    flash(`importados ${sourceItems.length} fondos de "${source.name}"`)
-  }
-
-  const copyToProject = async (bg, targetId) => {
-    await save({
-      ...bg,
-      id: crypto.randomUUID(),
-      projectId: targetId,
-      createdAt: new Date().toISOString(),
-    })
+    flash(`importadas ${sourceItems.length} referencias de "${source.name}"`)
   }
 
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
@@ -71,53 +62,38 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
     <ChatLayout>
       <div>
         <div className="section-header" style={{ justifyContent: 'space-between' }}>
-          <h1 className="ui-h1">fondos</h1>
+          <h1 className="ui-h1">referencias</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {feedback && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{feedback}</span>}
-            <button className="btn btn-primary" onClick={onNew}>nuevo fondo</button>
-            <button className="btn" onClick={() => setImporting(true)} title="traer los fondos de otro proyecto">importar</button>
+            <button className="btn btn-primary" onClick={onNew}>nueva referencia</button>
+            <button className="btn" onClick={() => setImporting(true)} title="traer las referencias de otro proyecto">importar</button>
           </div>
         </div>
 
       {scoped.length === 0 ? (
         <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
-          sin fondos aún. crea uno para empezar.
+          sin referencias aún. creá una para tenerla a mano al armar el prompt.
         </div>
       ) : (
         <div className="entity-grid">
-          {scoped.map(bg => (
+          {scoped.map(ref => (
             <div
-              key={bg.id}
+              key={ref.id}
               className="entity-card"
-              onClick={() => onEdit(bg)}
+              onClick={() => onEdit(ref)}
             >
-              <BackgroundThumb referenceImages={bg.referenceImages} />
+              <ReferenceThumb referenceImages={ref.referenceImages} />
               <div className="ui-h3">
-                {bg.name}
+                {ref.name}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                {bg.promptText || 'sin descripción'}
+                {ref.promptText || 'sin descripción'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <div className="color-dot" style={{ background: bg.color || '#999' }} />
-                  {projects.length > 1 && (
-                    <select
-                      className="input"
-                      style={{ fontSize: 10, maxWidth: 88, cursor: 'pointer', padding: '1px 2px', height: 'auto' }}
-                      value=""
-                      onClick={e => e.stopPropagation()}
-                      onChange={async (e) => { if (e.target.value) { await copyToProject(bg, e.target.value); e.target.value = '' } }}
-                      title="copiar a otro proyecto"
-                    >
-                      <option value="">copiar</option>
-                      {projects.filter(p => p.id !== projectId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  )}
-                </div>
+                <div className="color-dot" style={{ background: ref.color || '#999' }} />
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
-                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(bg.name, isInCloud(bg, projects))) remove(bg.id) }}
+                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(ref.name, isInCloud(ref, projects))) remove(ref.id) }}
                 >
                   ×
                 </button>
@@ -127,7 +103,7 @@ export default function BackgroundList({ projectId, onNew, onEdit }) {
         </div>
       )}
       {importing && (
-        <EntityImport kindLabel="fondos" candidates={candidates} onImport={importFrom} onClose={() => setImporting(false)} />
+        <EntityImport kindLabel="referencias" candidates={candidates} onImport={importFrom} onClose={() => setImporting(false)} />
       )}
       </div>
     </ChatLayout>

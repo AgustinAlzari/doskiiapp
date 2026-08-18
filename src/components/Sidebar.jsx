@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import useChatStore from '../store/chatStore'
 import doskiiIcon from '../assets/doskii_icon.png'
+import doskiiSerio from '../assets/doskii_serio.png'
+import doskiiMareado from '../assets/doskii_mareado.png'
 
 const STATUS_UI = {
   idle: { label: 'hecho' },
@@ -14,9 +16,45 @@ const STATUS_UI = {
 export default function Sidebar({ currentView, onNavigate, activeProject, onExitProject, onToggleMode }) {
   const [backupStatus, setBackupStatus] = useState(null)
   const [logoWidth, setLogoWidth] = useState(0)
+  const [logoState, setLogoState] = useState(0)
+  const [spinKey, setSpinKey] = useState(0)
   const boxRef = useRef(null)
   const chatOpen = useChatStore(s => s.open)
   const toggleChat = useChatStore(s => s.toggle)
+
+  const playFizz = () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (!Ctx) return
+      const ctx = new Ctx()
+      const dur = 0.22
+      const bufferSize = Math.floor(ctx.sampleRate * dur)
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+      const data = buffer.getChannelData(0)
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize)
+      const src = ctx.createBufferSource()
+      src.buffer = buffer
+      const bp = ctx.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.setValueAtTime(2400, ctx.currentTime)
+      bp.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + dur)
+      bp.Q.value = 1.2
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.12, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur)
+      src.connect(bp)
+      bp.connect(gain)
+      gain.connect(ctx.destination)
+      src.start()
+      setTimeout(() => { try { ctx.close() } catch {} }, dur * 1000 + 60)
+    } catch {}
+  }
+
+  const cycleLogo = () => {
+    setLogoState((s) => (s + 1) % 3)
+    setSpinKey((k) => k + 1)
+    playFizz()
+  }
 
   useEffect(() => {
     const api = window.api?.backup
@@ -37,6 +75,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     { id: 'backgrounds', label: 'fondos', active: ['backgrounds', 'new-background', 'edit-background'] },
     { id: 'objects', label: 'objetos', active: ['objects', 'new-object', 'edit-object'] },
     { id: 'balloons', label: 'globos', active: ['balloons', 'new-balloon', 'edit-balloon'] },
+    { id: 'references', label: 'referencias', active: ['references', 'new-reference', 'edit-reference'] },
     { id: 'export', label: 'preview y export', active: ['export'], divider: true },
     { id: 'authors', label: 'autores', active: ['authors', 'new-author', 'edit-author'], divider: true },
     { id: 'projects', label: 'proyectos', active: ['projects'] },
@@ -64,18 +103,24 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
     }}>
       <div ref={boxRef} style={{ marginBottom: 8 }}>
         <div style={{ paddingLeft: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <img
-              src={doskiiIcon}
-              alt=""
-              draggable={false}
-              style={{
-                width: logoWidth,
-                height: logoWidth,
-                display: 'block',
-                objectFit: 'contain',
-              }}
-            />
+          <div
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none', position: 'relative' }}
+            onClick={cycleLogo}
+            title="doskii"
+          >
+            <span key={spinKey} className="doski-spin" style={{ display: 'block', lineHeight: 0 }}>
+              <img
+                src={logoState === 0 ? doskiiIcon : logoState === 1 ? doskiiSerio : doskiiMareado}
+                alt=""
+                draggable={false}
+                style={{
+                  width: logoWidth,
+                  height: logoWidth,
+                  display: 'block',
+                  objectFit: 'contain',
+                }}
+              />
+            </span>
             <div
               style={{
                 fontSize: 18,
@@ -83,6 +128,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
                 letterSpacing: '-0.02em',
                 color: 'var(--color-title)',
                 whiteSpace: 'nowrap',
+                transition: 'color 0.28s ease',
               }}
             >
               doskii

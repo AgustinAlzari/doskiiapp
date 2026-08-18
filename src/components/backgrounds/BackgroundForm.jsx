@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
-import AutoTextarea from '../editor/AutoTextarea'
+import SpellCheckedTextarea from '../SpellCheckedTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 import { LANDSCAPE_EXTRACTOR_PROMPT } from '../../data/landscapeExtractorPrompt'
 import { copyToClipboard } from '../../utils/clipboard'
+import useAutoSaveBack from '../../utils/useAutoSaveBack'
+import FormShade from '../FormShade'
 import ChatLayout from '../chat/ChatLayout'
 
 export default function BackgroundForm({ background, projectId, onCancel }) {
   const save = useBackgroundStore(s => s.save)
+  const remove = useBackgroundStore(s => s.remove)
+  const backgrounds = useBackgroundStore(s => s.backgrounds)
   const isNew = !background?.id
 
   const [name, setName] = useState(background?.name || '')
@@ -37,11 +41,22 @@ export default function BackgroundForm({ background, projectId, onCancel }) {
     setTimeout(() => setSavedFlash(false), 2000)
   }
 
+  const payload = () => ({ ...background, id: savedId || crypto.randomUUID(), projectId: background?.projectId || projectId, name, promptText, color, referenceImages })
+  const { goBack } = useAutoSaveBack({
+    save,
+    remove,
+    payload,
+    fields: ['name', 'promptText', 'color', 'referenceImages'],
+    hasContent: !!name.trim(),
+    getStored: (id) => backgrounds.find(b => b.id === id) || null,
+    onBack: onCancel,
+  })
+
   return (
     <ChatLayout>
       <div style={{ maxWidth: 520 }}>
         <div className="section-header">
-          <button className="back-arrow" onClick={onCancel} title="volver">←</button>
+          <button className="back-arrow" onClick={goBack} title="volver">←</button>
           <h1 className="ui-h1">
             {isNew ? 'nuevo fondo' : 'editar fondo'}
           </h1>
@@ -59,6 +74,7 @@ export default function BackgroundForm({ background, projectId, onCancel }) {
           />
         </div>
 
+        <FormShade active={!!name.trim()} hint="colocá un nombre para poder editar el resto">
         <ReferenceImagePicker entityId={draftId} entityName={name} value={referenceImages} onChange={setReferenceImages} />
 
         <div>
@@ -73,7 +89,7 @@ export default function BackgroundForm({ background, projectId, onCancel }) {
               {copied ? 'copiado ✓' : 'copiar extractor'}
             </button>
           </div>
-          <AutoTextarea
+          <SpellCheckedTextarea
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describe el fondo: ambiente, iluminación, época, estilo..."
@@ -109,6 +125,7 @@ export default function BackgroundForm({ background, projectId, onCancel }) {
             {saving ? 'guardando...' : savedFlash ? 'guardado ✓' : 'guardar'}
           </button>
         </div>
+        </FormShade>
       </form>
       </div>
     </ChatLayout>
