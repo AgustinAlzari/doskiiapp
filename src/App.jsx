@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import StripList from './components/StripList'
@@ -24,6 +24,7 @@ import ModelList from './components/ModelList'
 import SyncWizard from './components/SyncWizard'
 import useProjectStore from './store/projectStore'
 import useStripStore from './store/stripStore'
+import useTiraStore from './store/tiraStore'
 import useCharacterStore from './store/characterStore'
 import useBackgroundStore from './store/backgroundStore'
 import useObjectStore from './store/objectStore'
@@ -60,6 +61,7 @@ export default function App() {
   const [backupConfig, setBackupConfig] = useState(null)
   const [backupReady, setBackupReady] = useState(false)
   const setChatOpen = useChatStore(s => s.setOpen)
+  const userStartedRef = useRef(false)
 
   const reloadAllStores = async () => {
     await useProjectStore.getState().load()
@@ -69,6 +71,7 @@ export default function App() {
     await useBalloonStore.getState().load()
     await useReferenceStore.getState().load()
     await useStripStore.getState().load()
+    await useTiraStore.getState().load()
     await usePaletteStore.getState().load()
     await useAuthorStore.getState().load()
   }
@@ -126,6 +129,7 @@ export default function App() {
   const objects = useObjectStore(s => s.objects)
 
   const openProject = async (id) => {
+    userStartedRef.current = true
     const globalMode = backupConfig?.mode || 'online'
     if (activeProject) await persistMode(activeProject, globalMode)
     const proj = projects.find(p => p.id === id)
@@ -147,11 +151,13 @@ export default function App() {
   }
 
   const exitProject = () => {
+    userStartedRef.current = true
     setActiveProjectId(null)
     setView('projects')
   }
 
   const navigate = (section) => {
+    userStartedRef.current = true
     if (section === 'projects') { setView('projects'); return }
     if (!activeProject && SCOPED_VIEWS.includes(section) && section !== 'edit-project') return
     if (section === 'edit-project' && !activeProject) return
@@ -164,6 +170,7 @@ export default function App() {
     if (!projectsLoaded || !backupReady) return
     let active = true
     ;(async () => {
+      if (userStartedRef.current) return
       let blocker = false
       if (backupConfig?.mode === 'online' && window.api?.backup?.setupStatus) {
         try {
@@ -171,7 +178,7 @@ export default function App() {
           blocker = !diag.rcloneInstalled || !diag.remoteExists
         } catch {}
       }
-      if (!active) return
+      if (!active || userStartedRef.current) return
       if (blocker) { setView('sync'); return }
       let savedId = null
       try { savedId = localStorage.getItem('doski:lastProject') } catch {}
@@ -202,8 +209,9 @@ export default function App() {
   const renderProjectList = () => (
     <ProjectList
       onOpen={openProject}
-      onNew={() => { setActiveProjectId(null); setView('edit-project') }}
+      onNew={() => { userStartedRef.current = true; setActiveProjectId(null); setView('edit-project') }}
       onEdit={(project) => {
+        userStartedRef.current = true
         if (!project) { exitProject(); return }
         setActiveProjectId(project.id)
         setView('edit-project')

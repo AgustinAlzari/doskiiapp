@@ -129,6 +129,7 @@ function ensureDataDirs() {
   ensureDir(path.join(DATA_DIR, 'palettes'));
   ensureDir(path.join(DATA_DIR, 'authors'));
   ensureDir(path.join(DATA_DIR, 'references'));
+  ensureDir(path.join(DATA_DIR, 'tiras'));
 }
 
 function readJsonDir(dir) {
@@ -359,6 +360,27 @@ ipcMain.handle('strips:delete', async (_, id) => {
   return true;
 });
 
+// --- IPC: Tiras (agrupaciones de viñetas, funcionan como carpeta) ---
+ipcMain.handle('tiras:list', async () => {
+  ensureDataDirs();
+  const dir = path.join(DATA_DIR, 'tiras');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+});
+
+ipcMain.handle('tiras:save', async (_, tira) => {
+  ensureDataDirs();
+  const filePath = path.join(DATA_DIR, 'tiras', `${tira.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(tira, null, 2), 'utf-8');
+  backup.markDirty();
+  return tira;
+});
+
+ipcMain.handle('tiras:delete', async (_, id) => {
+  deleteEntityCloud('tiras', id);
+  return true;
+});
+
 // --- IPC: Save file dialog ---
 ipcMain.handle('dialog:save', async (_, { defaultPath, filters }) => {
   return await dialog.showSaveDialog(mainWindow, { defaultPath, filters });
@@ -367,6 +389,11 @@ ipcMain.handle('dialog:save', async (_, { defaultPath, filters }) => {
 // --- IPC: Open file dialog ---
 ipcMain.handle('dialog:open', async (_, { filters } = {}) => {
   return await dialog.showOpenDialog(mainWindow, { properties: ['openFile'], filters });
+});
+
+// --- IPC: Open directory dialog (para exportar por lotes a una carpeta) ---
+ipcMain.handle('dialog:open-directory', async () => {
+  return await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] });
 });
 
 // --- IPC: Backgrounds ---
@@ -540,6 +567,7 @@ ipcMain.handle('projects:deleteAll', async (_, projectId) => {
   deleteOwned(path.join(DATA_DIR, 'balloons'), 'balloons');
   deleteOwned(path.join(DATA_DIR, 'referenceDefs'), 'referenceDefs');
   deleteOwned(path.join(DATA_DIR, 'strips'), 'strips');
+  deleteOwned(path.join(DATA_DIR, 'tiras'), 'tiras');
   const p = path.join(DATA_DIR, 'projects', `${projectId}.json`);
   if (fs.existsSync(p)) fs.unlinkSync(p);
   if (projectCloud) cloudPaths.push(`projects/${projectId}.json`);
@@ -593,6 +621,16 @@ ipcMain.handle('projects:duplicate', async (_, projectId) => {
       updatedAt: new Date().toISOString(),
     });
   });
+  readJsonDir(path.join(DATA_DIR, 'tiras')).filter(t => t.projectId === projectId).forEach(tira => {
+    writeJsonFile(path.join(DATA_DIR, 'tiras'), {
+      ...tira,
+      id: crypto.randomUUID(),
+      projectId: newProjectId,
+      stripIds: (tira.stripIds || []).map(id => idMap[id] || id).filter(Boolean),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
   backup.markDirty();
   return newProject;
 });
@@ -606,6 +644,7 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
   const objects = readJsonDir(path.join(DATA_DIR, 'objects')).filter(o => o.projectId === projectId);
   const balloons = readJsonDir(path.join(DATA_DIR, 'balloons')).filter(b => b.projectId === projectId);
   const referenceDefs = readJsonDir(path.join(DATA_DIR, 'referenceDefs')).filter(r => r.projectId === projectId);
+  const tiras = readJsonDir(path.join(DATA_DIR, 'tiras')).filter(t => t.projectId === projectId);
 
   const refNames = new Set();
   [...characters, ...backgrounds, ...objects, ...balloons, ...referenceDefs].forEach(e => (e.referenceImages || []).forEach(r => {
@@ -630,6 +669,7 @@ ipcMain.handle('projects:export', async (_, { projectId, filePath }) => {
     objects,
     balloons,
     referenceDefs,
+    tiras,
     references,
   };
   fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');
@@ -659,6 +699,7 @@ ipcMain.handle('data:export-all', async (_, filePath) => {
     projects: readDir('projects'),
     referenceDefs: readDir('referenceDefs'),
     strips: readDir('strips'),
+    tiras: readDir('tiras'),
     references,
   };
   fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8');
@@ -704,6 +745,18 @@ ipcMain.handle('projects:import', async (_, filePath) => {
     }));
   });
 
+  (bundle.tiras || []).forEach(t => {
+    const newId = crypto.randomUUID();
+    writeJsonFile(path.join(DATA_DIR, 'tiras'), {
+      ...t,
+      id: newId,
+      projectId: newProjectId,
+      stripIds: (t.stripIds || []).map(id => idMap[id] || id).filter(Boolean),
+      createdAt: t.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
   const newProject = fixProjectBalloonPaths({
     ...bundle.project,
     id: newProjectId,
@@ -727,6 +780,14 @@ ipcMain.handle('references:save-svg', async (_, { fileName, svgContent }) => {
 // --- IPC: Save exported image to an arbitrary path chosen by the user ---
 ipcMain.handle('export:save', async (_, { filePath, data }) => {
   if (!filePath) return { ok: false };
+  fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+  return { ok: true, filePath };
+});
+
+// --- IPC: Save exported image inside a chosen directory (batch export) ---
+ipcMain.handle('export:save-to-dir', async (_, { dirPath, fileName, data }) => {
+  if (!dirPath || !fileName) return { ok: false };
+  const filePath = path.join(dirPath, fileName);
   fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
   return { ok: true, filePath };
 });

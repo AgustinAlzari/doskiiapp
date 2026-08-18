@@ -13,6 +13,7 @@ export default function ImagePreview({ src, title, onClose, gallery, index, onIn
   const [dragging, setDragging] = useState(false)
   const [panEnabled, setPanEnabled] = useState(true)
   const dragRef = useRef(null)
+  const movedRef = useRef(false)
   const containerRef = useRef(null)
 
   // Al cambiar de imagen (galería), resetear zoom/pan.
@@ -52,12 +53,14 @@ export default function ImagePreview({ src, title, onClose, gallery, index, onIn
 
   const onPointerDown = (e) => {
     if (!panEnabled) return
+    movedRef.current = false
     dragRef.current = { startX: e.clientX, startY: e.clientY, px: pan.x, py: pan.y }
     setDragging(true)
   }
   const onPointerMove = (e) => {
     if (!dragRef.current) return
     const d = dragRef.current
+    movedRef.current = true
     setPan({ x: d.px + (e.clientX - d.startX), y: d.py + (e.clientY - d.startY) })
   }
   const onPointerUp = () => { dragRef.current = null; setDragging(false) }
@@ -81,7 +84,7 @@ export default function ImagePreview({ src, title, onClose, gallery, index, onIn
       {/* Flecha de retorno: siempre arriba a la izquierda */}
       <button
         className="back-arrow"
-        style={{ position: 'absolute', top: 10, left: 14, zIndex: 2 }}
+        style={{ position: 'absolute', top: 10, left: 14, zIndex: 1000 }}
         onClick={onClose}
         title="volver / cerrar (Esc)"
       >←</button>
@@ -111,7 +114,11 @@ export default function ImagePreview({ src, title, onClose, gallery, index, onIn
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
           onDoubleClick={(e) => { e.stopPropagation(); reset() }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (movedRef.current) { movedRef.current = false; return }
+            onClose()
+          }}
         >
           <img
             src={cur.src}

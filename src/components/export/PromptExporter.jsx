@@ -58,8 +58,11 @@ export default function PromptExporter({ strip, characters, project, balloons })
       setTimeout(() => setCopiedImage(false), 2000)
     }
   }
-  const copyFirstResult = () => {
-    const r = (results || [])[0]
+  // Copia al portapapeles la imagen TILDADA (la que va a preview y export);
+  // si ninguna está tildada, copia el primer resultado.
+  const copyCoverResult = () => {
+    const idx = coverIndex >= 0 ? coverIndex : 0
+    const r = (results || [])[idx]
     if (r) copyResultImage(r)
   }
 
@@ -216,9 +219,13 @@ export default function PromptExporter({ strip, characters, project, balloons })
     else if (nextCover >= next.length) nextCover = next.length - 1
     persistResults(next, nextCover)
   }
+  // La ✓ elige qué resultado va a preview y export. Tildar la misma de nuevo la
+  // destilda (ninguna): la viñeta no aparece en preview y export, pero sus
+  // resultados siguen saliendo en "exportar todas".
   const selectCover = (idx) => {
-    setCoverIndex(idx)
-    saveStrip({ ...liveStrip, results: results || [], resultCoverIndex: idx })
+    const next = coverIndex === idx ? -1 : idx
+    setCoverIndex(next)
+    saveStrip({ ...liveStrip, results: results || [], resultCoverIndex: next })
   }
 
   // ---- referencias por panel ----
@@ -314,7 +321,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
               <button className="btn btn-sm" onClick={openUsedFolder} disabled={!usedFileNames.length}>
                 abrir carpeta
               </button>
-              <button className="btn btn-sm" onClick={copyFirstResult}>
+              <button className="btn btn-sm" onClick={copyCoverResult} title="copiar la imagen tildada (la que va a preview y export)">
                 {copiedImage ? 'copiado' : 'copiar'}
               </button>
             </>
@@ -352,7 +359,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
                   </span>
                   <span
                     onClick={(e) => { e.stopPropagation(); selectCover(idx) }}
-                    title={coverIndex === idx ? 'elegida: se muestra en preview y export' : 'elegir para preview y export'}
+                    title={coverIndex === idx ? 'destildar: no va a preview y export' : 'elegir para preview y export'}
                     style={{
                       position: 'absolute',
                       bottom: 6,
@@ -402,7 +409,12 @@ export default function PromptExporter({ strip, characters, project, balloons })
           </div>
           {(results || []).length > 1 && (
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
-              la imagen con ✓ es la que se muestra en preview y export.
+              la imagen con ✓ es la que se muestra en preview y export, y la que copia el botón copiar. tildá y destildá para elegir; destildada, la viñeta no aparece en preview y export pero sale en "exportar todas".
+            </div>
+          )}
+          {coverIndex === -1 && (results || []).length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
+              sin imagen elegida: esta viñeta no aparece en preview y export (queda como traza), pero sus resultados se exportan con "exportar todas".
             </div>
           )}
           </>

@@ -51,9 +51,9 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
   }
 
   const cycleLogo = () => {
-    setLogoState((s) => (s + 1) % 3)
     setSpinKey((k) => k + 1)
     playFizz()
+    setTimeout(() => setLogoState((s) => (s + 1) % 3), 250)
   }
 
   useEffect(() => {

@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('api', {
     save: (s) => ipcRenderer.invoke('strips:save', s),
     delete: (id) => ipcRenderer.invoke('strips:delete', id),
   },
+  tiras: {
+    list: () => ipcRenderer.invoke('tiras:list'),
+    save: (t) => ipcRenderer.invoke('tiras:save', t),
+    delete: (id) => ipcRenderer.invoke('tiras:delete', id),
+  },
   backgrounds: {
     list: () => ipcRenderer.invoke('backgrounds:list'),
     save: (b) => ipcRenderer.invoke('backgrounds:save', b),
@@ -53,6 +58,7 @@ contextBridge.exposeInMainWorld('api', {
   dialog: {
     save: (opts) => ipcRenderer.invoke('dialog:save', opts),
     open: (opts) => ipcRenderer.invoke('dialog:open', opts),
+    openDirectory: () => ipcRenderer.invoke('dialog:open-directory'),
   },
   clipboard: {
     write: (text) => ipcRenderer.invoke('clipboard:write', text),
@@ -72,6 +78,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   export: {
     save: (data) => ipcRenderer.invoke('export:save', data),
+    saveToDir: (data) => ipcRenderer.invoke('export:save-to-dir', data),
   },
   data: {
     exportAll: (filePath) => ipcRenderer.invoke('data:export-all', filePath),

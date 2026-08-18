@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { exportCleanImage, slugify, FORMAT_EXT } from '../services/imageExport'
+import { exportCleanImage, exportCleanImages, slugify, FORMAT_EXT } from '../services/imageExport'
 import ImagePreview from './ImagePreview'
 
 const FORMATS = [
@@ -59,9 +59,17 @@ export default function GalleryPreview({ items, author, onClose }) {
   const exportAll = async () => {
     setExportOpen(false)
     setExporting('all')
-    for (let i = 0; i < items.length; i++) {
-      const res = await doExport(items[i], i)
-      if (!res) break // el usuario canceló el diálogo
+    try {
+      const f = FORMATS.find(x => x.id === format)
+      const pad = String(items.length).length
+      const batch = items.map((item, i) => ({
+        sourcePath: item.path,
+        title: item.stripTitle,
+        fileName: `${String(i + 1).padStart(pad, '0')}-${slugify(item.stripTitle)}.${FORMAT_EXT[format]}`,
+      }))
+      await exportCleanImages({ items: batch, author, format, quality: f?.quality })
+    } catch (e) {
+      console.error('export todas falló:', e)
     }
     setExporting(null)
   }
