@@ -21,11 +21,8 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
     return nums
   })()
 
-  const setDialoguePreset = (pos) => {
-    const width = panelChar.dialoguePos?.width || 0.26
-    const height = panelChar.dialoguePos?.height || 0.1
-    const x = panelChar.dialoguePos?.x ?? (panelChar.x + panelChar.width / 2 - width / 2)
-    onUpdate({ dialoguePos: { x, y: pos === 'top' ? 0.02 : 0.88, width, height } })
+  const toggleSpeaksFirst = () => {
+    onUpdate({ speaksFirst: !panelChar.speaksFirst })
   }
 
   const toggleAction = (action) => {
@@ -209,18 +206,11 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
           </label>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
-              className={`btn btn-sm ${panelChar.dialoguePos?.y < 0.2 ? '' : 'btn-ghost'}`}
-              onClick={() => setDialoguePreset('top')}
+              className={`btn btn-sm ${panelChar.speaksFirst ? '' : 'btn-ghost'}`}
+              onClick={toggleSpeaksFirst}
               style={{ fontSize: 10, padding: '2px 6px' }}
             >
-              ↑ top
-            </button>
-            <button
-              className={`btn btn-sm ${panelChar.dialoguePos?.y > 0.8 ? '' : 'btn-ghost'}`}
-              onClick={() => setDialoguePreset('bottom')}
-              style={{ fontSize: 10, padding: '2px 6px' }}
-            >
-              ↓ bottom
+              habla primero
             </button>
           </div>
         </div>

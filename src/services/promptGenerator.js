@@ -189,6 +189,7 @@ export function orderedPanelDialogues(panel, characters = []) {
   const byInstance = new Map()
   const firstY = new Map()
   const speakerOrder = new Map()
+  const speaksFirst = new Map()
 
   panelCharacters.forEach((item, charIdx) => {
     const definition = characters.find(c => c.id === item.characterId)
@@ -199,6 +200,7 @@ export function orderedPanelDialogues(panel, characters = []) {
     if (!byInstance.has(name)) {
       byInstance.set(name, [])
       speakerOrder.set(name, speakerOrder.size)
+      speaksFirst.set(name, !!item.speaksFirst)
     }
     const total = stackCount.get(item.characterId) || 0
     const push = (dialogue) => {
@@ -223,6 +225,8 @@ export function orderedPanelDialogues(panel, characters = []) {
   })
 
   const speakers = [...byInstance.keys()].sort((a, b) => {
+    const sf = (speaksFirst.get(b) ? 1 : 0) - (speaksFirst.get(a) ? 1 : 0)
+    if (sf !== 0) return sf
     const byY = (firstY.get(a) ?? 0) - (firstY.get(b) ?? 0)
     if (byY !== 0) return byY
     return speakerOrder.get(a) - speakerOrder.get(b)
@@ -480,14 +484,18 @@ function stylePaletteLines(project, generalStyle, paletteColors) {
   return lines
 }
 
-function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author = null) {
+function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author = null, layoutName = '') {
   const lines = []
   if (panel.timeTransition) {
     const transition = TIME_TRANSITIONS.find(item => item.id === panel.timeTransition)
     if (transition) lines.push(`TIME TRANSITION: ${transition.label}.`)
   }
   if (panel.scene) lines.push(`SCENE: ${panel.scene}`)
-  if (panel.horizon) lines.push(`HORIZON LINE: at ${Math.round(panel.horizon.y * 100)}% of the panel height.${panel.horizon.description ? ` Description: ${panel.horizon.description}.` : ''} Draw behind landscape, characters, and objects.`)
+  if (panel.horizon) {
+    const ref = layoutName ? ` It is marked in the layout reference image "${layoutName}" by a full-width line behind all elements — place the horizon exactly there.` : ''
+    const style = styleText ? ` Draw it following the project's general style ("${styleText}") — hand-rendered like the rest of the scene, NOT as a perfectly straight ruler line.` : ''
+    lines.push(`HORIZON LINE: at ${Math.round(panel.horizon.y * 100)}% of the panel height, drawn as a full-width line always behind the landscape, characters, and objects.${panel.horizon.description ? ` Description: ${panel.horizon.description}.` : ''}${ref}${style} Draw it behind landscape, characters, and objects.`)
+  }
 
   if (panel.shotType) {
     const shot = SHOT_TYPES.find(item => item.id === panel.shotType && item.scope === 'scene')
@@ -711,6 +719,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
     lines.push('')
     lines.push('DIALOGUE SEQUENCE — STRICT, MUST BE REPRODUCED EXACTLY (verbatim, in this logical order):')
     lines.push(`PHYSICAL PLACEMENT: follow "${layoutFileName}" for each balloon's exact position, size, and order on canvas (highest priority). The sequence below is the logical reading order only.`)
+    const handDrawnConnector = `Connect them with a short, thin connector tube drawn by hand with the same bold outline as the balloons. The tube enters BOTH balloons: each balloon's outline must be left OPEN where the tube meets it (the outline line is interrupted there so the tube passes through and links the two interiors — never drawn over a closed outline). Only the LAST balloon carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon from another speaker.`
     const lastByChar = {}
     let anyImage = false
     orderedDialogues.forEach((d, idx) => {
@@ -721,7 +730,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       const typeLabel = isImage ? 'image balloon' : (DIALOGUE_TYPE_LABELS[d.type] || d.type)
       const prev = lastByChar[d.name]
       const linked = prev != null
-        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. Connect them with a thin DASHED line (the comic "air" connector); only the LAST balloon of the speaker carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon from another speaker.`
+        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. ${handDrawnConnector}`
         : ''
       lastByChar[d.name] = d.number
       let styleRef = ''
@@ -733,7 +742,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
         ? (() => {
             const ch = (ctx.panelCharacters || [])[d.charIdx]
             const side = bubbleSideFromHead(d, ch) || 'UPPER'
-            return ` It is joined to the head of the speaker (${d.name}) by a trail of THREE small bubbles decreasing in size. The bubbles must emerge from the ${side} side of the character's head and point from the balloon down toward their head, following the connector in the layout. They must always stay visibly connected to the head — NEVER hanging loose or disconnected.`
+            return ` It is joined to the head of the speaker (${d.name}) by a trail of THREE small bubbles decreasing in size. The bubbles must emerge from the ${side} side of the character's head and point from the balloon down toward their head, following the bubble trail in the layout. They must always stay visibly connected to the head — NEVER hanging loose or disconnected.`
           })()
         : ` Its tail must point to the head of the speaker (${d.name}).`
       if (idx === 0) {
@@ -809,9 +818,9 @@ function letteringFinalCheck(hasImageBalloon, hasBubbleAnchor = false) {
     ? ' Also verify that every thought and image balloon is visibly connected to its speaker\'s head by its three bubbles — NEVER left hanging or disconnected.'
     : ''
   if (hasImageBalloon) {
-    return 'FINAL CHECK: Before finishing, verify every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector. IMAGE balloons must contain the described scene drawn STRICTLY inside them, with NO text, letters, or typography.' + bubbleCheck
+    return 'FINAL CHECK: Before finishing, verify every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by a short, thin connector tube. IMAGE balloons must contain the described scene drawn STRICTLY inside them, with NO text, letters, or typography.' + bubbleCheck
   }
-  return 'FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by the typical comic "air" connector used between consecutive balloons of the same speaker.' + bubbleCheck
+  return 'FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by a short, thin connector tube used between consecutive balloons of the same speaker.' + bubbleCheck
 }
 
 const LEGAL_NOTICE = 'IMPORTANT: I certify that I am the sole author and rightful owner of all images attached to this request and of the content of the prompt itself, and that I hold the rights to use them. I take full responsibility for any legal issue that may arise from this generation.'
@@ -830,7 +839,7 @@ export function generateScenePrompt(panel, characters = [], generalStyle, backgr
     ...stylePaletteLines(project, generalStyle, paletteColors),
     'LETTERING LOCK: This prompt describes the SCENE layer only, WITHOUT any dialogue or lettering. Do NOT draw any speech balloons, thought bubbles, narration boxes, captions, or sound-effect words. Do not write any text, letters, or typography anywhere in the image. Do not leave blank outlines, circles, or box placeholders hinting at future balloons. The scene must stand alone as a text-free panel; lettering is added later in a separate step.',
     '',
-    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author),
+    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author, layoutName),
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved, and with NO text, lettering, or balloons of any kind. Use "${layoutName}" strictly as a spatial guide for where each scene element sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,
   ]
@@ -865,7 +874,7 @@ export function generatePanelPrompt(panel, characters = [], generalStyle, backgr
   const lines = [
     ...headerLines(ctx, layoutName, strip),
     ...stylePaletteLines(project, generalStyle, paletteColors),
-    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author),
+    ...sceneBodyLines(ctx, panel, styleText, paletteColors, author, layoutName),
     ...letteringLines(ctx, panel, project, layoutName, balloons, generalStyle, paletteColors),
     '',
     `FINAL REMINDER: Generate a single comic panel in ${ctx.ratioLabel} aspect ratio with clear composition, correct layering, and spatial relationships preserved. Use "${layoutName}" strictly as a spatial guide for where each element (including balloons) sits — do NOT copy its figures, lines, or graphic aspects. DO NOT CHANGE THE ASPECT RATIO.`,

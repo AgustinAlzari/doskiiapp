@@ -40,6 +40,11 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
   const svgH = Math.round(svgW * (ratioParts[1] / ratioParts[0]))
 
   const rects = []
+  const backLines = []
+
+  if (panel.horizon) {
+    backLines.push({ y: Math.round(panel.horizon.y * svgH), label: 'horizonte' })
+  }
 
   if (mode === 'scene') {
     if (panel.backgroundId) {
@@ -86,6 +91,11 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}">`
   svg += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="white" stroke="#000" stroke-width="1"/>`
+
+  backLines.forEach(l => {
+    svg += `<line x1="0" y1="${l.y}" x2="${svgW}" y2="${l.y}" stroke="#7f8c8d" stroke-width="1.5"/>`
+    svg += `<text x="${svgW - 4}" y="${l.y - 3}" text-anchor="end" font-family="monospace" font-size="9" fill="#7f8c8d">${l.label}</text>`
+  })
 
   rects.forEach(r => {
     const dash = r.dash ? ` stroke-dasharray="${r.dash}"` : ''
