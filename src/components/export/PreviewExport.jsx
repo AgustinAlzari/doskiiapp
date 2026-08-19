@@ -294,15 +294,17 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   return (
     <ChatLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Encabezado + slider: fijos al scrollear (fondo blanco desde arriba, esconde lo que pasa debajo) */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 500, background: 'var(--color-bg)', paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Encabezado */}
-      <div className="section-header" style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <h1 className="ui-h1" style={{ marginBottom: 4 }}>preview y export</h1>
+      <div className="section-header" style={{ flexWrap: 'wrap', alignItems: 'center', marginBottom: 0, justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 220, flex: 1 }}>
+          <h1 className="ui-h1" style={{ marginBottom: 0 }}>preview y export</h1>
           {project?.name && (
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{project.name}</div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} data-no-deselect="1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} data-no-deselect="1">
           <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{allItems.length} {allItems.length === 1 ? 'resultado' : 'resultados'}</span>
           <select className="input" style={{ width: 'auto', fontSize: 12, cursor: 'pointer' }} value={format} onChange={e => setFormat(e.target.value)} title="PNG = lossless (máxima calidad)">
             {FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -340,6 +342,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           onChange={e => setTileScale(Number(e.target.value))}
           title="tamaño de las imágenes del mosaico"
         />
+      </div>
       </div>
 
       {/* Categoría tiras: carpetas que reúnen viñetas */}

@@ -161,6 +161,7 @@ export default function App() {
     if (section === 'projects') { setView('projects'); return }
     if (!activeProject && SCOPED_VIEWS.includes(section) && section !== 'edit-project') return
     if (section === 'edit-project' && !activeProject) return
+    if (section === 'export') useChatStore.getState().setOpen(false)
     setView(section)
   }
 
