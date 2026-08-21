@@ -287,6 +287,7 @@ export default function App() {
             backgrounds={backgrounds}
             objects={objects}
             focusStripId={selectedStripId}
+            onGoToStrips={() => setView('strips')}
           />
         )
 

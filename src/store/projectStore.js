@@ -32,7 +32,7 @@ export const makeDefaultProject = () => ({
   world: '',
   styleNotes: '',
   defaultAspectRatio: 'hd',
-  defaultPanelCount: 1,
+  previewGeneral: true,
   colorMode: 'bw',
   palette: [],
   paletteId: null,
@@ -158,6 +158,17 @@ const useProjectStore = create((set, get) => ({
     await migrate(useObjectStore, 'objects')
     await migrate(useBalloonStore, 'balloons')
     await migrate(useStripStore, 'strips')
+    // Viñetas multi-cuadro → un solo cuadro (el primero). Los cuadros extra se pierden.
+    for (const strip of useStripStore.getState().strips || []) {
+      const panels = strip.panels || []
+      if (panels.length !== 1) {
+        await useStripStore.getState().save({
+          ...strip,
+          panels: panels.slice(0, 1),
+          panelCount: 1,
+        })
+      }
+    }
     for (const project of get().projects) {
       if (project.balloons) {
         const { balloons, ...rest } = project

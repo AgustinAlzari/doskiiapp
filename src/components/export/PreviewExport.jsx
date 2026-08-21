@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import useStripStore from '../../store/stripStore'
 import useAuthorStore from '../../store/authorStore'
 import useTiraStore from '../../store/tiraStore'
-import { confirmDelete } from '../../utils/confirmDelete'
 import { exportCleanImage, exportCleanImages, resolveAuthor, slugify, FORMAT_EXT } from '../../services/imageExport'
 import ImagePreview from '../ImagePreview'
 import ChatLayout from '../chat/ChatLayout'
-import TiraCard from '../tiras/TiraCard'
-import TiraView from '../tiras/TiraView'
 import { coverOf } from '../../utils/stripCover'
+import TiraSelect from './TiraSelect'
 
 // PNG es lossless; JPEG/WebP exportan con el máximo factor de calidad.
 const FORMATS = [
@@ -17,37 +15,25 @@ const FORMATS = [
   { id: 'webp', label: 'WebP', quality: 1 },
 ]
 
+const GENERAL = '__general__'
 const keyOf = (stripId, resultId) => `${stripId}:${resultId}`
 
-// Mosaico puro: todas las imágenes del proyecto solas, en orden de lectura
-// (izquierda → derecha, arriba → abajo). Clic en una imagen → preview completo
-// con zoom, exportar limpio y usar como portada. Las tiras se arman con
-// "seleccionar" + "mover acá" (o ⌘V con la viñeta copiada).
-export default function PreviewExport({ project, strips, characters, backgrounds, objects, focusStripId }) {
+// Galería flotante de imágenes: muestra la unión de las tiras seleccionadas en
+// el desplegable de arriba (general + una o varias tiras, para ver
+// continuidades). Debajo de cada viñeta hay un desplegable para asignarle una
+// tira (ir a una tira, o volver a general).
+export default function PreviewExport({ project, strips, characters, backgrounds, objects, focusStripId, onGoToStrips }) {
   const saveStrip = useStripStore(s => s.save)
   const authors = useAuthorStore(s => s.authors)
   const author = useMemo(() => resolveAuthor(project, authors), [project, authors])
 
   const tiras = useTiraStore(s => s.tiras)
   const saveTira = useTiraStore(s => s.save)
-  const removeTira = useTiraStore(s => s.remove)
-  const createTira = useTiraStore(s => s.create)
+
   const scopedTiras = tiras.filter(t => t.projectId === project?.id)
-  const [openTiraId, setOpenTiraId] = useState(null)
-  const [editingTiraId, setEditingTiraId] = useState(null)
-  const openTira = openTiraId ? scopedTiras.find(t => t.id === openTiraId) || null : null
 
-  const addStripToTira = (tiraId, stripId) => {
-    const t = useTiraStore.getState().tiras.find(x => x.id === tiraId)
-    if (!t || (t.stripIds || []).includes(stripId)) return
-    saveTira({ ...t, stripIds: [...(t.stripIds || []), stripId] })
-  }
-
-  const newTira = async () => {
-    const n = scopedTiras.length + 1
-    const t = await createTira(project?.id, `tira ${n}`)
-    setEditingTiraId(t.id)
-  }
+  // Tiras seleccionadas que se muestran en el mosaico (general = viñetas sueltas).
+  const [selectedTiras, setSelectedTiras] = useState([GENERAL])
 
   const stripsState = useStripStore(s => s.strips)
   const liveStrips = useMemo(
@@ -55,16 +41,30 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     [strips, stripsState]
   )
 
-  // Viñetas dentro de alguna tira: "movidas" a una subcarpeta → se ocultan de la
-  // galería general (madre) y de exportar todas. Solo se ven sueltas las libres.
-  const inTiraIds = useMemo(
-    () => new Set(scopedTiras.flatMap(t => t.stripIds || [])),
-    [scopedTiras]
-  )
-  const looseStrips = useMemo(() => liveStrips.filter(s => !inTiraIds.has(s.id)), [liveStrips, inTiraIds])
+  // Qué tira contiene a cada viñeta (general = no está en ninguna).
+  const tiraOfStrip = useMemo(() => {
+    const map = {}
+    for (const t of scopedTiras) {
+      for (const id of (t.stripIds || [])) {
+        if (!map[id]) map[id] = t.id
+      }
+    }
+    return map
+  }, [scopedTiras])
+
+  const selectedSet = useMemo(() => new Set(selectedTiras), [selectedTiras])
+
+  // Viñetas visibles: unión de las tiras seleccionadas (general + varias tiras).
+  const visibleStrips = useMemo(() => {
+    return liveStrips.filter(s => {
+      const inTira = tiraOfStrip[s.id]
+      if (!inTira) return selectedSet.has(GENERAL)
+      return selectedSet.has(inTira)
+    })
+  }, [liveStrips, tiraOfStrip, selectedSet])
 
   const allItems = useMemo(
-    () => looseStrips.flatMap(s =>
+    () => visibleStrips.flatMap(s =>
       (s.results || []).map((r, idx) => ({
         key: keyOf(s.id, r.id),
         stripId: s.id,
@@ -75,11 +75,11 @@ export default function PreviewExport({ project, strips, characters, backgrounds
         pasted: r.pasted,
       }))
     ),
-    [looseStrips]
+    [visibleStrips]
   )
 
   const defaultItems = useMemo(
-    () => looseStrips.flatMap(s => {
+    () => visibleStrips.flatMap(s => {
       const results = s.results || []
       if (results.length === 0) return []
       const cover = coverOf(s)
@@ -104,7 +104,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
         pasted: cover.pasted,
       }]
     }),
-    [looseStrips]
+    [visibleStrips]
   )
 
   // Aplica el orden guardado (galleryOrder) y agrega al final lo que no está.
@@ -144,15 +144,20 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(new Set())
 
-  // Ids de viñetas de las imágenes seleccionadas (para "mover acá" en una tira).
-  const selectedStripIds = useMemo(
-    () => [...new Set(items.filter(it => selected.has(it.key)).map(it => it.stripId).filter(Boolean))],
-    [items, selected]
-  )
-
-  const moveSelectedToTira = (tiraId) => {
-    selectedStripIds.forEach(id => addStripToTira(tiraId, id))
-    setSelected(new Set())
+  // Asigna una viñeta a una tira (o la devuelve a general). Solo vive en una
+  // tira a la vez: sale de la actual antes de entrar a la elegida.
+  const assignStripTira = (stripId, tiraId) => {
+    const current = tiraOfStrip[stripId]
+    if (current) {
+      const t = scopedTiras.find(x => x.id === current)
+      if (t) saveTira({ ...t, stripIds: (t.stripIds || []).filter(id => id !== stripId) })
+    }
+    if (tiraId !== GENERAL) {
+      const t = scopedTiras.find(x => x.id === tiraId)
+      if (t && !(t.stripIds || []).includes(stripId)) {
+        saveTira({ ...t, stripIds: [...(t.stripIds || []), stripId] })
+      }
+    }
   }
 
   const toggleSelect = (key) => {
@@ -279,33 +284,27 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     .filter(it => srcs[it.key])
     .map(it => ({ src: srcs[it.key], title: `${it.stripTitle} · resultado ${it.resultIdx + 1}` }))
 
-  if (openTira) {
-    return (
-      <TiraView
-        tira={openTira}
-        strips={liveStrips}
-        project={project}
-        authors={authors}
-        onBack={() => setOpenTiraId(null)}
-      />
-    )
-  }
-
   return (
     <ChatLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Encabezado + slider: fijos al scrollear (fondo blanco desde arriba, esconde lo que pasa debajo) */}
       <div style={{ position: 'sticky', top: 0, zIndex: 500, background: 'var(--color-bg)', paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Encabezado */}
-      <div className="section-header" style={{ flexWrap: 'wrap', alignItems: 'center', marginBottom: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 220, flex: 1 }}>
-          <h1 className="ui-h1" style={{ marginBottom: 0 }}>preview y export</h1>
+      <div className="section-header" style={{ flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 0, justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, minWidth: 220, flex: 1 }}>
+          <h1 className="ui-h1" style={{ marginBottom: 0, lineHeight: 1 }}>preview y export</h1>
           {project?.name && (
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{project.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', paddingBottom: 2 }}>{project.name}</div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} data-no-deselect="1">
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{allItems.length} {allItems.length === 1 ? 'resultado' : 'resultados'}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flexShrink: 0 }} data-no-deselect="1">
+          <TiraSelect
+            tiras={scopedTiras}
+            strips={liveStrips}
+            value={selectedTiras}
+            onChange={setSelectedTiras}
+          />
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', paddingBottom: 2 }}>{allItems.length} {allItems.length === 1 ? 'resultado' : 'resultados'}</span>
           <select className="input" style={{ width: 'auto', fontSize: 12, cursor: 'pointer' }} value={format} onChange={e => setFormat(e.target.value)} title="PNG = lossless (máxima calidad)">
             {FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
           </select>
@@ -317,7 +316,6 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           >
             {selectMode ? 'listo' : 'seleccionar'}
           </button>
-          <button className="btn btn-sm" onClick={newTira} title="crear una tira: carpeta que reúne viñetas">nueva tira</button>
           {selectMode ? (
             <button className="btn btn-primary btn-sm" onClick={exportSelected} disabled={exportingAll || selected.size === 0}>
               {exportingAll ? 'exportando...' : `exportar seleccionadas (${selected.size})`}
@@ -345,41 +343,12 @@ export default function PreviewExport({ project, strips, characters, backgrounds
       </div>
       </div>
 
-      {/* Categoría tiras: carpetas que reúnen viñetas */}
-      {scopedTiras.length > 0 && (
-        <div data-no-deselect="1">
-          <div className="label" style={{ marginBottom: 8 }}>tiras</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-            {scopedTiras.map(t => (
-              <div key={t.id} style={{ position: 'relative' }}>
-                <TiraCard
-                  tira={t}
-                  strips={liveStrips}
-                  onOpen={() => setOpenTiraId(t.id)}
-                  onAddStrip={(stripId) => addStripToTira(t.id, stripId)}
-                  pendingStripIds={selectedStripIds}
-                  onMoveSelected={moveSelectedToTira}
-                  editing={editingTiraId === t.id}
-                  onDone={(title) => { saveTira({ ...t, title }); setEditingTiraId(null) }}
-                />
-                <button
-                  className="btn btn-ghost btn-sm btn-danger"
-                  style={{ position: 'absolute', top: 4, right: 4, zIndex: 2, background: '#fff' }}
-                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(t.title || 'tira', false)) removeTira(t.id) }}
-                  title="eliminar tira"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Mosaico puro */}
+      {/* Galería flotante de imágenes */}
       {items.length === 0 ? (
         <div className="card" style={{ padding: 16, fontSize: 13, color: 'var(--color-text-muted)' }}>
-          este proyecto no tiene resultados todavía. pegá la imagen que generó la IA en la vista de prompts de una viñeta.
+          {visibleStrips.length === 0
+            ? 'no hay viñetas en las tiras seleccionadas. elegí una tira en el desplegable de arriba.'
+            : 'este proyecto no tiene resultados todavía. pegá la imagen que generó la IA en la vista de prompts de una viñeta.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
@@ -452,6 +421,20 @@ export default function PreviewExport({ project, strips, characters, backgrounds
                 >
                   {selected.has(it.key) ? '✓' : ''}
                 </span>
+              )}
+              {/* Menú desplegable de tira: una tile por viñeta (su portada) */}
+              {!selectMode && (
+                <select
+                  className="input"
+                  value={tiraOfStrip[it.stripId] || GENERAL}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => { e.stopPropagation(); assignStripTira(it.stripId, e.target.value) }}
+                  title="asignar a una tira (o devolver a general)"
+                  style={{ width: '100%', fontSize: 11, marginTop: 4, cursor: 'pointer' }}
+                >
+                  <option value={GENERAL}>general</option>
+                  {scopedTiras.map(t => <option key={t.id} value={t.id}>{t.title || 'sin título'}</option>)}
+                </select>
               )}
             </div>
           ))}

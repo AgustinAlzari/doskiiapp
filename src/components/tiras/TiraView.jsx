@@ -22,10 +22,12 @@ const FORMATS = [
 // sueltas a tamaño natural (vista "preview y export", como siempre fue).
 export default function TiraView({ tira, strips, project, authors, onBack, onOpenStrip, asCards = false }) {
   const save = useTiraStore(s => s.save)
+  const tiras = useTiraStore(s => s.tiras)
   const copyStrip = useClipboardStore(s => s.copy)
   const removeStripStore = useStripStore(s => s.remove)
   const duplicate = useStripStore(s => s.duplicate)
   const projects = useProjectStore(s => s.projects)
+  const scopedTiras = tiras.filter(t => t.projectId === project?.id)
   const liveStrips = useMemo(
     () => strips.map(s => ({ ...s })).filter(s => (tira.stripIds || []).includes(s.id)),
     [strips, tira.stripIds]
@@ -120,6 +122,19 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
     update({ stripIds: (tira.stripIds || []).filter(id => id !== stripId) })
   }
 
+  // Asigna una viñeta a otra tira (o a general): sale de la actual antes de entrar.
+  const assignStripTira = (stripId, tiraId) => {
+    if (tiraId === tira.id) return
+    const current = tiras.find(x => x.id === tira.id)
+    if (current) save({ ...current, stripIds: (current.stripIds || []).filter(id => id !== stripId) })
+    if (tiraId) {
+      const target = tiras.find(x => x.id === tiraId)
+      if (target && !(target.stripIds || []).includes(stripId)) {
+        save({ ...target, stripIds: [...(target.stripIds || []), stripId] })
+      }
+    }
+  }
+
   const exportTira = async () => {
     setExporting(true)
     try {
@@ -204,6 +219,9 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
                 copied={copiedId === s.id}
                 removeTitle="eliminar viñeta"
                 onRemove={async (st) => { if (await confirmDelete(st.title || 'viñeta', isInCloud(st, projects))) removeStripStore(st.id) }}
+                tiraOptions={scopedTiras.map(t => ({ id: t.id, title: t.title }))}
+                tiraId={tira.id}
+                onAssignTira={assignStripTira}
               />
             ))}
           </div>

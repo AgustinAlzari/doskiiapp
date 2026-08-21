@@ -42,11 +42,20 @@ const useTiraStore = create((set, get) => ({
       projectId,
       title: title || 'tira',
       stripIds: [],
+      showInPreview: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       savedAt: new Date().toISOString(),
     }
     return get().save(tira)
+  },
+
+  // Asegura que el proyecto tenga su tira "borrador" por defecto.
+  ensureDefault: async (projectId) => {
+    if (!projectId) return
+    const exists = get().tiras.some(t => t.projectId === projectId && t.title === 'borrador')
+    if (exists) return
+    await get().create(projectId, 'borrador')
   },
 }))
 

@@ -23,7 +23,6 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
   const [world, setWorld] = useState(project?.world || '')
   const [styleNotes, setStyleNotes] = useState(project?.styleNotes || '')
   const [defaultAspectRatio, setDefaultAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
-  const [defaultPanelCount, setDefaultPanelCount] = useState(project?.defaultPanelCount || 1)
   const [colorMode, setColorMode] = useState(project?.colorMode || 'bw')
   const [palette, setPalette] = useState(project?.palette || [])
   const [paletteId, setPaletteId] = useState(project?.paletteId || null)
@@ -45,7 +44,6 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     world,
     styleNotes,
     defaultAspectRatio,
-    defaultPanelCount,
     colorMode,
     palette,
     paletteId,
@@ -67,7 +65,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
     save,
     remove: removeAll,
     payload: collect,
-    fields: ['name', 'synopsis', 'genre', 'drawingStyle', 'world', 'styleNotes', 'defaultAspectRatio', 'defaultPanelCount', 'colorMode', 'palette', 'paletteId', 'authorId', 'cloudBackup'],
+    fields: ['name', 'synopsis', 'genre', 'drawingStyle', 'world', 'styleNotes', 'defaultAspectRatio', 'colorMode', 'palette', 'paletteId', 'authorId', 'cloudBackup'],
     hasContent: !!name.trim(),
     getStored: (id) => projects.find(p => p.id === id) || null,
     onBack,
@@ -169,18 +167,6 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
             <select className="input" value={defaultAspectRatio} onChange={e => setDefaultAspectRatio(e.target.value)} style={{ cursor: 'pointer' }}>
               {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{aspectLabel(ar)}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="label">cuadros por defecto</label>
-            <input
-              type="number"
-              className="input"
-              value={defaultPanelCount}
-              onChange={e => setDefaultPanelCount(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
-              min={1}
-              max={12}
-              style={{ width: 80 }}
-            />
           </div>
         </div>
 

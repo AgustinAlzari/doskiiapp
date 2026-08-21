@@ -1,33 +1,91 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import useStripStore from '../../store/stripStore'
+import useTiraStore from '../../store/tiraStore'
+import { confirmDelete } from '../../utils/confirmDelete'
 import ChatLayout from '../chat/ChatLayout'
 import { ASPECT_RATIOS } from '../../data/actionPresets'
+
+const GENERAL = '__general__'
+
 export default function StripCreator({ project, onCreated, onBack }) {
   const save = useStripStore(s => s.save)
+  const strips = useStripStore(s => s.strips)
+  const tiras = useTiraStore(s => s.tiras)
+  const saveTira = useTiraStore(s => s.save)
+  const removeTira = useTiraStore(s => s.remove)
+  const createTira = useTiraStore(s => s.create)
   const [title, setTitle] = useState('')
-  const [panelCount, setPanelCount] = useState(project?.defaultPanelCount || 1)
+  const [tiraId, setTiraId] = useState(GENERAL)
   const [aspectRatio, setAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
+
+  const scopedTiras = tiras.filter(t => t.projectId === project?.id)
+  const scopedStrips = strips.filter(s => s.projectId === project?.id)
+  const inTiraIds = new Set(scopedTiras.flatMap(t => t.stripIds || []))
+  const looseStrips = scopedStrips.filter(s => !inTiraIds.has(s.id))
+
+  // Formato de la primera viñeta de la tira elegida (para general, la primera
+  // viñeta suelta). Si la tira está vacía, usa el formato del proyecto.
+  const firstStripAspectRatio = useMemo(() => {
+    if (tiraId === GENERAL) {
+      const first = looseStrips[0]
+      return first?.aspectRatio || project?.defaultAspectRatio || 'hd'
+    }
+    const tira = scopedTiras.find(t => t.id === tiraId)
+    const firstId = (tira?.stripIds || [])[0]
+    const first = scopedStrips.find(s => s.id === firstId)
+    return first?.aspectRatio || project?.defaultAspectRatio || 'hd'
+  }, [tiraId, looseStrips, scopedTiras, scopedStrips, project?.defaultAspectRatio])
+
+  // Al cambiar de tira, pre-cargar el formato compartido de esa tira.
+  const chooseTira = (id) => {
+    setTiraId(id)
+    const next = id === GENERAL
+      ? (looseStrips[0]?.aspectRatio || project?.defaultAspectRatio || 'hd')
+      : (() => {
+          const t = scopedTiras.find(x => x.id === id)
+          const first = scopedStrips.find(s => s.id === (t?.stripIds || [])[0])
+          return first?.aspectRatio || project?.defaultAspectRatio || 'hd'
+        })()
+    setAspectRatio(next)
+  }
+
+  const newTira = async () => {
+    const n = scopedTiras.length + 1
+    const t = await createTira(project?.id, `tira ${n}`)
+    chooseTira(t.id)
+  }
+
+  const deleteTira = async (id) => {
+    const t = tiras.find(x => x.id === id)
+    if (!t) return
+    if (!(await confirmDelete(t.title || 'tira', false))) return
+    await removeTira(id)
+    if (tiraId === id) setTiraId(GENERAL)
+  }
 
   const handleCreate = async () => {
     if (!title.trim()) return
-    const panels = Array.from({ length: panelCount }, (_, i) => ({
-      id: crypto.randomUUID(),
-      scene: '',
-      characters: [],
-      backgroundId: null,
-      objects: [],
-      narration: null,
-    }))
     const strip = {
       id: crypto.randomUUID(),
       projectId: project?.id,
       title,
-      panelCount,
+      panelCount: 1,
       aspectRatio,
-      panels,
+      panels: [{
+        id: crypto.randomUUID(),
+        scene: '',
+        characters: [],
+        backgroundId: null,
+        objects: [],
+        narration: null,
+      }],
       createdAt: new Date().toISOString(),
     }
     await save(strip)
+    if (tiraId !== GENERAL) {
+      const t = tiras.find(x => x.id === tiraId)
+      if (t) await saveTira({ ...t, stripIds: [...(t.stripIds || []), strip.id] })
+    }
     onCreated(strip)
   }
 
@@ -52,18 +110,19 @@ export default function StripCreator({ project, onCreated, onBack }) {
         </div>
 
         <div>
-          <label className="label">cantidad de cuadros</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <input
-              type="number"
-              className="input"
-              value={panelCount}
-              onChange={e => setPanelCount(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
-              min={1}
-              max={12}
-              style={{ width: 80 }}
-            />
-            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>máx. 12</span>
+          <label className="label">tira</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select className="input" style={{ flex: 1 }} value={tiraId} onChange={e => chooseTira(e.target.value)} title="a qué tira pertenece la viñeta">
+              <option value={GENERAL}>general</option>
+              {scopedTiras.map(t => <option key={t.id} value={t.id}>{t.title || 'sin título'}</option>)}
+            </select>
+            <button className="btn" onClick={newTira} title="crear una tira">+</button>
+            {tiraId !== GENERAL && (
+              <button className="btn" onClick={() => deleteTira(tiraId)} title="borrar la tira">×</button>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            el formato se comparte con la primera viñeta de la tira (cambiable acá o en el editor)
           </div>
         </div>
 
@@ -122,6 +181,11 @@ export default function StripCreator({ project, onCreated, onBack }) {
               </div>
             )
           })}
+          {firstStripAspectRatio && aspectRatio === firstStripAspectRatio && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+              formato de la tira
+            </div>
+          )}
         </div>
 
         <button className="btn btn-primary" onClick={handleCreate} disabled={!title.trim()}>
