@@ -34,6 +34,8 @@ function StripCover({ strip }) {
 
 // Ficha de viñeta única: la misma en la vista general de viñetas y dentro de una
 // tira, con toda su funcionalidad (clic abre el editor, ⧉ duplica, copiar y ×).
+// Si recibe `tiraOptions`/`tiraId`/`onAssignTira`, muestra debajo un menú
+// desplegable para asignar la viñeta a una tira (o devolverla a general).
 export default function StripCard({
   strip,
   idx,
@@ -53,6 +55,9 @@ export default function StripCard({
   onDragOver,
   onDrop,
   onDragEnd,
+  tiraOptions,
+  tiraId,
+  onAssignTira,
 }) {
   return (
     <div
@@ -127,20 +132,22 @@ export default function StripCard({
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 8 }}>
-        <div className="strip-card-dots">
-          {(strip.panels || []).slice(0, 10).map((p, i) => (
-            <div
-              key={p.id || i}
-              className={`strip-card-dot ${p.scene ? 'has-scene' : ''}`}
-              title={`cuadro ${i + 1}${p.scene ? ': ' + p.scene : ''}`}
-            />
+      {tiraOptions && onAssignTira && (
+        <select
+          data-no-drag
+          className="input"
+          value={tiraId || ''}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { e.stopPropagation(); onAssignTira(strip.id, e.target.value || null) }}
+          title="asignar a una tira (o devolver a general)"
+          style={{ width: '100%', fontSize: 11, marginTop: 8, cursor: 'pointer' }}
+        >
+          <option value="">general</option>
+          {tiraOptions.map(t => (
+            <option key={t.id} value={t.id}>{t.title || 'sin título'}</option>
           ))}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-          {strip.panels?.length || 0} cuadros
-        </div>
-      </div>
+        </select>
+      )}
     </div>
   )
 }

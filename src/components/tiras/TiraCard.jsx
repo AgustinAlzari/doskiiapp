@@ -5,7 +5,9 @@ import { coverOf } from '../../utils/stripCover'
 // Tarjeta "carpeta" de una tira: reúne viñetas bajo un título. Es un destino de
 // arrastre (tirar una viñeta encima la agrega) y también acepta pegar con ⌘V la
 // viñeta copiada. Si `editing` está activo, muestra un input de nombre enfocado.
-export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, onDone, pendingStripIds, onMoveSelected }) {
+// El toggle "mostrar a preview" (showInPreview) controla si sus viñetas se ven
+// en el mosaico de preview y export.
+export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, onDone, pendingStripIds, onMoveSelected, onTogglePreview }) {
   const [src, setSrc] = useState(null)
   // Muestra la ÚLTIMA viñeta agregada: al pegar/copiar una viñeta esta se
   // agrega al final, así la tarjeta refleja siempre la imagen recién pegada.
@@ -152,7 +154,20 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
               pegar
             </button>
           )}
-          <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>arrastrá o ⌘V</div>
+          <label
+            data-no-drag
+            onClick={(e) => e.stopPropagation()}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', marginLeft: 'auto' }}
+            title="mostrar las viñetas de esta tira en preview y export"
+          >
+            <input
+              type="checkbox"
+              checked={!!tira.showInPreview}
+              onChange={() => onTogglePreview?.(tira.id)}
+              style={{ cursor: 'pointer', accentColor: 'var(--color-text)' }}
+            />
+            mostrar a preview
+          </label>
         </div>
       </div>
     </div>

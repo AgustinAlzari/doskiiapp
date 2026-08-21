@@ -111,6 +111,7 @@ app.on('before-quit', async (e) => {
 // --- Data directory ---
 const DATA_DIR = path.join(app.getPath('appData'), 'dibuweb', 'data');
 const APP_DATA_DIR = path.join(app.getPath('appData'), 'dibuweb');
+const APP_ROOT = path.join(__dirname, '..');
 const backup = initBackup({
   dataDir: DATA_DIR,
   appDataDir: APP_DATA_DIR,
@@ -174,6 +175,23 @@ function safeRefName(entity, ref) {
   return clean || 'referencia';
 }
 
+// Resuelve la ruta de un archivo de referencia de forma independiente de la
+// máquina: prueba la ruta guardada y, si no existe (otra máquina, otro usuario),
+// busca por nombre de archivo en las carpetas de referencias (Electron y repo).
+function resolveRefPath(filePath) {
+  if (!filePath) return null;
+  if (fs.existsSync(filePath)) return filePath;
+  const base = path.basename(filePath);
+  const candidates = [
+    path.join(DATA_DIR, 'references', base),
+    path.join(APP_ROOT, 'data', 'references', base),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 function fixRefPaths(entity) {
   return {
     ...entity,
@@ -209,14 +227,8 @@ ipcMain.handle('references:import', async (_, { sourcePath, entityId, entityName
 });
 
 ipcMain.handle('references:read', async (_, filePath) => {
-  let resolved = filePath;
-  if (!filePath || !fs.existsSync(filePath)) {
-    if (filePath) {
-      const candidate = path.join(DATA_DIR, 'references', path.basename(filePath));
-      if (fs.existsSync(candidate)) resolved = candidate;
-    }
-  }
-  if (!resolved || !fs.existsSync(resolved)) return null;
+  const resolved = resolveRefPath(filePath);
+  if (!resolved) return null;
   const ext = path.extname(resolved).toLowerCase();
   const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png';
   return `data:${mime};base64,${fs.readFileSync(resolved).toString('base64')}`;
@@ -300,7 +312,7 @@ ipcMain.handle('characters:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'characters');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('characters:save', async (_, character) => {
@@ -339,12 +351,28 @@ ipcMain.handle('characters:delete', async (_, id) => {
   return true;
 });
 
+// Normaliza los paths de referencias de una entidad hacia la máquina actual
+// (otra máquina/u otro usuario → buscar por nombre de archivo).
+function normalizeRefPaths(entity) {
+  if (!entity) return entity;
+  const map = (ref) => {
+    if (!ref) return ref;
+    const resolved = resolveRefPath(ref.path);
+    if (resolved) return { ...ref, path: resolved };
+    return ref;
+  };
+  const next = { ...entity };
+  if (Array.isArray(next.results)) next.results = next.results.map(map);
+  if (Array.isArray(next.referenceImages)) next.referenceImages = next.referenceImages.map(map);
+  return next;
+}
+
 // --- IPC: Strips ---
 ipcMain.handle('strips:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'strips');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('strips:save', async (_, strip) => {
@@ -401,7 +429,7 @@ ipcMain.handle('backgrounds:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'backgrounds');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('backgrounds:save', async (_, background) => {
@@ -422,7 +450,7 @@ ipcMain.handle('objects:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'objects');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('objects:save', async (_, object) => {
@@ -443,7 +471,7 @@ ipcMain.handle('balloons:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'balloons');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('balloons:save', async (_, balloon) => {
@@ -464,7 +492,7 @@ ipcMain.handle('referenceDefs:list', async () => {
   ensureDataDirs();
   const dir = path.join(DATA_DIR, 'referenceDefs');
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  return files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  return files.map(f => normalizeRefPaths(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))));
 });
 
 ipcMain.handle('referenceDefs:save', async (_, ref) => {

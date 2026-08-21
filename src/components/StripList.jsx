@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useStripStore from '../store/stripStore'
 import useTiraStore from '../store/tiraStore'
 import useClipboardStore from '../store/clipboardStore'
@@ -21,11 +21,15 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const saveTira = useTiraStore(s => s.save)
   const removeTira = useTiraStore(s => s.remove)
   const createTira = useTiraStore(s => s.create)
+  const ensureDefault = useTiraStore(s => s.ensureDefault)
   const copyStrip = useClipboardStore(s => s.copy)
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
   const scopedTiras = tiras.filter(t => t.projectId === projectId)
+
+  // Tira "borrador" por defecto del proyecto.
+  useEffect(() => { ensureDefault(projectId) }, [projectId, ensureDefault])
   // Viñetas dentro de alguna tira: "movidas" a subcarpeta → se ocultan de la lista
   // general (madre); solo se ven sueltas las libres.
   const inTiraIds = new Set(scopedTiras.flatMap(t => t.stripIds || []))
@@ -47,6 +51,33 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
     if (!t) return
     if ((t.stripIds || []).includes(stripId)) return
     saveTira({ ...t, stripIds: [...(t.stripIds || []), stripId] })
+  }
+
+  // Qué tira contiene a cada viñeta (general = no está en ninguna).
+  const tiraIdOfStrip = useMemo(() => {
+    const map = {}
+    for (const t of scopedTiras) {
+      for (const id of (t.stripIds || [])) {
+        if (!map[id]) map[id] = t.id
+      }
+    }
+    return map
+  }, [scopedTiras])
+
+  // Asigna una viñeta a una tira (o la devuelve a general): sale de la tira
+  // actual antes de entrar a la elegida.
+  const assignStripTira = (stripId, tiraId) => {
+    const current = tiraIdOfStrip[stripId]
+    if (current) {
+      const t = tiras.find(x => x.id === current)
+      if (t) saveTira({ ...t, stripIds: (t.stripIds || []).filter(id => id !== stripId) })
+    }
+    if (tiraId) {
+      const t = tiras.find(x => x.id === tiraId)
+      if (t && !(t.stripIds || []).includes(stripId)) {
+        saveTira({ ...t, stripIds: [...(t.stripIds || []), stripId] })
+      }
+    }
   }
 
   const newTira = async () => {
@@ -178,6 +209,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
                   onAddStrip={(stripId) => addStripToTira(t.id, stripId)}
                   editing={editingTiraId === t.id}
                   onDone={(title) => { saveTira({ ...t, title }); setEditingTiraId(null) }}
+                  onTogglePreview={(tiraId) => { const tt = tiras.find(x => x.id === tiraId); if (tt) saveTira({ ...tt, showInPreview: !tt.showInPreview }) }}
                 />
                 <button
                   className="btn btn-ghost btn-sm btn-danger"
@@ -228,6 +260,9 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
               onCopy={doCopy}
               copied={copiedId === strip.id}
               onRemove={async (s) => { if (await confirmDelete(s.title || 'viñeta', isInCloud(s, projects))) remove(s.id) }}
+              tiraOptions={scopedTiras.map(t => ({ id: t.id, title: t.title }))}
+              tiraId={tiraIdOfStrip[strip.id] || ''}
+              onAssignTira={assignStripTira}
             />
           ))}
         </div>
