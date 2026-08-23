@@ -89,7 +89,7 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
         top: `${balloon.y * 100}%`,
         width: `${balloon.width * 100}%`,
         height: `${balloon.height * 100}%`,
-        zIndex: 14 + (balloon.z ?? 0),
+        zIndex: isSelected ? 9999 : 14 + (balloon.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
       title={`${balloon.label} — globo ${balloon.number}`}

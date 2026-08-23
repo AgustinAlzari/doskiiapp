@@ -84,7 +84,7 @@ export default function SignatureBlock({ signature, color, text, imagePath, isSe
     <div
       ref={blockRef}
       className={`signature-block ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
-      style={{ left: `${signature.x * 100}%`, top: `${signature.y * 100}%`, width: `${signature.width * 100}%`, height: `${signature.height * 100}%`, borderColor: border, zIndex: 13 + (signature.z ?? 0) }}
+      style={{ left: `${signature.x * 100}%`, top: `${signature.y * 100}%`, width: `${signature.width * 100}%`, height: `${signature.height * 100}%`, borderColor: border, zIndex: isSelected ? 9999 : 13 + (signature.z ?? 0) }}
       onMouseDown={handleMouseDown}
       title="firma"
     >

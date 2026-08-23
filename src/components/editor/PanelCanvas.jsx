@@ -148,24 +148,43 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
     ...(panel.globosX || []).map((g, i) => ({ key: `gx-${i}`, el: g, name: `X${i + 1}`, prio: (g.z ?? 0) * 10000 + BASE.gx + i, onSelect: () => onSelectGloboX?.(i), onMove: (x, y) => onMoveGloboX?.(i, { x, y }) })),
   ]
   const behindRects = blocks.filter(b => blocks.some(o => o !== b && o.prio > b.prio && overlap(b.el, o.el)))
-  const blockByKey = Object.fromEntries(blocks.map(b => [b.key, b]))
 
-  // Ciclo de selección por doble clic: si un elemento está detrás de otro, el
-  // doble clic sobre el de adelante selecciona el siguiente de la pila (el de
-  // atrás). Repetir el doble clic sobre la misma zona baja un puesto más.
-  const behindRef = useRef(null)
-  const selectBehind = useCallback((b) => {
-    if (!b) return
-    const stack = blocks
-      .filter(x => overlap(b.el, x.el))
-      .sort((a, z) => z.prio - a.prio)
-    if (stack.length < 2) return
-    let idx = 0
-    if (behindRef.current?.key === b.key) idx = behindRef.current.idx
-    idx = (idx + 1) % stack.length
-    behindRef.current = { key: b.key, idx }
-    stack[idx].onSelect()
-  }, [blocks])
+  // Doble clic a nivel del canvas (fase de captura, antes de los bloques):
+  // calcula todos los bloques bajo el punto, ordenados por prioridad, y
+  // selecciona el siguiente al actualmente seleccionado (el de atrás). Repetir
+  // el doble clic baja un puesto más.
+  const dblRef = useRef({ t: 0, x: 0, y: 0 })
+  const canvasMouseDownCapture = useCallback((e) => {
+    const now = Date.now()
+    const last = dblRef.current
+    const near = Math.hypot(e.clientX - last.x, e.clientY - last.y) < 10
+    if (now - last.t < 400 && near) {
+      dblRef.current = { t: 0, x: 0, y: 0 }
+      const canvas = canvasRef2.current
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect()
+        const px = (e.clientX - rect.left) / rect.width
+        const py = (e.clientY - rect.top) / rect.height
+        const stack = blocks
+          .filter(b => px >= b.el.x && px <= b.el.x + b.el.width && py >= b.el.y && py <= b.el.y + b.el.height)
+          .sort((a, z) => z.prio - a.prio)
+        if (stack.length >= 2) {
+          const currentKey =
+            selectedObjIdx != null ? `obj-${selectedObjIdx}` :
+            selectedCharIdx != null ? `char-${selectedCharIdx}` :
+            selectedSfxIdx != null ? `sfx-${selectedSfxIdx}` :
+            selectedGloboXIdx != null ? `gx-${selectedGloboXIdx}` : null
+          let idx = stack.findIndex(b => b.key === currentKey)
+          if (idx === -1) idx = 0
+          stack[(idx + 1) % stack.length].onSelect()
+        }
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      return
+    }
+    dblRef.current = { t: now, x: e.clientX, y: e.clientY }
+  }, [blocks, selectedObjIdx, selectedCharIdx, selectedSfxIdx, selectedGloboXIdx])
   const offFrameTabs = (() => {
     const tabs = []
     for (const b of blocks) {
@@ -325,7 +344,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
 
   return (
     <div ref={wrapperRef} style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div ref={setCanvasRef} className="panel-canvas" style={{ width: canvasW || '100%', height: canvasH || '100%' }} onMouseDown={e => { const t = e.target; if (t === e.currentTarget || (t.style.pointerEvents === 'none' && t.parentElement === e.currentTarget)) onCanvasClick?.() }}>
+      <div ref={setCanvasRef} className="panel-canvas" style={{ width: canvasW || '100%', height: canvasH || '100%' }} onMouseDownCapture={canvasMouseDownCapture} onMouseDown={e => { const t = e.target; if (t === e.currentTarget || (t.style.pointerEvents === 'none' && t.parentElement === e.currentTarget)) onCanvasClick?.() }}>
         <CompositionGuides grid={grid} visible={gridVisible} horizon={panel.horizon} onMoveHorizon={next => onUpdateHorizon?.({ ...panel.horizon, ...next })} />
         {panelBackground && backgroundDef && (
           <ObjectBlock
@@ -362,7 +381,6 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             sfx={s}
             isSelected={selectedSfxIdx === idx}
             onSelect={() => onSelectSfx(idx)}
-            onDoubleClick={() => selectBehind(blockByKey[`sfx-${idx}`])}
             onMove={(x, y) => onUpdateSfx(idx, { x, y })}
             onResize={(width, height) => onUpdateSfx(idx, { width, height })}
             onUpdate={(updates) => onUpdateSfx(idx, updates)}
@@ -439,7 +457,6 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
               objDef={objDef}
               isSelected={selectedObjIdx === idx}
               onSelect={() => onSelectObj(idx)}
-              onDoubleClick={() => selectBehind(blockByKey[`obj-${idx}`])}
               onMove={(x, y) => onUpdateObj(idx, { x, y })}
               onResize={(updates) => onUpdateObj(idx, updates)}
               onRemove={() => onRemoveObj?.(idx)}
@@ -459,7 +476,6 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
               charDef={charDef}
               isSelected={selectedCharIdx === idx}
               onSelect={() => onSelectChar(idx)}
-              onDoubleClick={() => selectBehind(blockByKey[`char-${idx}`])}
               onMove={(x, y) => onUpdateChar(idx, { x, y })}
               onResize={(updates) => onUpdateChar(idx, updates)}
               onRemove={() => onRemoveChar?.(idx)}
@@ -528,7 +544,6 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
               balloon={{ ...g, type: g.channel || 'speech', label: `X${textIdx || idx + 1}`, number: textIdx || idx + 1 }}
               isSelected={selectedGloboXIdx === idx}
               onSelect={() => onSelectGloboX?.(idx)}
-              onDoubleClick={() => selectBehind(blockByKey[`gx-${idx}`])}
               onMove={(x, y) => onMoveGloboX?.(idx, { x, y })}
               onResize={(updates) => onResizeGloboX?.(idx, updates)}
               onText={(text) => onTextGloboX?.(idx, text)}

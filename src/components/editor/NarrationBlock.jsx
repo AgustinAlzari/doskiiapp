@@ -85,7 +85,7 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         top: `${panelNarr.y * 100}%`,
         width: `${panelNarr.width * 100}%`,
         height: `${panelNarr.height * 100}%`,
-        zIndex: 2 + (panelNarr.z ?? 0),
+        zIndex: isSelected ? 9999 : 2 + (panelNarr.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >
