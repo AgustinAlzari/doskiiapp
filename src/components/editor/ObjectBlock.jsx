@@ -82,7 +82,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
         width: `${panelObj.width * 100}%`,
         height: `${panelObj.height * 100}%`,
         borderColor: objDef.color || 'var(--color-border)',
-        zIndex: isBackground ? 0 : 2 + (panelObj.z ?? 0),
+        zIndex: isBackground ? 0 : isSelected ? 9999 : 2 + (panelObj.z ?? 0),
         pointerEvents: isBackground ? 'none' : 'auto',
       }}
       onMouseDown={isBackground ? undefined : handleMouseDown}

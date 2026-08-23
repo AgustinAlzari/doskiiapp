@@ -107,7 +107,7 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
         top: `${panelChar.y * 100}%`,
         width: `${panelChar.width * 100}%`,
         height: `${panelChar.height * 100}%`,
-        zIndex: 2 + (panelChar.z ?? 0),
+        zIndex: isSelected ? 9999 : 2 + (panelChar.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >

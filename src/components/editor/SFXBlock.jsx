@@ -84,7 +84,7 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
         top: `${sfx.y * 100}%`,
         width: `${sfx.width * 100}%`,
         height: `${sfx.height * 100}%`,
-        zIndex: 14 + (sfx.z ?? 0),
+        zIndex: isSelected ? 9999 : 14 + (sfx.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
     >
