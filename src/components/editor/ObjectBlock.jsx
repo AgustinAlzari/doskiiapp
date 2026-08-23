@@ -1,15 +1,18 @@
 import { useRef, useState, useCallback } from 'react'
+import useDoubleClick from './useDoubleClick'
 
-export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, onMove, onResize, onRemove, onConnInEnd, showInputPort = true, isBackground = false }) {
+export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, onMove, onResize, onRemove, onConnInEnd, showInputPort = true, isBackground = false, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
+  const detectDbl = useDoubleClick(onDoubleClick)
 
   const handleMouseDown = useCallback((e) => {
     if (isResizingRef.current) return
+    if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -33,7 +36,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [panelObj, onSelect, onMove])
+  }, [panelObj, onSelect, onMove, detectDbl])
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()

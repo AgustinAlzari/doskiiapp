@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useStripStore from '../../store/stripStore'
+import useProjectStore from '../../store/projectStore'
 import useAuthorStore from '../../store/authorStore'
 import useTiraStore from '../../store/tiraStore'
 import { exportCleanImage, exportCleanImages, resolveAuthor, slugify, FORMAT_EXT } from '../../services/imageExport'
@@ -24,16 +25,23 @@ const keyOf = (stripId, resultId) => `${stripId}:${resultId}`
 // tira (ir a una tira, o volver a general).
 export default function PreviewExport({ project, strips, characters, backgrounds, objects, focusStripId, onGoToStrips }) {
   const saveStrip = useStripStore(s => s.save)
+  const saveProject = useProjectStore(s => s.save)
   const authors = useAuthorStore(s => s.authors)
   const author = useMemo(() => resolveAuthor(project, authors), [project, authors])
 
   const tiras = useTiraStore(s => s.tiras)
   const saveTira = useTiraStore(s => s.save)
+  const reorderTira = useTiraStore(s => s.reorder)
 
   const scopedTiras = tiras.filter(t => t.projectId === project?.id)
 
   // Tiras seleccionadas que se muestran en el mosaico (general = viñetas sueltas).
-  const [selectedTiras, setSelectedTiras] = useState([GENERAL])
+  // Arranca con las tiras marcadas "mostrar a preview" en viñetas (showInPreview),
+  // además de general: así el checkbox del sidebar se respeta en preview y export.
+  const [selectedTiras, setSelectedTiras] = useState(() => [
+    GENERAL,
+    ...tiras.filter(t => t.projectId === project?.id && t.showInPreview).map(t => t.id),
+  ])
 
   const stripsState = useStripStore(s => s.strips)
   const liveStrips = useMemo(
@@ -54,29 +62,34 @@ export default function PreviewExport({ project, strips, characters, backgrounds
 
   const selectedSet = useMemo(() => new Set(selectedTiras), [selectedTiras])
 
-  // Viñetas visibles: unión de las tiras seleccionadas (general + varias tiras).
-  const visibleStrips = useMemo(() => {
-    return liveStrips.filter(s => {
-      const inTira = tiraOfStrip[s.id]
-      if (!inTira) return selectedSet.has(GENERAL)
-      return selectedSet.has(inTira)
-    })
-  }, [liveStrips, tiraOfStrip, selectedSet])
-
-  const allItems = useMemo(
-    () => visibleStrips.flatMap(s =>
-      (s.results || []).map((r, idx) => ({
-        key: keyOf(s.id, r.id),
-        stripId: s.id,
-        stripTitle: s.title || 'sin título',
-        resultId: r.id,
-        resultIdx: idx,
-        path: r.path,
-        pasted: r.pasted,
-      }))
-    ),
-    [visibleStrips]
+  // Tiras seleccionadas que están vacías: se ven como tarjeta en el mosaico.
+  const emptySelectedTiras = useMemo(
+    () => scopedTiras.filter(t => selectedSet.has(t.id) && (t.stripIds || []).length === 0),
+    [scopedTiras, selectedSet]
   )
+
+  // Viñetas visibles: unión de las tiras seleccionadas (general + varias tiras),
+  // heredando el orden actual: las tiras en su propio orden (position), cada una
+  // con sus viñetas en el orden de stripIds, y al final las viñetas sueltas
+  // (general) en el orden de la lista de viñetas.
+  const visibleStrips = useMemo(() => {
+    const out = []
+    const seen = new Set()
+    for (const t of scopedTiras) {
+      if (!selectedSet.has(t.id)) continue
+      for (const id of (t.stripIds || [])) {
+        const s = liveStrips.find(x => x.id === id)
+        if (s && !seen.has(s.id)) { out.push(s); seen.add(s.id) }
+      }
+    }
+    if (selectedSet.has(GENERAL)) {
+      for (const s of liveStrips) {
+        const inTira = tiraOfStrip[s.id]
+        if (!inTira && !seen.has(s.id)) { out.push(s); seen.add(s.id) }
+      }
+    }
+    return out
+  }, [liveStrips, scopedTiras, tiraOfStrip, selectedSet])
 
   const defaultItems = useMemo(
     () => visibleStrips.flatMap(s => {
@@ -117,6 +130,32 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     return [...keys.map(k => byKey[k]), ...rest]
   }, [defaultItems, project?.galleryOrder])
 
+  // Todos los resultados, en el orden del mosaico (items = portadas + galleryOrder),
+  // expandiendo cada viñeta en sus resultados. Es el orden que usan "exportar
+  // todas" y la galería del preview.
+  const allItems = useMemo(() => {
+    const orderIndex = new Map(items.map((it, i) => [it.stripId, i]))
+    const list = visibleStrips.flatMap(s =>
+      (s.results || []).map((r, idx) => ({
+        key: keyOf(s.id, r.id),
+        stripId: s.id,
+        stripTitle: s.title || 'sin título',
+        resultId: r.id,
+        resultIdx: idx,
+        path: r.path,
+        pasted: r.pasted,
+      }))
+    )
+    return list.sort((a, b) => {
+      const ia = orderIndex.get(a.stripId)
+      const ib = orderIndex.get(b.stripId)
+      if (ia == null && ib == null) return 0
+      if (ia == null) return 1
+      if (ib == null) return -1
+      return ia - ib
+    })
+  }, [visibleStrips, items])
+
   // Carga las fuentes (data URL) de cada imagen del mosaico.
   const [srcs, setSrcs] = useState({})
   useEffect(() => {
@@ -143,6 +182,57 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   const [tileScale, setTileScale] = useState(1)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(new Set())
+
+  // Reordenar el mosaico arrastrando: el orden queda guardado en project.galleryOrder.
+  const [dragIdx, setDragIdx] = useState(null)
+  const [insertIdx, setInsertIdx] = useState(null)
+  const dragOriginRef = useRef(null)
+
+  const persistOrder = (ordered) => {
+    const galleryOrder = ordered.map(it => it.key)
+    saveProject({ ...project, galleryOrder })
+  }
+
+  const onDragStart = (e, idx) => {
+    // Si el arrastre empieza sobre un control (select de tira), cancelarlo para
+    // que el clic del desplegable funcione aunque haya algo de movimiento.
+    if (dragOriginRef.current?.closest?.('select, button, [data-no-drag]')) {
+      e.preventDefault()
+      return
+    }
+    if (selectMode) return
+    setDragIdx(idx)
+    setInsertIdx(null)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const onDragOver = (e, idx) => {
+    if (dragIdx == null) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const before = e.clientX < rect.left + rect.width / 2
+    const next = before ? idx : idx + 1
+    if (next !== insertIdx) setInsertIdx(next)
+  }
+  const onDrop = (e, idx) => {
+    e.preventDefault()
+    if (dragIdx != null) {
+      let target = insertIdx
+      if (target == null) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        target = e.clientX < rect.left + rect.width / 2 ? idx : idx + 1
+      }
+      const next = [...items]
+      const [moved] = next.splice(dragIdx, 1)
+      let at = target > dragIdx ? target - 1 : target
+      at = Math.max(0, Math.min(next.length, at))
+      next.splice(at, 0, moved)
+      persistOrder(next)
+    }
+    setDragIdx(null)
+    setInsertIdx(null)
+  }
+  const onDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
   // Asigna una viñeta a una tira (o la devuelve a general). Solo vive en una
   // tira a la vez: sale de la actual antes de entrar a la elegida.
@@ -268,14 +358,8 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     if (i >= 0) setPreviewIdx(i)
   }
 
-  // Para tiles normales abre el preview; para tiles destildadas abre el primer
-  // resultado de la viñeta (así se puede volver a elegir una portada).
+  // Para tiles normales abre el preview.
   const openItem = (it) => {
-    if (it.none) {
-      const i = allItems.findIndex(x => x.stripId === it.stripId)
-      if (i >= 0) setPreviewIdx(i)
-      return
-    }
     openPreview(it.key)
   }
 
@@ -303,6 +387,13 @@ export default function PreviewExport({ project, strips, characters, backgrounds
             strips={liveStrips}
             value={selectedTiras}
             onChange={setSelectedTiras}
+            onReorder={(orderedIds) => {
+              reorderTira(project?.id, orderedIds)
+              // El orden de tiras del menú manda sobre el orden fino guardado
+              // (galleryOrder): se limpia para que la galería refleje el nuevo
+              // orden de tiras en vez de quedar clavada al orden viejo.
+              saveProject({ ...project, galleryOrder: [] })
+            }}
           />
           <span style={{ fontSize: 12, color: 'var(--color-text-muted)', paddingBottom: 2 }}>{allItems.length} {allItems.length === 1 ? 'resultado' : 'resultados'}</span>
           <select className="input" style={{ width: 'auto', fontSize: 12, cursor: 'pointer' }} value={format} onChange={e => setFormat(e.target.value)} title="PNG = lossless (máxima calidad)">
@@ -329,7 +420,7 @@ export default function PreviewExport({ project, strips, characters, backgrounds
       </div>
 
       {/* Control sutil del tamaño del mosaico */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '2px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '2px 0', gap: 8 }}>
         <input
           type="range"
           className="size-slider"
@@ -340,11 +431,12 @@ export default function PreviewExport({ project, strips, characters, backgrounds
           onChange={e => setTileScale(Number(e.target.value))}
           title="tamaño de las imágenes del mosaico"
         />
+        <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>arrastrá las imágenes para reordenar (se guarda el orden)</span>
       </div>
       </div>
 
       {/* Galería flotante de imágenes */}
-      {items.length === 0 ? (
+      {items.length === 0 && emptySelectedTiras.length === 0 ? (
         <div className="card" style={{ padding: 16, fontSize: 13, color: 'var(--color-text-muted)' }}>
           {visibleStrips.length === 0
             ? 'no hay viñetas en las tiras seleccionadas. elegí una tira en el desplegable de arriba.'
@@ -352,39 +444,55 @@ export default function PreviewExport({ project, strips, characters, backgrounds
         </div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
-          {items.map((it) => (
+          {emptySelectedTiras.map(t => (
+            <div
+              key={t.id}
+              style={{
+                width: 180,
+                height: 240,
+                border: '2px dashed var(--color-border-muted)',
+                borderRadius: 8,
+                background: 'rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: 12,
+                textAlign: 'center',
+              }}
+              title={`${t.title || 'sin título'} · tira vacía, sin viñetas todavía`}
+            >
+              <div style={{ fontSize: 22, color: 'var(--color-text-muted)' }}>▤</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{t.title || 'sin título'}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>tira vacía — sin viñetas todavía</div>
+            </div>
+          ))}
+          {items.map((it, idx) => (
             <div
               key={it.key}
               data-no-deselect="1"
+              draggable={!selectMode}
+              onMouseDown={(e) => { dragOriginRef.current = e.target }}
+              onDragStart={(e) => onDragStart(e, idx)}
+              onDragOver={(e) => onDragOver(e, idx)}
+              onDrop={(e) => onDrop(e, idx)}
+              onDragEnd={onDragEnd}
               onClick={() => selectMode ? toggleSelect(it.key) : openItem(it)}
               style={{
                 position: 'relative',
-                cursor: selectMode ? 'pointer' : 'zoom-in',
+                cursor: selectMode ? 'pointer' : 'grab',
+                opacity: dragIdx === idx ? 0.4 : 1,
               }}
-              title={selectMode ? (selected.has(it.key) ? 'quitar selección' : 'seleccionar') : (it.none ? 'destildada: elegir portada para que vuelva a preview y export' : 'ver en grande')}
+              title={selectMode ? (selected.has(it.key) ? 'quitar selección' : 'seleccionar') : 'ver en grande — arrastrala para reordenar'}
             >
-              {it.none ? (
-                <div
-                  style={{
-                    width: 180,
-                    height: 240,
-                    border: '2px dashed var(--color-border-muted)',
-                    borderRadius: 8,
-                    background: 'rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: 12,
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-2)' }}>{it.stripTitle}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>sin exportar</div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>click: elegir portada</div>
-                </div>
-              ) : (srcs[it.key] ? (
+              {dragIdx != null && insertIdx === idx && (
+                <span style={{ position: 'absolute', left: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+              )}
+              {dragIdx != null && insertIdx === idx + 1 && (
+                <span style={{ position: 'absolute', right: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+              )}
+              {srcs[it.key] ? (
                 <img
                   src={srcs[it.key]}
                   alt=""
@@ -394,11 +502,11 @@ export default function PreviewExport({ project, strips, characters, backgrounds
                     maxWidth: '100%',
                     objectFit: 'contain',
                     display: 'block',
-                    cursor: selectMode ? 'pointer' : 'zoom-in',
+                    cursor: selectMode ? 'pointer' : 'grab',
                     userSelect: 'none',
                   }}
                 />
-              ) : null)}
+              ) : null}
               {selectMode && (
                 <span
                   style={{

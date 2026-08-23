@@ -7,16 +7,19 @@ import { coverOf } from '../../utils/stripCover'
 // viñeta copiada. Si `editing` está activo, muestra un input de nombre enfocado.
 // El toggle "mostrar a preview" (showInPreview) controla si sus viñetas se ven
 // en el mosaico de preview y export.
-export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, onDone, pendingStripIds, onMoveSelected, onTogglePreview }) {
+// Con `general` es la tarjeta del directorio base (las viñetas sueltas): no es
+// una tira real, no se abre ni tiene toggle; `count` viene de afuera.
+export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, onDone, pendingStripIds, onMoveSelected, onTogglePreview, general, count }) {
   const [src, setSrc] = useState(null)
-  // Muestra la ÚLTIMA viñeta agregada: al pegar/copiar una viñeta esta se
-  // agrega al final, así la tarjeta refleja siempre la imagen recién pegada.
+  // Muestra la ÚLTIMA viñeta agregada que tenga portada: al pegar/copiar una
+  // viñeta esta se agrega al final, así la tarjeta refleja siempre la imagen
+  // recién pegada. Si la última no tiene resultado, busca la anterior con uno.
   const stripIds = tira.stripIds || []
   const stripsById = (id) => strips.find(s => s.id === id)
   const foundStrips = stripIds.map(stripsById).filter(Boolean)
-  const lastStrip = foundStrips[foundStrips.length - 1]
+  const lastStrip = [...foundStrips].reverse().find(s => coverOf(s)) || foundStrips[foundStrips.length - 1]
   const cover = coverOf(lastStrip)
-  const count = (tira.stripIds || []).length
+  const shownCount = count != null ? count : stripIds.length
   const pending = Array.isArray(pendingStripIds) ? pendingStripIds.filter(id => !(tira.stripIds || []).includes(id)) : []
 
   const copiedStripId = useClipboardStore(s => s.copiedStripId)
@@ -63,7 +66,7 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
   return (
     <div
       tabIndex={0}
-      onClick={() => { if (!editing) onOpen() }}
+      onClick={() => { if (!editing && onOpen) onOpen() }}
       onKeyDown={handleKeyDown}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOver(true) }}
       onDragLeave={() => setOver(false)}
@@ -81,14 +84,16 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
         const id = e.dataTransfer.getData('application/x-doski-strip')
         if (id) onAddStrip?.(id)
       }}
-      title={count > 0 ? 'abrir la tira (⌘V para pegar una viñeta copiada)' : 'tira vacía: arrastrá viñetas acá'}
+      title={general
+        ? (shownCount > 0 ? `${shownCount} ${shownCount === 1 ? 'viñeta' : 'viñetas'} sueltas — arrastrá acá una viñeta para devolverla a general` : 'directorio base — las viñetas que no están en ninguna tira')
+        : (shownCount > 0 ? 'abrir la tira (⌘V para pegar una viñeta copiada)' : 'tira vacía: arrastrá viñetas acá')}
       style={{
         width: 190,
         minHeight: 200,
         border: over ? '2px solid var(--color-text)' : '2px dashed var(--color-border)',
         borderRadius: 10,
         background: 'rgba(0,0,0,0.02)',
-        cursor: editing ? 'default' : 'pointer',
+        cursor: editing ? 'default' : (onOpen ? 'pointer' : 'default'),
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -114,7 +119,7 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
         )}
       </div>
       <div style={{ padding: 8 }}>
-        {editing ? (
+        {editing && !general ? (
           <input
             ref={inputRef}
             className="input"
@@ -131,7 +136,7 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
           </div>
         )}
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-          {count === 0 ? 'vacía' : `${count} ${count === 1 ? 'viñeta' : 'viñetas'}`}
+          {shownCount === 0 ? 'vacía' : `${shownCount} ${shownCount === 1 ? 'viñeta' : 'viñetas'}`}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
           {pending.length > 0 && (
@@ -154,20 +159,22 @@ export default function TiraCard({ tira, strips, onOpen, onAddStrip, editing, on
               pegar
             </button>
           )}
-          <label
-            data-no-drag
-            onClick={(e) => e.stopPropagation()}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', marginLeft: 'auto' }}
-            title="mostrar las viñetas de esta tira en preview y export"
-          >
-            <input
-              type="checkbox"
-              checked={!!tira.showInPreview}
-              onChange={() => onTogglePreview?.(tira.id)}
-              style={{ cursor: 'pointer', accentColor: 'var(--color-text)' }}
-            />
-            mostrar a preview
-          </label>
+          {!general && onTogglePreview && (
+            <label
+              data-no-drag
+              onClick={(e) => e.stopPropagation()}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', marginLeft: 'auto' }}
+              title="mostrar las viñetas de esta tira en preview y export"
+            >
+              <input
+                type="checkbox"
+                checked={!!tira.showInPreview}
+                onChange={() => onTogglePreview?.(tira.id)}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-text)' }}
+              />
+              mostrar a preview
+            </label>
+          )}
         </div>
       </div>
     </div>

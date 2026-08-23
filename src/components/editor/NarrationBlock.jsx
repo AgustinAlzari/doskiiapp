@@ -1,15 +1,21 @@
-import { useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
-export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove, onResize, onRemove }) {
+export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove, onResize, onRemove, onText }) {
   const blockRef = useRef(null)
+  const textRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
 
+  useEffect(() => {
+    if (isSelected && textRef.current) textRef.current.focus()
+  }, [isSelected])
+
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
+    if (e.target.tagName === 'TEXTAREA') return
     if (isResizingRef.current) return
     e.stopPropagation()
     onSelect()
@@ -89,9 +95,21 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         </span>
       </div>
 
-      <div className="char-block-body" style={{ fontSize: 10, padding: '2px 6px', textAlign: 'center', lineHeight: 1.3 }}>
-        {panelNarr.text || '...'}
-      </div>
+      <textarea
+          ref={textRef}
+          className="narration-editor"
+          value={panelNarr.text || ''}
+          placeholder="texto del narrador..."
+          onChange={e => onText?.(e.target.value)}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+          onFocus={() => onSelect?.()}
+          spellCheck={false}
+          style={{
+            fontSize: `${Math.round(((panelNarr.fontSize ?? 1) * 10))}px`,
+            textAlign: (panelNarr.textX ?? 0) < 0 ? 'left' : (panelNarr.textX ?? 0) > 0 ? 'right' : 'center',
+          }}
+        />
 
       {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title="quitar narración">{'\u00D7'}</button>}
 

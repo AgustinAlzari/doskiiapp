@@ -82,11 +82,12 @@ export default function StripCreator({ project, onCreated, onBack }) {
       createdAt: new Date().toISOString(),
     }
     await save(strip)
-    if (tiraId !== GENERAL) {
-      const t = tiras.find(x => x.id === tiraId)
+    const destTiraId = tiraId !== GENERAL ? tiraId : null
+    if (destTiraId) {
+      const t = tiras.find(x => x.id === destTiraId)
       if (t) await saveTira({ ...t, stripIds: [...(t.stripIds || []), strip.id] })
     }
-    onCreated(strip)
+    onCreated(strip, destTiraId)
   }
 
   return (

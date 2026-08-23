@@ -68,6 +68,18 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
     })
   }
 
+  // Marca un globo como "por default" de su categoría (diálogo/pensamiento):
+  // solo uno por categoría, así que desmarca los demás de la misma categoría.
+  const toggleDefault = async (balloon) => {
+    if (balloon.isDefault) {
+      await save({ ...balloon, isDefault: false })
+      return
+    }
+    const sameKind = scoped.filter(b => b.kind === balloon.kind && b.id !== balloon.id && b.isDefault)
+    for (const b of sameKind) await save({ ...b, isDefault: false })
+    await save({ ...balloon, isDefault: true })
+  }
+
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   return (
@@ -103,6 +115,19 @@ export default function BalloonList({ projectId, onNew, onEdit }) {
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                   {KIND_LABELS[balloon.kind] || balloon.kind || 'globo'} · {lawCount} restricciones
                   {balloon.text ? ` · "${balloon.text.slice(0, 30)}"` : ''}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label
+                    className="check-item"
+                    style={{ fontSize: 11, padding: 0 }}
+                    title={`usar este globo por default cuando se elige ${KIND_LABELS[balloon.kind] || balloon.kind || 'globo'} en el lienzo`}
+                  >
+                    <div
+                      className={`check-box ${balloon.isDefault ? 'checked' : ''}`}
+                      onClick={async (e) => { e.stopPropagation(); await toggleDefault(balloon) }}
+                    />
+                    <span>por default</span>
+                  </label>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
                   <div style={{ display: 'flex', gap: 4 }}>

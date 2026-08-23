@@ -1,15 +1,18 @@
 import { useRef, useState, useCallback } from 'react'
+import useDoubleClick from './useDoubleClick'
 
-export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, onUpdate, onRemove }) {
+export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, onUpdate, onRemove, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
-  const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
+  const detectDbl = useDoubleClick(onDoubleClick)
 
   const handleMouseDown = useCallback((e) => {
     if (isResizingRef.current) return
+    if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -33,7 +36,7 @@ export default function SFXBlock({ sfx, isSelected, onSelect, onMove, onResize, 
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [sfx, onSelect, onMove])
+  }, [sfx, onSelect, onMove, detectDbl])
 
   const handleResizeDown = useCallback((e) => {
     e.stopPropagation()

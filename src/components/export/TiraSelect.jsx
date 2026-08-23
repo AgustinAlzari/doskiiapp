@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { coverOf } from '../../utils/stripCover'
+import { isDefaultTira } from '../../store/tiraStore'
 
 const GENERAL = '__general__'
 
@@ -7,20 +8,34 @@ const GENERAL = '__general__'
 // tiras del proyecto. Cada opción muestra la miniatura de la última viñeta.
 // Al tocar (hover) una opción su borde se vuelve muy grueso en negro sutil;
 // clic selecciona/deselecciona esa tira (pueden elegirse varias, para ver
-// continuidades). El mosaico se actualiza en vivo debajo.
-export default function TiraSelect({ tiras, strips, value, onChange }) {
+// continuidades). Las tiras se reordenan ARRASTRÁNDOLAS (arriba = primero en
+// la galería); el orden se guarda con onReorder. El mosaico se actualiza en
+// vivo debajo.
+export default function TiraSelect({ tiras, strips, value, onChange, onReorder }) {
   const [open, setOpen] = useState(false)
   const [thumbs, setThumbs] = useState({})
   const [hoverId, setHoverId] = useState(null)
   const boxRef = useRef(null)
 
+  // Reordenar tiras arrastrando dentro del menú.
+  const [dragIdx, setDragIdx] = useState(null)
+  const [insertIdx, setInsertIdx] = useState(null)
+
   const inTiraIds = useMemo(() => new Set(tiras.flatMap(t => t.stripIds || [])), [tiras])
   const generalCount = strips.filter(s => !inTiraIds.has(s.id)).length
 
-  const options = useMemo(() => [
-    { id: GENERAL, title: 'general', count: generalCount },
-    ...tiras.map(t => ({ id: t.id, title: t.title || 'sin título', count: (t.stripIds || []).length })),
-  ], [tiras, generalCount])
+  // "general" solo se muestra si tiene viñetas sueltas; las tiras por defecto
+  // (borrador) vacías se ocultan para no ensuciar el menú.
+  const options = useMemo(() => {
+    const opts = []
+    if (generalCount > 0) opts.push({ id: GENERAL, title: 'general', count: generalCount })
+    tiras.forEach((t, i) => {
+      const hasStrips = (t.stripIds || []).length > 0
+      if (!hasStrips && isDefaultTira(t)) return
+      opts.push({ id: t.id, title: t.title || 'sin título', count: (t.stripIds || []).length, tiraIdx: i })
+    })
+    return opts
+  }, [tiras, generalCount])
 
   const selectedSet = useMemo(() => new Set(value || []), [value])
   const selectedOptions = options.filter(o => selectedSet.has(o.id))
@@ -67,6 +82,43 @@ export default function TiraSelect({ tiras, strips, value, onChange }) {
     else next.add(id)
     onChange([...next])
   }
+
+  // Reordenar arrastrando: el índice del arrastre es sobre la lista de tiras
+  // (general queda fija arriba y no se arrastra).
+  const onTiraDragStart = (e, tiraIdx) => {
+    setDragIdx(tiraIdx)
+    setInsertIdx(null)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', '') // Firefox necesita setData para iniciar el drag
+  }
+  const onTiraDragOver = (e, tiraIdx) => {
+    if (dragIdx == null) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const before = e.clientY < rect.top + rect.height / 2
+    const next = before ? tiraIdx : tiraIdx + 1
+    if (next !== insertIdx) setInsertIdx(next)
+  }
+  const onTiraDrop = (e, tiraIdx) => {
+    e.preventDefault()
+    if (dragIdx != null) {
+      let target = insertIdx
+      if (target == null) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        target = e.clientY < rect.top + rect.height / 2 ? tiraIdx : tiraIdx + 1
+      }
+      const next = [...tiras]
+      const [moved] = next.splice(dragIdx, 1)
+      let at = target > dragIdx ? target - 1 : target
+      at = Math.max(0, Math.min(next.length, at))
+      next.splice(at, 0, moved)
+      if (onReorder) onReorder(next.map(t => t.id))
+    }
+    setDragIdx(null)
+    setInsertIdx(null)
+  }
+  const onTiraDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
   const buttonLabel = selectedOptions.length === 0
     ? 'mostrar en preview'
@@ -118,16 +170,31 @@ export default function TiraSelect({ tiras, strips, value, onChange }) {
             return (
               <div
                 key={opt.id}
+                draggable={opt.id !== GENERAL}
                 onMouseEnter={() => setHoverId(opt.id)}
                 onMouseLeave={() => setHoverId(null)}
+                onDragStart={(e) => onTiraDragStart(e, opt.tiraIdx)}
+                onDragOver={(e) => onTiraDragOver(e, opt.tiraIdx)}
+                onDrop={(e) => onTiraDrop(e, opt.tiraIdx)}
+                onDragEnd={onTiraDragEnd}
                 onClick={() => toggle(opt.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                  position: 'relative',
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '5px 10px', fontSize: 12,
+                  cursor: opt.id === GENERAL ? 'pointer' : 'grab',
+                  opacity: dragIdx === opt.tiraIdx ? 0.4 : 1,
                   border: thick ? '3px solid rgba(0,0,0,0.75)' : '3px solid transparent',
                   borderRadius: 6,
                   transition: 'border-color 0.08s ease',
                 }}
+                title={opt.id === GENERAL ? undefined : 'clic: mostrar/ocultar en preview · arrastrá para reordenar'}
               >
+                {dragIdx != null && insertIdx === opt.tiraIdx && (
+                  <span style={{ position: 'absolute', top: -5, left: 8, right: 8, height: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+                )}
+                {dragIdx != null && insertIdx === opt.tiraIdx + 1 && (
+                  <span style={{ position: 'absolute', bottom: -5, left: 8, right: 8, height: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+                )}
                 <div
                   style={{
                     width: 52, height: 40, flexShrink: 0,
@@ -137,7 +204,7 @@ export default function TiraSelect({ tiras, strips, value, onChange }) {
                   }}
                 >
                   {thumbs[opt.id] ? (
-                    <img src={thumbs[opt.id]} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                    <img src={thumbs[opt.id]} alt="" draggable={false} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
                   ) : (
                     <span style={{ fontSize: 16, color: 'var(--color-text-muted)' }}>▤</span>
                   )}

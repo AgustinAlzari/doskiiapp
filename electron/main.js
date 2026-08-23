@@ -323,6 +323,25 @@ ipcMain.handle('characters:save', async (_, character) => {
   return character;
 });
 
+// Tira por defecto de VERDAD (la del id reservado o marcada default): el guard
+// de borrado usa SOLO esto, para que la migración pueda limpiar las "borrador"
+// viejas de id random (que no son la por defecto).
+function isDefaultTiraEntity(t) {
+  if (!t) return false;
+  if (t.default === true) return true;
+  return /^(borrador|general)-/.test(String(t.id || ''));
+}
+
+// Tiras por defecto del proyecto ("borrador", y "general" si existiera): no se
+// borran ni se duplican vía nube o importación. El id reservado es determinista
+// (`borrador-<projectId>`), así que la nube nunca puede crear una segunda copia.
+function isReservedTira(t) {
+  if (!t) return false;
+  if (isDefaultTiraEntity(t)) return true;
+  const title = String(t.title || '').toLowerCase();
+  return title === 'borrador' || title === 'general';
+}
+
 // Borra un archivo de entidad y, si estaba en la nube, registra el tombstone
 // (el borrado se propaga a la nube y no revive en otras máquinas).
 function deleteEntityCloud(sub, id) {
@@ -405,6 +424,13 @@ ipcMain.handle('tiras:save', async (_, tira) => {
 });
 
 ipcMain.handle('tiras:delete', async (_, id) => {
+  const filePath = path.join(DATA_DIR, 'tiras', `${id}.json`);
+  if (fs.existsSync(filePath)) {
+    try {
+      const tira = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (isDefaultTiraEntity(tira)) return false; // tiras por defecto: no se borran
+    } catch {}
+  }
   deleteEntityCloud('tiras', id);
   return true;
 });
@@ -650,6 +676,7 @@ ipcMain.handle('projects:duplicate', async (_, projectId) => {
     });
   });
   readJsonDir(path.join(DATA_DIR, 'tiras')).filter(t => t.projectId === projectId).forEach(tira => {
+    if (isReservedTira(tira)) return; // las por defecto no se duplican: la copia las crea sola
     writeJsonFile(path.join(DATA_DIR, 'tiras'), {
       ...tira,
       id: crypto.randomUUID(),
@@ -774,6 +801,7 @@ ipcMain.handle('projects:import', async (_, filePath) => {
   });
 
   (bundle.tiras || []).forEach(t => {
+    if (isReservedTira(t)) return; // las por defecto no se importan: el proyecto nuevo las crea solo
     const newId = crypto.randomUUID();
     writeJsonFile(path.join(DATA_DIR, 'tiras'), {
       ...t,

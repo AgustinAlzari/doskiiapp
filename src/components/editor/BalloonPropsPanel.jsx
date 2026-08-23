@@ -1,11 +1,19 @@
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
+import TextLayoutControls from './TextLayoutControls'
 
 const ANCHOR_DIRECTIONS = ['bottom', 'left', 'right', 'top']
 
+// Panel del globo seleccionado: sliders de layout, tipo, y para diálogo los
+// botones de conexión. El texto se escribe directamente en el globo del lienzo.
 export default function BalloonPropsPanel({
   kind, label, characterName,
   text, balloonId, balloons, defaultBalloon,
   anchor, panelCharacters, panelObjects, characters, objects,
+  align, onAlign,
+  fontSize, onFontSize, textX, onTextX, textY, onTextY,
+  linked, onLinked,
+  speaksFirst, onSpeaksFirst,
+  dialogueType, onDialogueType,
+  onAddDialogue,
   onText, onType, onAnchor, onRemove, onClose,
 }) {
   const anchorType = anchor?.type || 'none'
@@ -35,18 +43,6 @@ export default function BalloonPropsPanel({
       </div>
 
       <div>
-        <label className="label">{isImageBalloon ? 'describe la imagen del globo' : 'texto'}</label>
-        <SpellCheckedTextarea
-          value={text}
-          onChange={e => onText(e.target.value)}
-          placeholder={isImageBalloon
-            ? 'describí la escena que va dentro del globo (en vez de texto)...'
-            : (kind === 'dialogue' ? 'qué dice o piensa...' : 'texto de este globo...')}
-          minRows={2}
-        />
-      </div>
-
-      <div>
         <label className="label">tipo de globo</label>
         <select
           className="input"
@@ -66,6 +62,75 @@ export default function BalloonPropsPanel({
             : (effective ? `define el globo: ${effective.name}. Si es de pensamiento, se dibuja como nube.` : 'elegí un globo de la sección "globos".')}
         </div>
       </div>
+
+      {kind === 'dialogue' && (
+        <>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-sm" onClick={() => onAddDialogue?.('speech')} style={{ fontSize: 11 }}>
+              + diálogo
+            </button>
+            <button className="btn btn-sm" onClick={() => onAddDialogue?.('thought')} style={{ fontSize: 11 }}>
+              + pensamiento
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span
+              className={`radio-pill ${dialogueType !== 'thought' ? 'active' : ''}`}
+              style={{ fontSize: 10, cursor: 'pointer' }}
+              onClick={() => onDialogueType?.('speech')}
+              title="tipo: diálogo"
+            >
+              diálogo
+            </span>
+            <span
+              className={`radio-pill ${dialogueType === 'thought' ? 'active' : ''}`}
+              style={{ fontSize: 10, cursor: 'pointer' }}
+              onClick={() => onDialogueType?.('thought')}
+              title="tipo: pensamiento"
+            >
+              pensamiento
+            </span>
+            <div style={{ flex: 1 }} />
+            <button
+              className={`btn btn-sm ${speaksFirst ? '' : 'btn-ghost'}`}
+              onClick={() => onSpeaksFirst?.()}
+              style={{ fontSize: 10, padding: '2px 6px' }}
+            >
+              {speaksFirst ? '✓ habla primero' : 'habla primero'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>conexión con el globo anterior:</span>
+            <span
+              className={`radio-pill ${linked !== false ? 'active' : ''}`}
+              style={{ fontSize: 10, cursor: 'pointer' }}
+              onClick={() => onLinked?.(true)}
+              title="unir este globo al anterior del mismo personaje con el tubo conector"
+            >
+              conectado
+            </span>
+            <span
+              className={`radio-pill ${linked === false ? 'active' : ''}`}
+              style={{ fontSize: 10, cursor: 'pointer' }}
+              onClick={() => onLinked?.(false)}
+              title="dejar este globo separado del anterior (por ejemplo si cambia el tipo de globo)"
+            >
+              desconectado
+            </span>
+          </div>
+        </>
+      )}
+
+      <TextLayoutControls
+        align={align || 'center'}
+        onAlignChange={onAlign}
+        fontSize={fontSize}
+        onFontSize={onFontSize}
+        textX={textX}
+        onTextX={onTextX}
+        textY={textY}
+        onTextY={onTextY}
+      />
 
       {kind === 'globox' && (
         <>
