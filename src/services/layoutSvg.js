@@ -43,7 +43,14 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
   const backLines = []
 
   if (panel.horizon) {
-    backLines.push({ y: Math.round(panel.horizon.y * svgH), label: 'horizonte' })
+    const h = panel.horizon
+    backLines.push({
+      x1: Math.round((h.x1 ?? 0) * svgW),
+      y1: Math.round((h.y1 ?? h.y ?? 0.5) * svgH),
+      x2: Math.round((h.x2 ?? 1) * svgW),
+      y2: Math.round((h.y2 ?? h.y ?? 0.5) * svgH),
+      label: 'horizonte',
+    })
   }
 
   if (mode === 'scene') {
@@ -75,7 +82,7 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
 
     const balloons = orderedPanelDialogues(panel, characters || [])
     balloons.forEach(b => {
-      rects.push({ x: b.x * svgW, y: b.y * svgH, w: b.width * svgW, h: b.height * svgH, stroke: b.type === 'thought' ? '#7d3cff' : '#e04040', fill: 'rgba(0,0,0,0.03)', dash: '4 3', label: `${b.number}. ${b.label}` })
+      rects.push({ x: b.x * svgW, y: b.y * svgH, w: b.width * svgW, h: b.height * svgH, stroke: b.type === 'thought' ? '#7d3cff' : '#e04040', fill: 'rgba(0,0,0,0.03)', dash: '4 3', label: `${b.number}. ${b.linked === false ? 'suelto' : b.label}` })
     })
 
     ;(panel.globosX || []).forEach((g, i) => {
@@ -93,8 +100,10 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
   svg += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="white" stroke="#000" stroke-width="1"/>`
 
   backLines.forEach(l => {
-    svg += `<line x1="0" y1="${l.y}" x2="${svgW}" y2="${l.y}" stroke="#7f8c8d" stroke-width="1.5"/>`
-    svg += `<text x="${svgW - 4}" y="${l.y - 3}" text-anchor="end" font-family="monospace" font-size="9" fill="#7f8c8d">${l.label}</text>`
+    svg += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#7f8c8d" stroke-width="1.5"/>`
+    const lx = Math.round((l.x1 + l.x2) / 2)
+    const ly = Math.round((l.y1 + l.y2) / 2)
+    svg += `<text x="${lx}" y="${ly - 3}" text-anchor="middle" font-family="monospace" font-size="9" fill="#7f8c8d">${l.label}</text>`
   })
 
   rects.forEach(r => {
@@ -119,6 +128,7 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
       for (let i = 0; i < list.length - 1; i++) {
         const a = list[i]
         const b = list[i + 1]
+        if (!b.linked) continue
         const x1 = (a.x + a.width / 2) * svgW
         const y1 = (a.y + a.height / 2) * svgH
         const x2 = (b.x + b.width / 2) * svgW
@@ -127,14 +137,20 @@ export function generateLayoutSVG(panel, characters, backgrounds, objects, strip
       }
     })
     Object.values(byInstance).forEach(list => {
-      const last = list[list.length - 1]
-      const ch = (panel.characters || [])[last.charIdx]
-      if (!ch) return
-      const bx = (last.x + last.width / 2) * svgW
-      const by = (last.y + last.height / 2) * svgH
-      const cx = (ch.x + ch.width / 2) * svgW
-      const cy = (ch.y + ch.height * 0.3) * svgH
-      svg += lineEl(bx, by, cx, cy)
+      // Cola por grupo: cada serie de globos conectados (linked) termina en una
+      // cola hacia el hablante; un globo desconectado forma su propio grupo.
+      for (let i = 0; i < list.length; i++) {
+        const isGroupEnd = i === list.length - 1 || !list[i + 1].linked
+        if (!isGroupEnd) continue
+        const last = list[i]
+        const ch = (panel.characters || [])[last.charIdx]
+        if (!ch) continue
+        const bx = (last.x + last.width / 2) * svgW
+        const by = (last.y + last.height / 2) * svgH
+        const cx = (ch.x + ch.width / 2) * svgW
+        const cy = (ch.y + ch.height * 0.3) * svgH
+        svg += lineEl(bx, by, cx, cy)
+      }
     })
     ;(panel.globosX || []).forEach(g => {
       if (!g.text) return

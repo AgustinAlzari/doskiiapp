@@ -475,6 +475,12 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     const ts = loadTombstones();
     const keep = [];
     for (const t of ts.files) {
+      // Las tiras por defecto del proyecto (borrador/general) nunca se borran
+      // por la nube: quedan protegidas, su contenido se actualiza por archivo.
+      if (/^tiras\/(borrador|general)-/.test(t.path)) {
+        keep.push(t);
+        continue;
+      }
       const local = path.join(dataDir, t.path);
       let exists = false;
       let mtime = 0;

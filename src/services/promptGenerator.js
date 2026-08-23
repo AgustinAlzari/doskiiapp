@@ -1,5 +1,6 @@
 import { DIALOGUE_TYPES, DIRECTIONS, DIRECTION_MODES, DIRECTION_MODE_HAS_GAZE, SHOT_TYPES, HATCH_TYPES, TIME_TRANSITIONS, MOTION_LINE_DESCS, ACTION_EFFECTS, ASPECT_RATIOS } from '../data/actionPresets'
 import { balloonLawsToPrompt, balloonLawDiffSentences, lawsEqual, makeDefaultBalloonLaws } from '../data/balloonLaws'
+import { markdownPromptParts, layoutPrompt, DEFAULT_ALIGN } from './markdown'
 
 function describePosition(x = 0, y = 0, width = 0, height = 0) {
   const centerX = x + width / 2
@@ -159,15 +160,16 @@ function channelStyleText(type) {
   return ''
 }
 
-export function orderedPanelDialogues(panel, characters = []) {
+export function orderedPanelDialogues(panel, characters = [], opts = {}) {
+  const includeEmpty = opts.includeEmpty === true
   const panelCharacters = panel?.characters || []
   const occurrences = new Map()
   const typeName = (id) => DIALOGUE_TYPES.find(v => v.id === id)?.id || 'speech'
 
   const stackCount = new Map()
   panelCharacters.forEach(item => {
-    const hasMain = !!item.dialogue
-    const extras = (item.extraDialogues || []).filter(e => e.text).length
+    const hasMain = !!item.dialogue || (includeEmpty && item.dialogueOpen)
+    const extras = (item.extraDialogues || []).filter(e => e.text || (includeEmpty && e.open)).length
     stackCount.set(item.characterId, (hasMain ? 1 : 0) + extras)
   })
 
@@ -209,17 +211,17 @@ export function orderedPanelDialogues(panel, characters = []) {
     }
     let k = 0
 
-    if (item.dialogue) {
+    if (item.dialogue || (includeEmpty && item.dialogueOpen)) {
       const base = defaultPos(item, k, total)
       const pos = item.dialoguePos ? { ...base, ...item.dialoguePos } : base
-      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, isExtra: false, extraIdx: null, order: 0, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, linked: item.linked !== false, align: item.align || DEFAULT_ALIGN, fontSize: item.fontSize, textX: item.textX, textY: item.textY, isExtra: false, extraIdx: null, order: 0, ...pos })
       k++
     }
     ;(item.extraDialogues || []).forEach((extra, eIdx) => {
-      if (!extra.text) return
+      if (!extra.text && !(includeEmpty && extra.open)) return
       const base = defaultPos(item, k, total)
       const pos = extra.pos ? { ...base, ...extra.pos } : base
-      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, isExtra: true, extraIdx: eIdx, order: eIdx + 1, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, linked: extra.linked !== false, align: extra.align || DEFAULT_ALIGN, fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, isExtra: true, extraIdx: eIdx, order: eIdx + 1, ...pos })
       k++
     })
   })
@@ -288,31 +290,40 @@ export function usedBalloonTypes(panel) {
 
 export function usedBalloonEntityIds(panel, project = null, balloonDefs = []) {
   const ids = new Set()
-  let needsDefault = false
+  const needsDefault = new Set()
   ;(panel?.characters || []).forEach(c => {
-    if (c.balloonId) ids.add(c.balloonId)
-    else if (c.dialogue) needsDefault = true
+    const hasMain = !!c.dialogue
+    if (hasMain && c.balloonId) ids.add(c.balloonId)
+    else if (hasMain) needsDefault.add(c.dialogueType === 'thought' ? 'thought' : 'speech')
     ;(c.extraDialogues || []).forEach(e => {
       if (e.balloonId) ids.add(e.balloonId)
-      else if (e.text) needsDefault = true
+      else if (e.text) needsDefault.add(e.type === 'thought' ? 'thought' : 'speech')
     })
   })
   if (panel?.narration?.balloonId) ids.add(panel.narration.balloonId)
-  else if (panel?.narration?.text) needsDefault = true
+  else if (panel?.narration?.text) needsDefault.add('narration')
   ;(panel?.globosX || []).forEach(g => {
     if (g.balloonId) ids.add(g.balloonId)
-    else if (g.text) needsDefault = true
+    else if (g.text) needsDefault.add('other')
   })
-  if (needsDefault) {
-    const def = resolveDefaultBalloon(project, balloonDefs)
+  needsDefault.forEach(kind => {
+    const def = resolveDefaultBalloon(project, balloonDefs, kind)
     if (def) ids.add(def.id)
-  }
+  })
   return [...ids]
 }
 
-function resolveDefaultBalloon(project, balloonDefs = []) {
+function resolveDefaultBalloon(project, balloonDefs = [], kind = null) {
   const pid = project?.id
-  return (balloonDefs || []).find(b => b.projectId === pid && b.comodin && b.kind === 'other') || null
+  const scoped = (balloonDefs || []).filter(b => b.projectId === pid)
+  if (kind) {
+    const byKind = scoped.filter(b => b.kind === kind)
+    if (byKind.length) {
+      const marked = byKind.find(b => b.isDefault)
+      return marked || byKind[0]
+    }
+  }
+  return scoped.find(b => b.comodin && b.kind === 'other') || null
 }
 
 const BALLOON_LETTERING_RULES = [
@@ -348,7 +359,6 @@ function balloonGraphicsText(panel, project, balloonDefs = []) {
 
   const defaultLaws = makeDefaultBalloonLaws()
   const byId = Object.fromEntries((balloonDefs || []).map(b => [b.id, b]))
-  const defaultBalloon = resolveDefaultBalloon(project, balloonDefs)
   const usedEntities = []
   const lines = ['BALLOON GRAPHICS:']
 
@@ -360,8 +370,9 @@ function balloonGraphicsText(panel, project, balloonDefs = []) {
     lines.push(`- ${label}: ${text || '(default comic balloon style)'}`)
   }
 
-  const fallback = (label) => {
-    if (defaultBalloon) addEntry(`${label.toUpperCase()} ("${defaultBalloon.name}")`, defaultBalloon)
+  const fallback = (label, kind = null) => {
+    const def = resolveDefaultBalloon(project, balloonDefs, kind)
+    if (def) addEntry(`${label.toUpperCase()} ("${def.name}")`, def)
     else addEntry(label.toUpperCase(), null)
   }
 
@@ -371,7 +382,7 @@ function balloonGraphicsText(panel, project, balloonDefs = []) {
       const ids = [...new Set((panel.globosX || []).map(g => g.balloonId).filter(Boolean))]
       const entities = ids.map(id => byId[id]).filter(Boolean)
       if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
-      else fallback(label)
+      else fallback(label, 'other')
       return
     }
     const kind = type
@@ -393,7 +404,7 @@ function balloonGraphicsText(panel, project, balloonDefs = []) {
     }
     const entities = [...ids].map(id => byId[id]).filter(Boolean)
     if (entities.length) entities.forEach(e => addEntry(`${label.toUpperCase()} ("${e.name}")`, e))
-    else if (needsDefault) fallback(label)
+    else if (needsDefault) fallback(label, kind)
     else addEntry(label.toUpperCase(), null)
   })
 
@@ -492,9 +503,18 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
   }
   if (panel.scene) lines.push(`SCENE: ${panel.scene}`)
   if (panel.horizon) {
-    const ref = layoutName ? ` It is marked in the layout reference image "${layoutName}" by a full-width line behind all elements — place the horizon exactly there.` : ''
+    const h = panel.horizon
+    const x1 = Math.round((h.x1 ?? 0) * 100)
+    const y1 = Math.round((h.y1 ?? h.y ?? 0.5) * 100)
+    const x2 = Math.round((h.x2 ?? 1) * 100)
+    const y2 = Math.round((h.y2 ?? h.y ?? 0.5) * 100)
+    const full = x1 <= 0 && x2 >= 100 && y1 === y2
+    const ref = layoutName ? ` It is marked in the layout reference image "${layoutName}" by a line behind all elements — place the horizon exactly there.` : ''
     const style = styleText ? ` Draw it following the project's general style ("${styleText}") — hand-rendered like the rest of the scene, NOT as a perfectly straight ruler line.` : ''
-    lines.push(`HORIZON LINE: at ${Math.round(panel.horizon.y * 100)}% of the panel height, drawn as a full-width line always behind the landscape, characters, and objects.${panel.horizon.description ? ` Description: ${panel.horizon.description}.` : ''}${ref}${style} Draw it behind landscape, characters, and objects.`)
+    const span = full
+      ? `a full-width line at ${y1}% of the panel height`
+      : `a line that starts at ${x1}% from the left edge at ${y1}% height and ends at ${x2}% from the left edge at ${y2}% height`
+    lines.push(`HORIZON LINE: ${span}, drawn as a line always behind the landscape, characters, and objects.${h.description ? ` Description: ${h.description}.` : ''}${ref}${style} Draw it behind landscape, characters, and objects.`)
   }
 
   if (panel.shotType) {
@@ -688,7 +708,13 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
         const override = (balloonDefs || []).find(b => b.id === narr.balloonId)
         if (override) narrStyle = ` Balloon style entity: "${override.name}".`
       }
-      lines.push(`- Narration [${style}]: "${narr.text}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}${narrStyle}`)
+      const narrParts = markdownPromptParts(narr.text, narr.align)
+      const narrExtras = []
+      if (narrParts.emphasis.length) narrExtras.push(` Lettering emphasis: ${narrParts.emphasis.join('; ')}.`)
+      narrExtras.push(...narrParts.lineBreaks)
+      narrExtras.push(` ${narrParts.align}`)
+      narrExtras.push(layoutPrompt(narr.fontSize, narr.textX, narr.textY))
+      lines.push(`- Narration [${style}]: "${narrParts.literal}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}${narrExtras.join('')}${narrStyle}`)
     }
     panelSfx.forEach(item => {
       if (!item.text) return
@@ -719,7 +745,32 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
     lines.push('')
     lines.push('DIALOGUE SEQUENCE — STRICT, MUST BE REPRODUCED EXACTLY (verbatim, in this logical order):')
     lines.push(`PHYSICAL PLACEMENT: follow "${layoutFileName}" for each balloon's exact position, size, and order on canvas (highest priority). The sequence below is the logical reading order only.`)
-    const handDrawnConnector = `Connect them with a short, thin connector tube drawn by hand with the same bold outline as the balloons. The tube enters BOTH balloons: each balloon's outline must be left OPEN where the tube meets it (the outline line is interrupted there so the tube passes through and links the two interiors — never drawn over a closed outline). Only the LAST balloon carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon from another speaker.`
+    const handDrawnConnector = `Connect them with a short, thin connector tube drawn by hand with the same bold outline as the balloons. The tube enters BOTH balloons: each balloon's outline must be left OPEN where the tube meets it (the outline line is interrupted there so the tube passes through and links the two interiors — never drawn over a closed outline). Only the LAST balloon of the chain carries the solid tail pointing to the speaker. Keep a clear visible gap between these balloons and any balloon outside this chain (whether from another speaker or a DISCONNECTED balloon of the same speaker).`
+    // Agrupar los globos de cada hablante en cadenas conectadas: un globo con
+    // linked === false no se une al anterior e inicia una cadena nueva (independiente,
+    // con su propia cola hacia el hablante).
+    const byName = new Map()
+    orderedDialogues.forEach(d => {
+      const list = byName.get(d.name) || []
+      list.push(d)
+      byName.set(d.name, list)
+    })
+    const groupInfo = new Map()
+    byName.forEach(list => {
+      let start = 0
+      for (let i = 0; i < list.length; i++) {
+        const isEnd = i === list.length - 1 || list[i + 1].linked === false
+        if (!isEnd) continue
+        for (let j = start; j <= i; j++) {
+          groupInfo.set(list[j], {
+            first: j === start,
+            last: j === i,
+            length: i - start + 1,
+          })
+        }
+        start = i + 1
+      }
+    })
     const lastByChar = {}
     let anyImage = false
     orderedDialogues.forEach((d, idx) => {
@@ -729,26 +780,52 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       if (isImage) anyImage = true
       const typeLabel = isImage ? 'image balloon' : (DIALOGUE_TYPE_LABELS[d.type] || d.type)
       const prev = lastByChar[d.name]
-      const linked = prev != null
-        ? ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. ${handDrawnConnector}`
-        : ''
+      const gi = groupInfo.get(d)
+      const chainMember = gi.length > 1
+      const isChainLast = gi.last && chainMember
+      const isStandalone = gi.length === 1
+      const linkage = (() => {
+        if (prev == null) {
+          return chainMember
+            ? ` Balloon ${d.number} is the FIRST of a chain belonging to ${d.name}: it is joined to the NEXT balloon by a short connector tube and has NO tail of its own — only the last balloon of the chain carries the tail pointing to the speaker.`
+            : ''
+        }
+        if (isStandalone) {
+          return ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}) but is DISCONNECTED from it: do NOT join them with a connector tube. Place it as a separate, independent balloon with its own tail pointing to the speaker.`
+        }
+        if (isChainLast) {
+          return ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}). They MUST be placed in SEPARATE, non-overlapping positions of the panel as shown in the layout image — do NOT stack, merge, or attach them. ${handDrawnConnector}`
+        }
+        return ` Balloon ${d.number} belongs to the same speaker as balloon ${prev} (${d.name}): it is joined to it by a short connector tube and continues the same chain (only the last balloon of the chain carries the tail pointing to the speaker).`
+      })()
       lastByChar[d.name] = d.number
       let styleRef = ''
       if (entity) styleRef = ` Balloon style entity: "${entity.name}".`
       const content = isImage
         ? imageBalloonContent(entity, d.text, project, generalStyle, paletteColors)
-        : `contains exactly: "${d.text}".`
+        : (() => {
+            const parts = markdownPromptParts(d.text, d.align)
+            const extras = []
+            if (parts.emphasis.length) extras.push(` Lettering emphasis: ${parts.emphasis.join('; ')}.`)
+            extras.push(...parts.lineBreaks)
+            extras.push(` ${parts.align}`)
+            extras.push(layoutPrompt(d.fontSize, d.textX, d.textY))
+            return `contains exactly: "${parts.literal}".${extras.join('')}`
+          })()
       const anchor = (isImage || d.type === 'thought')
         ? (() => {
             const ch = (ctx.panelCharacters || [])[d.charIdx]
             const side = bubbleSideFromHead(d, ch) || 'UPPER'
             return ` It is joined to the head of the speaker (${d.name}) by a trail of THREE small bubbles decreasing in size. The bubbles must emerge from the ${side} side of the character's head and point from the balloon down toward their head, following the bubble trail in the layout. They must always stay visibly connected to the head — NEVER hanging loose or disconnected.`
           })()
-        : ` Its tail must point to the head of the speaker (${d.name}).`
+        : (chainMember && !isChainLast
+          ? ` It has NO tail of its own: it is joined to the next balloon by the connector tube; only the last balloon of the chain carries the tail pointing to the speaker (${d.name}).`
+          : ` Its tail must point to the head of the speaker (${d.name}).`)
+      const tabId = d.linked === false ? `${d.number} suelto` : `${d.number}`
       if (idx === 0) {
-        lines.push(`${d.number}. "${d.label}" speaks FIRST: the balloon of "${d.label}" is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") speaks FIRST: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${anchor}`)
       } else {
-        lines.push(`${d.number}. "${d.label}" responds: the balloon of "${d.label}" is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linked}${styleRef}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") responds: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linkage}${styleRef}${anchor}`)
       }
     })
 
@@ -768,7 +845,15 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
       const content = isImage
         ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors)
-        : `contains exactly: "${g.text}".`
+        : (() => {
+            const parts = markdownPromptParts(g.text, g.align)
+            const extras = []
+            if (parts.emphasis.length) extras.push(` Lettering emphasis: ${parts.emphasis.join('; ')}.`)
+            extras.push(...parts.lineBreaks)
+            extras.push(` ${parts.align}`)
+            extras.push(layoutPrompt(g.fontSize, g.textX, g.textY))
+            return `contains exactly: "${parts.literal}".${extras.join('')}`
+          })()
       const bubbleTrail = (isImage || channel === 'thought')
         ? (() => {
             const a = g.anchor || {}
@@ -818,9 +903,9 @@ function letteringFinalCheck(hasImageBalloon, hasBubbleAnchor = false) {
     ? ' Also verify that every thought and image balloon is visibly connected to its speaker\'s head by its three bubbles — NEVER left hanging or disconnected.'
     : ''
   if (hasImageBalloon) {
-    return 'FINAL CHECK: Before finishing, verify every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by a short, thin connector tube. IMAGE balloons must contain the described scene drawn STRICTLY inside them, with NO text, letters, or typography.' + bubbleCheck
+    return 'FINAL CHECK: Before finishing, verify every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that consecutive balloons of the same speaker are joined by a short, thin connector tube — except any balloon explicitly DISCONNECTED from the previous one, which must remain a separate, independent balloon with its own tail. IMAGE balloons must contain the described scene drawn STRICTLY inside them, with NO text, letters, or typography.' + bubbleCheck
   }
-  return 'FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that when a character has more than one balloon they are joined to each other by a short, thin connector tube used between consecutive balloons of the same speaker.' + bubbleCheck
+  return 'FINAL CHECK — LEGIBILITY AND BALLOON STYLE: Before finishing, verify that the specified typography and its lettering style are fully legible, and that every balloon is crafted to respect the specified style — subtle and restrained, not exaggerated. Also check that each balloon emerges correctly from its anchor (character head, object, narration box, or panel edge as indicated), and that consecutive balloons of the same speaker are joined by a short, thin connector tube — except any balloon explicitly DISCONNECTED from the previous one, which must remain a separate, independent balloon with its own tail.' + bubbleCheck
 }
 
 const LEGAL_NOTICE = 'IMPORTANT: I certify that I am the sole author and rightful owner of all images attached to this request and of the content of the prompt itself, and that I hold the rights to use them. I take full responsibility for any legal issue that may arise from this generation.'

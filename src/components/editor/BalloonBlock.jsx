@@ -1,16 +1,26 @@
-import { useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import useDoubleClick from './useDoubleClick'
 
-export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, onResize, onRemove }) {
+export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, onResize, onRemove, onText, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
+  const textRef = useRef(null)
+  const detectDbl = useDoubleClick(onDoubleClick)
+
+  // Al seleccionar un globo (o crearlo), enfocar el texto para escribir directo.
+  useEffect(() => {
+    if (isSelected && textRef.current) textRef.current.focus()
+  }, [isSelected])
 
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
+    if (e.target.tagName === 'TEXTAREA') return
     if (isResizingRef.current) return
+    if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -34,7 +44,7 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [balloon, onSelect, onMove])
+  }, [balloon, onSelect, onMove, detectDbl])
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()
@@ -85,8 +95,28 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
       title={`${balloon.label} — globo ${balloon.number}`}
     >
       <div className="balloon-shape">
-        <span className="balloon-label" title={`${balloon.label} — globo ${balloon.number}`}>{balloon.label}</span>
+        <textarea
+          ref={textRef}
+          className="balloon-editor"
+          value={balloon.text || ''}
+          placeholder={balloon.label}
+          onChange={e => onText?.(e.target.value)}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+          onFocus={() => onSelect?.()}
+          spellCheck={false}
+          style={{
+            fontSize: `${Math.round(((balloon.fontSize ?? 1) * 11))}px`,
+            textAlign: balloon.align || 'center',
+            paddingTop: `${Math.round(((balloon.textY ?? 0) * 40)) + 6}px`,
+            paddingLeft: `${Math.round(((balloon.textX ?? 0) * 40)) + 6}px`,
+            paddingRight: `${Math.max(0, 6 - Math.round((balloon.textX ?? 0) * 40))}px`,
+          }}
+        />
       </div>
+      <span className="balloon-tab" title={`${balloon.label} — globo ${balloon.number}`}>
+        {balloon.linked === false ? 'suelto' : balloon.number}
+      </span>
 
       {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title="quitar globo">×</button>}
 

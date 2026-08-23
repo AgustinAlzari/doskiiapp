@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useStripStore from '../store/stripStore'
-import useTiraStore from '../store/tiraStore'
+import useTiraStore, { isDefaultTira } from '../store/tiraStore'
 import useClipboardStore from '../store/clipboardStore'
 import useAuthorStore from '../store/authorStore'
 import useProjectStore from '../store/projectStore'
@@ -11,7 +11,7 @@ import StripCard from './StripCard'
 import TiraCard from './tiras/TiraCard'
 import TiraView from './tiras/TiraView'
 
-export default function StripList({ project, projectId, onNew, onEdit }) {
+export default function StripList({ project, projectId, initialOpenTiraId = null, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
   const loaded = useStripStore(s => s.loaded)
   const remove = useStripStore(s => s.remove)
@@ -21,6 +21,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const saveTira = useTiraStore(s => s.save)
   const removeTira = useTiraStore(s => s.remove)
   const createTira = useTiraStore(s => s.create)
+  const reorderTira = useTiraStore(s => s.reorder)
   const ensureDefault = useTiraStore(s => s.ensureDefault)
   const copyStrip = useClipboardStore(s => s.copy)
   const authors = useAuthorStore(s => s.authors)
@@ -35,12 +36,16 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   const inTiraIds = new Set(scopedTiras.flatMap(t => t.stripIds || []))
   const looseStrips = scopedStrips.filter(s => !inTiraIds.has(s.id))
   const hasAnyResult = scopedStrips.some(s => (s.results || []).length)
+  const hasEmptyTira = scopedTiras.some(t => (t.stripIds || []).length === 0)
+  const canOpenGallery = hasAnyResult || hasEmptyTira
   const author = project?.authorId ? (authors.find(a => a.id === project.authorId) || null) : null
 
   const [dragIdx, setDragIdx] = useState(null)
   const [insertIdx, setInsertIdx] = useState(null)
+  const [tiraDragIdx, setTiraDragIdx] = useState(null)
+  const [tiraInsertIdx, setTiraInsertIdx] = useState(null)
   const [gallery, setGallery] = useState(null)
-  const [openTiraId, setOpenTiraId] = useState(null)
+  const [openTiraId, setOpenTiraId] = useState(initialOpenTiraId)
   const [editingTiraId, setEditingTiraId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
   const dragOriginRef = useRef(null)
@@ -81,7 +86,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   }
 
   const newTira = async () => {
-    const n = scopedTiras.length + 1
+    const n = scopedTiras.filter(t => !isDefaultTira(t)).length + 1
     const t = await createTira(projectId, `tira ${n}`)
     setEditingTiraId(t.id)
   }
@@ -109,6 +114,12 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
             resultNum: ri + 1,
           })
         }
+      }
+    }
+    // Tiras vacías también se ven en la galería, como tarjeta sin viñetas.
+    for (const t of scopedTiras) {
+      if ((t.stripIds || []).length === 0) {
+        items.push({ isTira: true, tiraTitle: t.title || 'sin título' })
       }
     }
     if (items.length) setGallery(items)
@@ -155,6 +166,46 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   }
   const onDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
+  // Tiras visibles en la sección (las que se pueden reordenar arrastrando).
+  const visibleTiras = scopedTiras.filter(t => (t.stripIds || []).length > 0 || editingTiraId === t.id)
+  const onTiraDragStart = (e, idx) => {
+    if (dragOriginRef.current?.closest?.('[data-no-drag]')) {
+      e.preventDefault()
+      return
+    }
+    setTiraDragIdx(idx)
+    setTiraInsertIdx(null)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-doski-tira', visibleTiras[idx].id)
+  }
+  const onTiraDragOver = (e, idx) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const before = e.clientX < rect.left + rect.width / 2
+    const next = before ? idx : idx + 1
+    if (next !== tiraInsertIdx) setTiraInsertIdx(next)
+  }
+  const onTiraDrop = (e, idx) => {
+    e.preventDefault()
+    if (tiraDragIdx != null) {
+      let target = tiraInsertIdx
+      if (target == null) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        target = e.clientX < rect.left + rect.width / 2 ? idx : idx + 1
+      }
+      const next = [...visibleTiras]
+      const [moved] = next.splice(tiraDragIdx, 1)
+      let at = target > tiraDragIdx ? target - 1 : target
+      at = Math.max(0, Math.min(next.length, at))
+      next.splice(at, 0, moved)
+      reorderTira(projectId, next.map(t => t.id))
+    }
+    setTiraDragIdx(null)
+    setTiraInsertIdx(null)
+  }
+  const onTiraDragEnd = () => { setTiraDragIdx(null); setTiraInsertIdx(null) }
+
   if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
 
   if (openTira) {
@@ -165,7 +216,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
         project={project}
         authors={authors}
         onBack={() => setOpenTiraId(null)}
-        onOpenStrip={(strip) => onEdit(strip)}
+        onOpenStrip={(strip) => onEdit(strip, openTiraId)}
         asCards
       />
     )
@@ -174,34 +225,60 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
   return (
     <ChatLayout>
       <div>
-        <div className="section-header" style={{ justifyContent: 'space-between' }}>
-          <h1 className="ui-h1">viñetas</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span
+        <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 className="ui-h1" style={{ margin: 0 }}>viñetas</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              className="btn btn-sm"
               onClick={openGallery}
-              title={hasAnyResult ? 'ver todos los resultados en galería' : 'sin resultados para ver'}
+              title={canOpenGallery ? (hasAnyResult ? 'ver todos los resultados en galería' : 'ver las tiras vacías en galería') : 'sin resultados para ver'}
               style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: hasAnyResult ? 'var(--color-text)' : 'var(--color-text-muted)',
-                cursor: hasAnyResult ? 'pointer' : 'default',
-                userSelect: 'none',
+                color: canOpenGallery ? 'var(--color-text)' : 'var(--color-text-muted)',
+                cursor: canOpenGallery ? 'pointer' : 'default',
               }}
             >
               ver
-            </span>
-            <button className="btn btn-primary" onClick={onNew}>nueva viñeta</button>
-            <button className="btn" onClick={newTira} title="crear una tira: carpeta que reúne viñetas">nueva tira</button>
+            </button>
+            <button className="btn btn-sm" onClick={onNew}>nueva viñeta</button>
+            <button className="btn btn-sm" onClick={newTira} title="crear una tira: carpeta que reúne viñetas">nueva tira</button>
           </div>
         </div>
 
-      {/* Sección de tiras (carpetas de viñetas) */}
-      {scopedTiras.length > 0 && (
+      {/* Sección de tiras (carpetas de viñetas): general (directorio base) + tiras.
+          Solo se muestran las que tienen viñetas (o las que se están renombrando):
+          una tira vacía no aporta nada a la vista. */}
+      {(looseStrips.length > 0 || scopedTiras.some(t => (t.stripIds || []).length > 0) || editingTiraId != null) && (
         <div style={{ margin: '0 0 24px' }}>
           <div className="label" style={{ marginBottom: 8 }}>tiras</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-            {scopedTiras.map(t => (
-              <div key={t.id} style={{ position: 'relative' }}>
+            {looseStrips.length > 0 && (
+              <div key="general" style={{ position: 'relative' }}>
+                <TiraCard
+                  tira={{ id: 'general', title: 'general', stripIds: looseStrips.map(s => s.id), default: true }}
+                  strips={scopedStrips}
+                  general
+                  count={looseStrips.length}
+                  onAddStrip={(stripId) => assignStripTira(stripId, null)}
+                />
+              </div>
+            )}
+            {visibleTiras.map((t, idx) => (
+              <div
+                key={t.id}
+                draggable
+                onMouseDown={(e) => { dragOriginRef.current = e.target }}
+                onDragStart={(e) => onTiraDragStart(e, idx)}
+                onDragOver={(e) => onTiraDragOver(e, idx)}
+                onDrop={(e) => onTiraDrop(e, idx)}
+                onDragEnd={onTiraDragEnd}
+                style={{ position: 'relative', opacity: tiraDragIdx === idx ? 0.4 : 1, cursor: 'grab' }}
+              >
+                {tiraDragIdx != null && tiraInsertIdx === idx && (
+                  <span style={{ position: 'absolute', left: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+                )}
+                {tiraDragIdx != null && tiraInsertIdx === idx + 1 && (
+                  <span style={{ position: 'absolute', right: -8, top: 0, bottom: 0, width: 3, background: 'var(--color-accent)', borderRadius: 2, zIndex: 3 }} />
+                )}
                 <TiraCard
                   tira={t}
                   strips={scopedStrips}
@@ -211,14 +288,17 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
                   onDone={(title) => { saveTira({ ...t, title }); setEditingTiraId(null) }}
                   onTogglePreview={(tiraId) => { const tt = tiras.find(x => x.id === tiraId); if (tt) saveTira({ ...tt, showInPreview: !tt.showInPreview }) }}
                 />
-                <button
-                  className="btn btn-ghost btn-sm btn-danger"
-                  style={{ position: 'absolute', top: 4, right: 4, zIndex: 2, background: '#fff' }}
-                  onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(t.title || 'tira', false)) removeTira(t.id) }}
-                  title="eliminar tira"
-                >
-                  ×
-                </button>
+                {!isDefaultTira(t) && (
+                  <button
+                    data-no-drag
+                    className="btn btn-ghost btn-sm btn-danger"
+                    style={{ position: 'absolute', top: 4, right: 4, zIndex: 2, background: '#fff' }}
+                    onClick={async (e) => { e.stopPropagation(); if (await confirmDelete(t.title || 'tira', false)) removeTira(t.id) }}
+                    title="eliminar tira"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -255,7 +335,7 @@ export default function StripList({ project, projectId, onNew, onEdit }) {
               onDragOver={(e) => onDragOver(e, idx)}
               onDrop={(e) => onDrop(e, idx)}
               onDragEnd={onDragEnd}
-              onOpen={(s) => onEdit(s)}
+              onOpen={(s) => onEdit(s, null)}
               onDuplicate={duplicate}
               onCopy={doCopy}
               copied={copiedId === strip.id}

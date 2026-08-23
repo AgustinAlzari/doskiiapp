@@ -25,6 +25,7 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
   const tiras = useTiraStore(s => s.tiras)
   const copyStrip = useClipboardStore(s => s.copy)
   const removeStripStore = useStripStore(s => s.remove)
+  const saveStrip = useStripStore(s => s.save)
   const duplicate = useStripStore(s => s.duplicate)
   const projects = useProjectStore(s => s.projects)
   const scopedTiras = tiras.filter(t => t.projectId === project?.id)
@@ -46,7 +47,12 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
   const [dragIdx, setDragIdx] = useState(null)
   const [insertIdx, setInsertIdx] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [newStripId, setNewStripId] = useState(null)
   const dragOriginRef = useRef(null)
+
+  // Notas de la tira: se guardan al salir de la caja.
+  const [notes, setNotes] = useState(tira?.notes || '')
+  useEffect(() => { setNotes(tira?.notes || '') }, [tira?.id])
 
   const doCopy = (id) => {
     copyStrip(id)
@@ -76,6 +82,45 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
 
   const persistOrder = (list) => {
     update({ stripIds: list.map(s => s.id) })
+  }
+
+  // Crea una viñeta nueva dentro de la tira: adopta el nombre y formato de la
+  // tira (primera viñeta o el default del proyecto) y queda como tarjetón con el
+  // nombre en edición. Si no se le pone nombre, conserva "tira + N".
+  const createStripInTira = async () => {
+    const n = ordered.length + 1
+    const strip = {
+      id: crypto.randomUUID(),
+      projectId: project?.id,
+      title: `${tira.title || 'tira'} ${n}`,
+      panelCount: 1,
+      aspectRatio: ordered[0]?.aspectRatio || project?.defaultAspectRatio || 'hd',
+      panels: [{
+        id: crypto.randomUUID(),
+        scene: '',
+        characters: [],
+        backgroundId: null,
+        objects: [],
+        narration: null,
+      }],
+      createdAt: new Date().toISOString(),
+    }
+    await saveStrip(strip)
+    update({ stripIds: [...(tira.stripIds || []), strip.id] })
+    setNewStripId(strip.id)
+  }
+
+  const renameStrip = (strip, title) => {
+    saveStrip({ ...strip, title })
+    if (newStripId === strip.id) setNewStripId(null)
+  }
+
+  // Duplica una viñeta que está dentro de la tira: la copia queda también en la
+  // tira (al final de stripIds), no vuelve a general.
+  const duplicateInTira = async (strip) => {
+    const copy = await duplicate(strip)
+    update({ stripIds: [...(tira.stripIds || []), copy.id] })
+    return copy
   }
 
   const onDragStart = (e, idx) => {
@@ -168,7 +213,7 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
   return (
     <ChatLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="section-header" style={{ flexWrap: 'wrap', gap: 12 }}>
+        <div className="section-header" style={{ flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
           <button className="back-arrow" onClick={onBack} title="volver">←</button>
           <div style={{ flex: 1, minWidth: 200 }}>
             <input
@@ -176,13 +221,14 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
               value={tira.title || ''}
               onChange={e => update({ title: e.target.value })}
               placeholder="nombre de la tira"
-              style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}
+              style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}
             />
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
               {ordered.length} {ordered.length === 1 ? 'viñeta' : 'viñetas'} · tira
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-end', marginBottom: 22 }}>
+            <button className="btn btn-sm" onClick={createStripInTira} title="crear una viñeta nueva dentro de esta tira (toma su nombre y formato)">nueva viñeta</button>
             <select className="input" style={{ width: 'auto', fontSize: 12, cursor: 'pointer' }} value={format} onChange={e => setFormat(e.target.value)}>
               {FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
             </select>
@@ -214,9 +260,11 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
                 onDrop={(e) => onDrop(e, idx)}
                 onDragEnd={onDragEnd}
                 onOpen={(st) => onOpenStrip ? onOpenStrip(st) : openStrip(st)}
-                onDuplicate={duplicate}
+                onDuplicate={duplicateInTira}
                 onCopy={doCopy}
                 copied={copiedId === s.id}
+                editing={newStripId === s.id}
+                onRename={(title) => renameStrip(s, title)}
                 removeTitle="eliminar viñeta"
                 onRemove={async (st) => { if (await confirmDelete(st.title || 'viñeta', isInCloud(st, projects))) removeStripStore(st.id) }}
                 tiraOptions={scopedTiras.map(t => ({ id: t.id, title: t.title }))}
@@ -224,6 +272,27 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
                 onAssignTira={assignStripTira}
               />
             ))}
+            {/* Botón "+": agrega un tarjetón al final de la tira (mismo alto que una tarjeta) */}
+            <button
+              className="btn"
+              onClick={createStripInTira}
+              title="nueva viñeta en esta tira"
+              style={{
+                width: 220,
+                minHeight: 210,
+                height: 'auto',
+                border: '2px dashed var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                background: 'rgba(0,0,0,0.02)',
+                fontSize: 30,
+                fontWeight: 400,
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+                alignSelf: 'flex-start',
+              }}
+            >
+              +
+            </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
@@ -280,25 +349,23 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
           </div>
         )}
 
-        {/* Recuadro para devolver una viñeta al directorio base (nunca elimina) */}
-        <div
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-          onDrop={(e) => {
-            e.preventDefault()
-            const id = e.dataTransfer.getData('application/x-doski-strip')
-            if (id) removeStrip(id)
-          }}
-          style={{
-            border: '2px dashed var(--color-border-muted)',
-            borderRadius: 10,
-            padding: '14px 18px',
-            textAlign: 'center',
-            color: 'var(--color-text-muted)',
-            fontSize: 12,
-          }}
-        >
-          quitar de la tira — arrastrá una viñeta acá para devolverla al directorio base (nunca se elimina, solo se organiza)
-        </div>
+        {/* Footer de notas: solo cuando la tira tiene contenido, se guardan al salir de la caja */}
+        {ordered.length > 0 && (
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border-muted)', paddingTop: 12 }}>
+            <div style={{ marginBottom: 6 }}>
+              <span className="label">notas</span>
+            </div>
+            <textarea
+              className="input textarea"
+              rows={4}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => update({ notes })}
+              placeholder="notas de la tira..."
+              style={{ width: '100%', resize: 'none', overflowY: 'auto', lineHeight: 1.5 }}
+            />
+          </div>
+        )}
 
         {preview && (
           <ImagePreview src={preview.src} title={preview.title} onClose={() => setPreview(null)} />

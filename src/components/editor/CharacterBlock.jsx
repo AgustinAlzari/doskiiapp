@@ -1,7 +1,8 @@
 import { useRef, useState, useCallback } from 'react'
 import { DIRECTIONS, ACTION_EFFECTS, MOTION_LINE_DESCS } from '../../data/actionPresets'
+import useDoubleClick from './useDoubleClick'
 
-export default function CharacterBlock({ panelChar, charDef, isSelected, onSelect, onMove, onResize, onRemove, onConnOutStart, onConnInEnd, isConnDrag, connDragFrom }) {
+export default function CharacterBlock({ panelChar, charDef, isSelected, onSelect, onMove, onResize, onRemove, onConnOutStart, onConnInEnd, isConnDrag, connDragFrom, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
@@ -9,11 +10,13 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
   const isResizingRef = useRef(false)
+  const detectDbl = useDoubleClick(onDoubleClick)
 
   const isConnSource = connDragFrom === panelChar.characterId
 
   const handleMouseDown = useCallback((e) => {
     if (isResizingRef.current) return
+    if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -37,7 +40,7 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
     }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
-  }, [panelChar, onSelect, onMove])
+  }, [panelChar, onSelect, onMove, detectDbl])
 
   const handleResizeDown = useCallback((e, corner) => {
     e.stopPropagation()

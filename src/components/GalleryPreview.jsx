@@ -19,6 +19,9 @@ export default function GalleryPreview({ items, author, onClose }) {
   const [format, setFormat] = useState('png')
   const exportRef = useRef(null)
 
+  // Las tarjetas de tira vacía no son resultados: no se exportan ni se cuentan.
+  const resultItems = items.filter(it => !it.isTira)
+
   // Esc cierra la galería (solo si no hay preview abierto encima).
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && fullIndex == null) onClose() }
@@ -61,8 +64,8 @@ export default function GalleryPreview({ items, author, onClose }) {
     setExporting('all')
     try {
       const f = FORMATS.find(x => x.id === format)
-      const pad = String(items.length).length
-      const batch = items.map((item, i) => ({
+      const pad = String(resultItems.length).length
+      const batch = resultItems.map((item, i) => ({
         sourcePath: item.path,
         title: item.stripTitle,
         fileName: `${String(i + 1).padStart(pad, '0')}-${slugify(item.stripTitle)}.${FORMAT_EXT[format]}`,
@@ -81,7 +84,7 @@ export default function GalleryPreview({ items, author, onClose }) {
         <button className="back-arrow" onClick={onClose} title="volver atrás (Esc)">←</button>
         <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap' }}>ver</span>
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-          {items.length} {items.length === 1 ? 'resultado' : 'resultados'}
+          {resultItems.length} {resultItems.length === 1 ? 'resultado' : 'resultados'}
         </span>
         <div style={{ flex: 1 }} />
 
@@ -119,10 +122,10 @@ export default function GalleryPreview({ items, author, onClose }) {
               </div>
               <div style={{ width: '100%', height: 1, background: 'var(--color-border-muted)', margin: '4px 0' }} />
               <button className="btn btn-sm" onClick={exportAll} disabled={exporting != null}>
-                exportar todas ({items.length})
+                exportar todas ({resultItems.length})
               </button>
               <div style={{ width: '100%', height: 1, background: 'var(--color-border-muted)', margin: '4px 0' }} />
-              {items.map((item, i) => (
+              {resultItems.map((item, i) => (
                 <button key={i} className="btn btn-ghost btn-sm" style={{ justifyContent: 'flex-start' }} onClick={() => exportOne(item, i)} disabled={exporting != null}>
                   {i + 1} · {item.stripTitle}
                 </button>
@@ -134,7 +137,29 @@ export default function GalleryPreview({ items, author, onClose }) {
 
       {/* Galería flotante */}
       <div style={{ flex: 1, overflow: 'auto', padding: 28, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: 22, alignContent: 'flex-start' }}>
-        {items.map((item, i) => (
+        {items.map((item, i) => item.isTira ? (
+          <div
+            key={`tira-${i}`}
+            style={{
+              width: 180,
+              height: 240,
+              border: '2px dashed var(--color-border-muted)',
+              borderRadius: 12,
+              background: 'rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: 12,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 22, color: 'var(--color-text-muted)' }}>▤</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{item.tiraTitle}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>tira vacía — sin viñetas todavía</div>
+          </div>
+        ) : (
           <div
             key={i}
             style={{
@@ -148,7 +173,7 @@ export default function GalleryPreview({ items, author, onClose }) {
               src={item.src}
               alt=""
               draggable={false}
-              onClick={() => setFullIndex(i)}
+              onClick={() => setFullIndex(resultItems.findIndex(r => r === item))}
               style={{
                 maxHeight: '55vh',
                 maxWidth: '100%',
@@ -171,9 +196,9 @@ export default function GalleryPreview({ items, author, onClose }) {
       {/* Preview completo de una imagen */}
       {fullIndex != null && (
         <ImagePreview
-          gallery={items}
+          gallery={resultItems}
           index={fullIndex}
-          onIndex={(i) => setFullIndex((i + items.length) % items.length)}
+          onIndex={(i) => setFullIndex((i + resultItems.length) % resultItems.length)}
           onClose={() => setFullIndex(null)}
         />
       )}

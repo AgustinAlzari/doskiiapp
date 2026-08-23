@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { coverOf } from '../utils/stripCover'
 
 function formatDate(iso) {
@@ -58,7 +58,27 @@ export default function StripCard({
   tiraOptions,
   tiraId,
   onAssignTira,
+  editing,
+  onRename,
 }) {
+  const [draft, setDraft] = useState(strip.title || '')
+  const inputRef = useRef(null)
+
+  // Al entrar en modo edición, enfocar el input y seleccionar el nombre.
+  useEffect(() => {
+    if (editing) {
+      setDraft(strip.title || '')
+      setTimeout(() => {
+        if (inputRef.current) { inputRef.current.focus(); inputRef.current.select() }
+      }, 0)
+    }
+  }, [editing])
+
+  const commitName = () => {
+    const t = draft.trim()
+    onRename?.(t || strip.title || 'sin título')
+  }
+
   return (
     <div
       draggable={draggable}
@@ -69,7 +89,7 @@ export default function StripCard({
       onDragEnd={onDragEnd}
       className="strip-card"
       style={{ position: 'relative', cursor: 'grab', opacity: dragging ? 0.4 : 1 }}
-      onClick={() => onOpen(strip)}
+      onClick={() => { if (!editing) onOpen(strip) }}
     >
       {/* Línea de inserción en el espacio entre tarjetas */}
       {insertBefore && (
@@ -85,9 +105,27 @@ export default function StripCard({
       )}
       <StripCover strip={strip} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div className="ui-h3" style={{ flex: 1, minWidth: 0 }}>
-          {strip.title || 'sin título'}
-        </div>
+        {editing ? (
+          <input
+            ref={inputRef}
+            data-no-drag
+            className="input"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitName() }
+              if (e.key === 'Escape') { setDraft(strip.title || ''); onRename?.(strip.title || '') }
+              e.stopPropagation()
+            }}
+            onBlur={commitName}
+            onClick={(e) => e.stopPropagation()}
+            style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}
+          />
+        ) : (
+          <div className="ui-h3" style={{ flex: 1, minWidth: 0 }}>
+            {strip.title || 'sin título'}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {onDuplicate && (
             <button

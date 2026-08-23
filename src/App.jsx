@@ -51,6 +51,7 @@ export default function App() {
   const [view, setView] = useState('projects')
   const [activeProjectId, setActiveProjectId] = useState(null)
   const [selectedStripId, setSelectedStripId] = useState(null)
+  const [tiraReturnId, setTiraReturnId] = useState(null)
   const [editingCharacter, setEditingCharacter] = useState(null)
   const [editingBackground, setEditingBackground] = useState(null)
   const [editingObject, setEditingObject] = useState(null)
@@ -146,6 +147,7 @@ export default function App() {
     } catch {}
     setActiveProjectId(id)
     setSelectedStripId(null)
+    setTiraReturnId(null)
     setView('strips')
     try { localStorage.setItem('doski:lastProject', id) } catch {}
   }
@@ -153,6 +155,7 @@ export default function App() {
   const exitProject = () => {
     userStartedRef.current = true
     setActiveProjectId(null)
+    setTiraReturnId(null)
     setView('projects')
   }
 
@@ -241,8 +244,9 @@ export default function App() {
           <StripList
             project={activeProject}
             projectId={activeProjectId}
+            initialOpenTiraId={tiraReturnId}
             onNew={() => setView('new-strip')}
-            onEdit={(strip) => { setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
+            onEdit={(strip, tiraId) => { setTiraReturnId(tiraId || null); setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
           />
         )
 
@@ -250,7 +254,7 @@ export default function App() {
         return (
           <StripCreator
             project={activeProject}
-            onCreated={(strip) => { setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
+            onCreated={(strip, tiraId) => { setTiraReturnId(tiraId || null); setSelectedStripId(strip.id); setView('editor'); setChatOpen(false) }}
             onBack={() => setView('strips')}
           />
         )

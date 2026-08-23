@@ -34,8 +34,13 @@ export default function Layout({ children, currentView, onNavigate, activeProjec
     <div style={{ display: 'flex', height: '100vh' }}>
       <div className="title-drag-region" />
       <Sidebar currentView={currentView} onNavigate={onNavigate} activeProject={activeProject} onExitProject={onExitProject} onToggleMode={onToggleMode} />
-      <main className="app-main" style={{ flex: 1, overflow: 'auto', padding: '48px 32px 32px' }}>
-        {children}
+      <main className="app-main" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Área scrolleable que arranca DEBAJO de la barra de título (y=48): así el
+            contenido nunca asoma por encima del header fijo al scrollear y las
+            imágenes se ocultan de verdad detrás del sticky header de "preview". */}
+        <div style={{ position: 'absolute', top: 48, right: 0, bottom: 0, left: 0, overflow: 'auto', padding: '0 32px 32px' }}>
+          {children}
+        </div>
       </main>
     </div>
   )

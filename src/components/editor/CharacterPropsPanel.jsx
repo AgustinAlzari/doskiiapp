@@ -1,29 +1,8 @@
-import { useState } from 'react'
 import { ACTION_PRESETS, DIRECTIONS, DIRECTION_MODES, SHOT_TYPES } from '../../data/actionPresets'
-import { orderedPanelDialogues } from '../../services/promptGenerator'
 import SpellCheckedTextarea from '../SpellCheckedTextarea'
 
-export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, panelConnections, allCharacters, allObjects, defaultBalloonId, onUpdate, onRemove, onEdit }) {
+export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, panelConnections, allCharacters, allObjects, defaultBalloonId, defaultSpeechBalloonId, defaultThoughtBalloonId, onAddDialogue, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
-  const extraDialogues = panelChar.extraDialogues || []
-  const [editingExtra, setEditingExtra] = useState(null)
-
-  const dialogueNums = (() => {
-    const list = orderedPanelDialogues({ characters: panelCharacters || [] }, allCharacters || [])
-    const nums = { main: null, extras: {} }
-    let mainLabel = null
-    list.forEach(d => {
-      if (d.characterId !== panelChar.characterId) return
-      if (d.isExtra) nums.extras[d.extraIdx] = d.number
-      else { nums.main = d.number; mainLabel = d.label }
-    })
-    nums.mainLabel = mainLabel
-    return nums
-  })()
-
-  const toggleSpeaksFirst = () => {
-    onUpdate({ speaksFirst: !panelChar.speaksFirst })
-  }
 
   const toggleAction = (action) => {
     const next = actions.includes(action)
@@ -34,23 +13,6 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
 
   const removeAction = (action) => {
     onUpdate({ actions: actions.filter(a => a !== action) })
-  }
-
-  const addExtraDialogue = () => {
-    const newDialogues = [...extraDialogues, { text: '', type: 'speech', balloonId: defaultBalloonId || null }]
-    onUpdate({ extraDialogues: newDialogues })
-    setEditingExtra(newDialogues.length - 1)
-  }
-
-  const updateExtraDialogue = (idx, updates) => {
-    const newDialogues = extraDialogues.map((d, i) => i === idx ? { ...d, ...updates } : d)
-    onUpdate({ extraDialogues: newDialogues })
-  }
-
-  const removeExtraDialogue = (idx) => {
-    const newDialogues = extraDialogues.filter((_, i) => i !== idx)
-    onUpdate({ extraDialogues: newDialogues })
-    setEditingExtra(null)
   }
 
   const otherPanelChars = (panelCharacters || []).filter(c => c.characterId !== panelChar.characterId)
@@ -90,6 +52,18 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
           />
         </div>
       )}
+
+      {/* Diálogo / pensamiento */}
+      <div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <button className="btn btn-sm" onClick={() => onAddDialogue?.('speech')} style={{ fontSize: 11 }}>
+            + diálogo
+          </button>
+          <button className="btn btn-sm" onClick={() => onAddDialogue?.('thought')} style={{ fontSize: 11 }}>
+            + pensamiento
+          </button>
+        </div>
+      </div>
 
       {/* Expression */}
       <div>
@@ -197,59 +171,6 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
           )}
         </div>
       </div>
-
-      {/* Dialogue text + position */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <label className="label" style={{ marginBottom: 0 }}>
-            diálogo / pensamiento {dialogueNums.main != null && <span style={{ color: 'var(--color-accent)' }}>· G{dialogueNums.main}</span>}
-          </label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              className={`btn btn-sm ${panelChar.speaksFirst ? '' : 'btn-ghost'}`}
-              onClick={toggleSpeaksFirst}
-              style={{ fontSize: 10, padding: '2px 6px' }}
-            >
-              habla primero
-            </button>
-          </div>
-        </div>
-        <SpellCheckedTextarea
-          value={panelChar.dialogue || ''}
-          onChange={e => onUpdate({ dialogue: e.target.value })}
-          placeholder="qué dice o piensa..."
-          minRows={2}
-        />
-        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 4 }}>
-          el globo {dialogueNums.mainLabel || `${character.name} 1`} en el lienzo es solo indicación gráfica: movelo y redimensionálo para diseñar; el texto va al prompt.
-        </div>
-      </div>
-
-      {/* Extra dialogues */}
-      {extraDialogues.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label className="label">diálogos extra</label>
-          {extraDialogues.map((extra, idx) => (
-            <div key={idx} style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                  línea {idx + 2}{dialogueNums.extras[idx] != null && <span style={{ color: 'var(--color-accent)' }}> · G{dialogueNums.extras[idx]}</span>}
-                </span>
-                <button className="btn btn-ghost btn-sm btn-danger" onClick={() => removeExtraDialogue(idx)} style={{ fontSize: 10 }}>×</button>
-              </div>
-              <SpellCheckedTextarea
-                value={extra.text}
-                onChange={e => updateExtraDialogue(idx, { text: e.target.value })}
-                placeholder="siguiente línea de diálogo..."
-                minRows={2}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-      <button className="btn btn-sm btn-ghost" onClick={addExtraDialogue} style={{ fontSize: 11 }}>
-        + agregar línea de diálogo
-      </button>
 
       {/* Actions */}
       <div>
