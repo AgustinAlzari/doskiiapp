@@ -61,6 +61,7 @@ export default function App() {
   const [promptData, setPromptData] = useState(null)
   const [backupConfig, setBackupConfig] = useState(null)
   const [backupReady, setBackupReady] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const setChatOpen = useChatStore(s => s.setOpen)
   const userStartedRef = useRef(false)
 
@@ -84,6 +85,18 @@ export default function App() {
     await reloadAllStores()
   }
 
+  // Sincroniza en segundo plano: muestra un aviso "sincronizando..." mientras
+  // descarga la nube y recarga los stores, pero sin bloquear la navegación.
+  const syncInBackground = async () => {
+    if (syncing) return
+    setSyncing(true)
+    try {
+      await refreshAndReload()
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   // Aplica un modo (online/local) al backup y a la UI.
   const applyMode = async (mode) => {
     try { if (window.api?.backup?.setMode) await window.api.backup.setMode({ mode }) } catch {}
@@ -102,7 +115,7 @@ export default function App() {
     await persistMode(activeProject, nextMode)
     if (nextMode === 'online') {
       try { if (window.api?.backup?.syncNow) await window.api.backup.syncNow() } catch {}
-      await refreshAndReload()
+      await syncInBackground()
     }
   }
 
@@ -113,8 +126,8 @@ export default function App() {
       try { if (window.api?.backup?.getConfig) cfg = await window.api.backup.getConfig() } catch {}
       if (!active) return
       setBackupConfig(cfg)
-      if (cfg?.mode === 'online') await refreshAndReload()
       setBackupReady(true)
+      if (cfg?.mode === 'online') await syncInBackground()
     })()
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,19 +150,21 @@ export default function App() {
     // Cada proyecto recuerda el modo del switch en que se cerró; sin memoria, hereda el global.
     const memorized = proj?.syncMode || globalMode
     await applyMode(memorized)
-    if (memorized === 'online') {
-      await refreshAndReload()
-    }
     try {
       if (window.api?.backup?.setActiveProject) {
         await window.api.backup.setActiveProject({ cloudBackup: proj?.cloudBackup !== false })
       }
     } catch {}
+    // Abre al toque con lo que hay local; la sincronización corre en segundo plano
+    // (aviso "sincronizando...") mientras el usuario ya navega.
     setActiveProjectId(id)
     setSelectedStripId(null)
     setTiraReturnId(null)
     setView('strips')
     try { localStorage.setItem('doski:lastProject', id) } catch {}
+    if (memorized === 'online') {
+      await syncInBackground()
+    }
   }
 
   const exitProject = () => {
@@ -428,6 +443,26 @@ export default function App() {
       <Layout currentView={view} onNavigate={navigate} activeProject={activeProject} onExitProject={exitProject} onToggleMode={toggleSyncMode}>
         <ErrorBoundary>{renderContent()}</ErrorBoundary>
       </Layout>
+      {/* Aviso pequeño de sincronización: no bloquea la navegación */}
+      {syncing && (
+        <div style={{
+          position: 'fixed',
+          top: 12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10001,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 20,
+          padding: '5px 14px',
+          fontSize: 12,
+          color: 'var(--color-text-2)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          pointerEvents: 'none',
+        }}>
+          sincronizando...
+        </div>
+      )}
       {/* Chat de IA persistente: vive fuera del contenido que cambia al navegar,
           así la conversación no se reinicia al cambiar de vista. */}
       <ChatPanel />

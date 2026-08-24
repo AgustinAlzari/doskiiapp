@@ -1,5 +1,4 @@
 import { ACTION_PRESETS, DIRECTIONS, DIRECTION_MODES, SHOT_TYPES } from '../../data/actionPresets'
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
 
 export default function CharacterPropsPanel({ character, panelChar, panelCharacters, panelObjects, panelNarration, panelConnections, allCharacters, allObjects, defaultBalloonId, defaultSpeechBalloonId, defaultThoughtBalloonId, onAddDialogue, onUpdate, onRemove, onEdit }) {
   const actions = panelChar.actions || []
@@ -44,11 +43,13 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             <span className="color-dot" style={{ background: character.color }} />
             <span style={{ fontSize: 12, fontWeight: 600 }}>comodín — aparición única</span>
           </div>
-          <SpellCheckedTextarea
+          <textarea
+            className="input textarea"
             value={panelChar.comodinDesc || ''}
             onChange={e => onUpdate({ comodinDesc: e.target.value })}
             placeholder="qué es este personaje en este cuadro: ej. 'una laucha que habla'..."
-            minRows={3}
+            rows={3}
+            style={{ width: '100%', fontSize: 12, lineHeight: 1.5 }}
           />
         </div>
       )}
@@ -196,13 +197,13 @@ export default function CharacterPropsPanel({ character, panelChar, panelCharact
             </label>
           ))}
         </div>
-        <SpellCheckedTextarea
+        <textarea
+          className="input textarea"
           value={panelChar.actionNotes || ''}
           onChange={e => onUpdate({ actionNotes: e.target.value })}
           placeholder="descripción detallada de la acción..."
-          minRows={4}
-          maxRows={4}
-          style={{ width: '100%' }}
+          rows={4}
+          style={{ width: '100%', fontSize: 12, lineHeight: 1.5 }}
         />
       </div>
     </div>

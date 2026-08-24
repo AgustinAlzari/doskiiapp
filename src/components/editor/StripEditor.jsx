@@ -12,8 +12,6 @@ import PanelCanvas from './PanelCanvas'
 import CharacterPropsPanel from './CharacterPropsPanel'
 import BalloonPropsPanel from './BalloonPropsPanel'
 import TextLayoutControls from './TextLayoutControls'
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
-import SpellCheckedInput from '../SpellCheckedInput'
 import useChatStore from '../../store/chatStore'
 import EntityMenu from './EntityMenu'
 
@@ -913,20 +911,24 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                         {selectedObjDef.comodin && (
                           <div style={{ marginBottom: 12 }}>
                             <label className="label">qué es este objeto</label>
-                            <SpellCheckedTextarea
+                            <textarea
+                              className="input textarea"
                               value={selectedObjData.comodinDesc || ''}
                               onChange={e => updateObjectInPanel(0, selectedObjIdx, { comodinDesc: e.target.value })}
                               placeholder="ej. 'un microondas abandonado lleno de moscas'..."
-                              minRows={3}
+                              rows={3}
+                              style={{ fontSize: 12, lineHeight: 1.5 }}
                             />
                           </div>
                         )}
                         <label className="label">sobre el objeto</label>
-                        <SpellCheckedTextarea
+                        <textarea
+                          className="input textarea"
                           value={selectedObjData.note || ''}
                           onChange={e => updateObjectInPanel(0, selectedObjIdx, { note: e.target.value })}
                           placeholder="qué ocurre sobre este objeto, qué contiene o qué relación tiene con la escena..."
-                          minRows={4}
+                          rows={4}
+                          style={{ fontSize: 12, lineHeight: 1.5 }}
                         />
                       </div>
                     </div>
@@ -955,11 +957,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                         {bgDef?.comodin && (
                           <div style={{ marginTop: 12 }}>
                             <label className="label">qué es este fondo</label>
-                            <SpellCheckedTextarea
+                            <textarea
+                              className="input textarea"
                               value={panel?.comodinDesc || ''}
                               onChange={e => updatePanel(0, { comodinDesc: e.target.value })}
                               placeholder="qué es este fondo: ej. 'un baldío detrás de un supermercado'..."
-                              minRows={3}
+                              rows={3}
+                              style={{ fontSize: 12, lineHeight: 1.5 }}
                             />
                           </div>
                         )}
@@ -978,10 +982,12 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       </div>
                       <div style={{ marginTop: 12 }}>
                         <label className="label">texto</label>
-                        <SpellCheckedInput
+                        <input
+                          className="input"
                           value={selectedSfxData.text}
                           onChange={e => updateSfxInPanel(0, selectedSfxIdx, { text: e.target.value })}
                           placeholder="BAM, WHOOSH..."
+                          style={{ fontSize: 12 }}
                         />
                       </div>
                       <div style={{ marginTop: 12 }}>
@@ -1160,11 +1166,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     const bgDef = panel?.backgroundId ? backgrounds.find(b => b.id === panel.backgroundId) : null
                     if (!bgDef?.comodin) return null
                     return (
-                      <SpellCheckedTextarea
+                      <textarea
+                        className="input textarea"
                         value={panel?.comodinDesc || ''}
                         onChange={e => updatePanel(0, { comodinDesc: e.target.value })}
                         placeholder="qué es este fondo: ej. 'un baldío detrás de un supermercado'..."
-                        minRows={3}
+                        rows={3}
+                        style={{ fontSize: 12, lineHeight: 1.5 }}
                       />
                     )
                   })()}

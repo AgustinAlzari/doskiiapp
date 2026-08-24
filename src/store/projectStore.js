@@ -33,6 +33,7 @@ export const makeDefaultProject = () => ({
   styleNotes: '',
   defaultAspectRatio: 'hd',
   previewGeneral: true,
+  generalNote: '',
   colorMode: 'bw',
   palette: [],
   paletteId: null,

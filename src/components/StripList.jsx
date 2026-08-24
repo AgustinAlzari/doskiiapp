@@ -26,6 +26,7 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   const copyStrip = useClipboardStore(s => s.copy)
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
+  const saveProject = useProjectStore(s => s.save)
   const scopedStrips = strips.filter(s => s.projectId === projectId)
   const scopedTiras = tiras.filter(t => t.projectId === projectId)
 
@@ -345,6 +346,19 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
               onAssignTira={assignStripTira}
             />
           ))}
+        </div>
+      )}
+      {looseStrips.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <label className="label">nota general</label>
+          <textarea
+            className="input textarea"
+            value={project?.generalNote || ''}
+            onChange={e => saveProject({ ...project, generalNote: e.target.value })}
+            placeholder="nota de la base general: contexto, continuidad, recordatorios..."
+            rows={2}
+            style={{ fontSize: 12, lineHeight: 1.5 }}
+          />
         </div>
       )}
       {gallery && (

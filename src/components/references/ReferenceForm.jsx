@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import useReferenceStore from '../../store/referenceStore'
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 import { REFERENCE_EXTRACTOR_PROMPT } from '../../data/referenceExtractorPrompt'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -88,11 +87,13 @@ export default function ReferenceForm({ reference, projectId, onCancel }) {
               {copied ? 'copiado ✓' : 'copiar extractor'}
             </button>
           </div>
-          <SpellCheckedTextarea
+          <textarea
+            className="input textarea"
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describí la referencia: ciudad, cortina, textura, arquitectura, lo que sea..."
-            minRows={4}
+            rows={4}
+            style={{ fontSize: 12, lineHeight: 1.5 }}
           />
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
             pegá el "copiar extractor" en una IA multimodal junto con la imagen, y pegá su respuesta acá.
