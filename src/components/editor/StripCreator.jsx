@@ -17,6 +17,8 @@ export default function StripCreator({ project, onCreated, onBack }) {
   const [title, setTitle] = useState('')
   const [tiraId, setTiraId] = useState(GENERAL)
   const [aspectRatio, setAspectRatio] = useState(project?.defaultAspectRatio || 'hd')
+  const [newTiraName, setNewTiraName] = useState('')
+  const [creatingTira, setCreatingTira] = useState(false)
 
   const scopedTiras = tiras.filter(t => t.projectId === project?.id)
   const scopedStrips = strips.filter(s => s.projectId === project?.id)
@@ -49,9 +51,16 @@ export default function StripCreator({ project, onCreated, onBack }) {
     setAspectRatio(next)
   }
 
-  const newTira = async () => {
-    const n = scopedTiras.length + 1
-    const t = await createTira(project?.id, `tira ${n}`)
+  const startNewTira = () => {
+    setNewTiraName('')
+    setCreatingTira(true)
+  }
+
+  const commitNewTira = async () => {
+    const name = newTiraName.trim()
+    if (!name) { setCreatingTira(false); return }
+    const t = await createTira(project?.id, name)
+    setCreatingTira(false)
     chooseTira(t.id)
   }
 
@@ -117,7 +126,20 @@ export default function StripCreator({ project, onCreated, onBack }) {
               <option value={GENERAL}>general</option>
               {scopedTiras.map(t => <option key={t.id} value={t.id}>{t.title || 'sin título'}</option>)}
             </select>
-            <button className="btn" onClick={newTira} title="crear una tira">+</button>
+            {creatingTira ? (
+              <input
+                className="input"
+                value={newTiraName}
+                onChange={e => setNewTiraName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitNewTira(); if (e.key === 'Escape') setCreatingTira(false) }}
+                onBlur={commitNewTira}
+                placeholder="nombre de la tira"
+                autoFocus
+                style={{ width: 160 }}
+              />
+            ) : (
+              <button className="btn" onClick={startNewTira} title="crear una tira nueva">+</button>
+            )}
             {tiraId !== GENERAL && (
               <button className="btn" onClick={() => deleteTira(tiraId)} title="borrar la tira">×</button>
             )}

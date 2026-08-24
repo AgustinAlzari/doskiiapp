@@ -3,7 +3,6 @@ import useBalloonStore from '../../store/balloonStore'
 import useProjectStore from '../../store/projectStore'
 import { BALLOON_LAWS, BALLOON_LAW_GROUPS, makeDefaultBalloonLaws, balloonLawsToPrompt } from '../../data/balloonLaws'
 import { projectStyleText } from '../../services/promptGenerator'
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 import PaletteEditor from '../projects/PaletteEditor'
 import useAutoSaveBack from '../../utils/useAutoSaveBack'
@@ -179,11 +178,13 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
         {!isImage ? (
           <div>
             <label className="label">texto por defecto (opcional)</label>
-            <SpellCheckedTextarea
+            <textarea
+              className="input textarea"
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="texto que llevaría este globo por defecto (se sobrescribe con el texto de cada panel)..."
-              minRows={2}
+              rows={2}
+              style={{ fontSize: 12, lineHeight: 1.5 }}
             />
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
               el texto se escribe en cada panel como hasta ahora; este campo solo se usa como default si el panel no tiene texto.
@@ -199,11 +200,13 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
 
         <div>
           <label className="label">{isImage ? 'prompt del marco' : 'descripción del globo'}</label>
-          <SpellCheckedTextarea
+          <textarea
+            className="input textarea"
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder={isImage ? 'describe el marco del globo: forma, contorno, cola, textura...' : 'describe el estilo del globo: forma, contorno, cola, lettering...'}
-            minRows={4}
+            rows={4}
+            style={{ fontSize: 12, lineHeight: 1.5 }}
           />
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
             {isImage
@@ -245,11 +248,13 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
                     : 'el proyecto no tiene estilo definido; escribí uno propio.'}
                 </div>
               ) : (
-                <SpellCheckedTextarea
+                <textarea
+                  className="input textarea"
                   value={imageStyle}
                   onChange={e => setImageStyle(e.target.value)}
                   placeholder="estilo propio de la imagen que va dentro del globo..."
-                  minRows={2}
+                  rows={2}
+                  style={{ fontSize: 12, lineHeight: 1.5 }}
                 />
               )}
             </div>

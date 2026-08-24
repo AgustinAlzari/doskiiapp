@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import useBackgroundStore from '../../store/backgroundStore'
-import SpellCheckedTextarea from '../SpellCheckedTextarea'
 import ReferenceImagePicker from '../ReferenceImagePicker'
 import { LANDSCAPE_EXTRACTOR_PROMPT } from '../../data/landscapeExtractorPrompt'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -89,11 +88,13 @@ export default function BackgroundForm({ background, projectId, onCancel }) {
               {copied ? 'copiado ✓' : 'copiar extractor'}
             </button>
           </div>
-          <SpellCheckedTextarea
+          <textarea
+            className="input textarea"
             value={promptText}
             onChange={e => setPromptText(e.target.value)}
             placeholder="describe el fondo: ambiente, iluminación, época, estilo..."
-            minRows={4}
+            rows={4}
+            style={{ fontSize: 12, lineHeight: 1.5 }}
           />
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
             pegá el "copiar extractor" en una IA multimodal junto con la imagen del paisaje, y pegá su respuesta acá.

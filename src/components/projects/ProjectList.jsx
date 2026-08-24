@@ -103,7 +103,7 @@ export default function ProjectList({ onOpen, onNew, onEdit }) {
                     ))}
                   </div>
                   <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => onEdit(project)} title="abrir">abrir</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => onOpen(project.id)} title="abrir proyecto (viñetas)">abrir</button>
                     <button className="btn btn-ghost btn-sm" onClick={async () => { const copy = await duplicate(project.id); if (copy) onEdit(copy) }} title="duplicar">⧉</button>
                     <button
                       className="btn btn-ghost btn-sm btn-danger"
