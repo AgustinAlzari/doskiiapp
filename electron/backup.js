@@ -10,12 +10,15 @@
 //   }
 //
 // Sincronización BIDIRECCIONAL segura (modo en línea):
-//   - subir: cada cambio (`markDirty`) espeja el "conjunto nube" (excluye
-//     proyectos `cloudBackup:false`) y ejecuta `rclone copy --update`
-//     (más nuevo gana; nunca pisa un archivo más actual, nunca borra en la nube).
+//   - subir: cada cambio (`markDirty`) programa el ciclo con DEBOUNCE (60 s de
+//     calma, techo 5 min de actividad continua). El staging es PERSISTENTE e
+//     incremental: solo se copian archivos nuevos/cambiados, así `rclone copy
+//     --update` sube únicamente lo nuevo respecto de la nube (nunca pisa un
+//     archivo más actual, nunca borra en la nube).
 //   - bajar (`refresh`): antes de abrir un proyecto, `rclone copy --update
 //     --files-from=<conjunto permitido>` descarga solo lo más nuevo sin pisar
-//     trabajo local más actual.
+//     trabajo local más actual. Subida y bajada comparten UNA sola cola:
+//     nunca corren dos rclone en paralelo sobre los mismos datos.
 //   - borrados: al borrar algo que está en la nube se registra un "tombstone"
 //     (`.tombstones.json` en la nube) para que el borrado no reviva en otra
 //     máquina; si el trabajo local es más nuevo que el borrado, gana lo local.
@@ -23,6 +26,7 @@
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 
 const SUBDIRS = ['authors', 'backgrounds', 'balloons', 'characters', 'objects', 'palettes', 'projects', 'referenceDefs', 'references', 'strips', 'tiras'];
 const OWNED = ['characters', 'backgrounds', 'objects', 'balloons', 'referenceDefs', 'strips', 'tiras'];
@@ -60,15 +64,6 @@ function readJsonFiles(dir) {
   }).filter(Boolean);
 }
 
-function copyIfChanged(src, dst) {
-  const a = fs.statSync(src);
-  let b = null;
-  try { b = fs.statSync(dst); } catch { /* no existe */ }
-  if (b && b.size === a.size && Math.abs(b.mtimeMs - a.mtimeMs) < 2) return;
-  fs.copyFileSync(src, dst);
-  try { fs.utimesSync(dst, a.atime, a.mtime); } catch { /* best-effort */ }
-}
-
 module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   const BASE = appDataDir;
   const CONFIG_PATH = path.join(BASE, 'backup.json');
@@ -81,8 +76,21 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   let activeCloud = true; // el proyecto activo sube a la nube (cloudBackup !== false)
   let status = { state: 'pending', lastSync: null, message: 'inicio' };
 
-  let running = false;
-  let dirty = false;
+  let running = false;        // hay una operación de nube en curso (subida o bajada)
+  let dirty = false;          // quedó pendiente una subida
+  let downPending = false;    // quedó pendiente una bajada
+  let dirtyTimer = null;      // debounce del autoguardado
+  let firstDirtyAt = null;    // desde cuándo hay cambios sin sincronizar
+  let pendingChanges = false; // hay cambios esperando el ciclo de autoguardado
+
+  // Cadencia del autoguardado: sincroniza tras 1 min de calma; con trabajo
+  // continuo, fuerza el ciclo como máximo cada 5 min.
+  const SYNC_IDLE_MS = 60 * 1000;
+  const SYNC_MAX_WAIT_MS = 5 * 60 * 1000;
+
+  function clearDirtyTimer() {
+    if (dirtyTimer) { clearTimeout(dirtyTimer); dirtyTimer = null; }
+  }
 
   // --- config ---
   function writeConfig(cfg) {
@@ -174,10 +182,19 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
         : !activeCloud
           ? 'proyecto solo local: autobackup apagado'
           : null;
-    if (reason) return setStatus('disabled', { message: reason });
-    setStatus(status.state === 'syncing' || status.state === 'error' ? status.state : 'idle', {
-      message: status.state === 'error' ? status.message : 'al día',
-    });
+    if (reason) {
+      pendingChanges = false;
+      firstDirtyAt = null;
+      clearDirtyTimer();
+      return setStatus('disabled', { message: reason });
+    }
+    if (status.state === 'syncing' || status.state === 'error') {
+      return setStatus(status.state, {
+        message: status.state === 'error' ? status.message : status.message,
+      });
+    }
+    if (pendingChanges) return setStatus('pending', { message: 'cambios pendientes de sincronizar' });
+    setStatus('idle', { message: 'al día' });
   }
 
   // --- git helpers ---
@@ -391,27 +408,55 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     return ex;
   }
 
+  // Cache corto del conjunto permitido: isCloudPath se consulta en cada guardado
+  // y recalcular re-lee todos los JSON del disco.
+  let allowedCache = null;
+  let allowedCacheAt = 0;
+  const ALLOWED_TTL_MS = 5000;
+  function computeAllowedCached() {
+    const now = Date.now();
+    if (!allowedCache || now - allowedCacheAt > ALLOWED_TTL_MS) {
+      allowedCache = computeAllowed();
+      allowedCacheAt = now;
+    }
+    return allowedCache;
+  }
+
   function isCloudPath(sub, name) {
-    const allowed = computeAllowed();
-    return (allowed[sub] || new Set()).has(name);
+    return (computeAllowedCached()[sub] || new Set()).has(name);
   }
 
   // --- espejar los datos permitidos en el destino (staging) ---
-  function reconcile(allowed, relData) {
-    SUBDIRS.forEach(sub => {
+  // ASINCRONO e incremental: el staging es persistente, así que solo se copian
+  // los archivos nuevos/cambiados y se quitan los que ya no están permitidos.
+  async function copyIfChangedAsync(src, dst) {
+    const a = await fsp.stat(src);
+    let b = null;
+    try { b = await fsp.stat(dst); } catch { /* no existe */ }
+    if (b && b.size === a.size && Math.abs(b.mtimeMs - a.mtimeMs) < 2) return;
+    await fsp.copyFile(src, dst);
+    try { await fsp.utimes(dst, a.atime, a.mtime); } catch { /* best-effort */ }
+  }
+
+  async function reconcile(allowed, relData) {
+    for (const sub of SUBDIRS) {
       const srcDir = path.join(dataDir, sub);
       const dstDir = path.join(relData, sub);
-      ensureDir(dstDir);
+      await fsp.mkdir(dstDir, { recursive: true });
       const allowedNames = allowed[sub] || new Set();
-      allowedNames.forEach(name => {
+      for (const name of allowedNames) {
         const src = path.join(srcDir, name);
-        if (!fs.existsSync(src)) return;
-        copyIfChanged(src, path.join(dstDir, name));
-      });
-      listFiles(dstDir).forEach(name => {
-        if (!allowedNames.has(name)) fs.unlinkSync(path.join(dstDir, name));
-      });
-    });
+        try { await fsp.access(src); } catch { continue; }
+        await copyIfChangedAsync(src, path.join(dstDir, name));
+      }
+      const dstNames = await fsp.readdir(dstDir).catch(() => []);
+      for (const name of dstNames) {
+        if (name === '.DS_Store') continue;
+        if (!allowedNames.has(name)) {
+          try { await fsp.unlink(path.join(dstDir, name)); } catch { /* best-effort */ }
+        }
+      }
+    }
   }
 
   function writeFilesFrom(allowed) {
@@ -433,17 +478,18 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     return String(out).split('\n').map(s => s.trim()).filter(Boolean);
   }
 
-  function countFiles(dir) {
-    if (!fs.existsSync(dir)) return 0;
+  async function countFiles(dir) {
     let n = 0;
-    const walk = (d) => {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    const walk = async (d) => {
+      let entries = [];
+      try { entries = await fsp.readdir(d, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
         const p = path.join(d, e.name);
-        if (e.isDirectory()) walk(p);
+        if (e.isDirectory()) await walk(p);
         else n++;
       }
     };
-    walk(dir);
+    await walk(dir);
     return n;
   }
 
@@ -516,16 +562,18 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   // --- subir (autoback) ---
+  // El staging es PERSISTENTE e incremental: no se vacía por ciclo. Solo se
+  // copian los archivos nuevos/cambiados (copyIfChanged) y se quitan los
+  // borrados; `rclone copy --update` sube a la nube únicamente lo nuevo.
   async function runRcloneSync() {
     if (!(await rcloneAvailable())) {
       setStatus('offline', { message: 'rclone no está instalado (instalá con: brew install rclone)' });
       return;
     }
-    setStatus('syncing', { message: 'subiendo datos a la nube...' });
+    setStatus('syncing', { message: 'subiendo cambios a la nube...' });
     try {
-      resetDir(STAGING_R);
       const allowed = computeAllowed();
-      reconcile(allowed, STAGING_R);
+      await reconcile(allowed, STAGING_R);
       await rclone('copy', '--update', STAGING_R, config.rclone.remote, '--transfers', '4', '--stats', '0');
       await uploadTombstones();
       setStatus('idle', { message: 'al día', lastSync: new Date().toISOString() });
@@ -538,11 +586,7 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   // Lista la nube, excluye tombstones y proyectos "solo local", y descarga lo
   // más nuevo SIN pisar trabajo local más actual (`--update`). Los archivos
   // locales que la nube reemplaza quedan respaldados en .sync-backup/cloud.
-  async function refresh() {
-    if (!config.enabled) {
-      setStatus('disabled', { message: 'backup desactivado en backup.json' });
-      return;
-    }
+  async function refreshInternal() {
     if (!(await rcloneAvailable())) {
       setStatus('offline', { message: 'rclone no está instalado (instalá con: brew install rclone)' });
       return;
@@ -554,15 +598,16 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
       const cloudFiles = await listCloudFiles();
       const files = cloudFiles.filter(p => !excluded.has(p));
       const backupDir = path.join(BASE, '.sync-backup', 'cloud');
+      let replaced = 0;
       if (files.length) {
         const list = writePathsToFile(files, FILES_LIST);
         await rclone(
           'copy', '--update', `--backup-dir=${backupDir}`, `--files-from=${list}`,
           config.rclone.remote, dataDir, '--transfers', '4', '--stats', '0'
         );
+        replaced = await countFiles(backupDir);
       }
       applyTombstones();
-      const replaced = countFiles(backupDir);
       setStatus('idle', {
         message: replaced > 0 ? `actualizado (${replaced} reemplazados, respaldados en .sync-backup)` : 'actualizado',
         lastSync: new Date().toISOString(),
@@ -581,7 +626,7 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     try {
       const relData = config.git.subfolder;
       const allowed = computeAllowed();
-      reconcile(allowed, path.join(STAGING, relData));
+      await reconcile(allowed, path.join(STAGING, relData));
 
       await git('add', '--', relData);
       const changed = await git('status', '--porcelain', '--', relData);
@@ -605,48 +650,93 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     }
   }
 
-  async function runSync() {
+  function performSync() {
+    if (!config.enabled) {
+      setStatus('disabled', { message: 'backup desactivado en backup.json' });
+      return Promise.resolve();
+    }
+    return config.provider === 'rclone' ? runRcloneSync() : runGitSync();
+  }
+
+  // Cola ÚNICA para todas las operaciones de nube: sube primero lo pendiente y
+  // después baja. Nunca corren dos rclone en paralelo sobre los mismos datos.
+  async function pump() {
+    if (running) return;
+    running = true;
+    clearDirtyTimer();
+    try {
+      while (dirty || downPending) {
+        if (dirty) {
+          dirty = false;
+          pendingChanges = false;
+          firstDirtyAt = null;
+          await performSync().catch(() => {});
+        } else {
+          downPending = false;
+          await refreshInternal().catch(() => {});
+        }
+      }
+    } finally {
+      running = false;
+    }
+    if (dirty || downPending) pump();
+  }
+
+  // Manual o encolada: sube siempre que config.enabled, aunque sea modo local.
+  function syncNow() {
+    reloadConfig();
+    if (!config.enabled) {
+      setStatus('disabled', { message: 'backup desactivado en backup.json' });
+      return Promise.resolve();
+    }
+    clearDirtyTimer();
+    dirty = true;
+    return pump();
+  }
+
+  // Bajada programada (abrir proyecto / arranque): pasa por la misma cola.
+  async function refresh() {
+    reloadConfig();
     if (!config.enabled) {
       setStatus('disabled', { message: 'backup desactivado en backup.json' });
       return;
     }
-    if (config.provider === 'rclone') return runRcloneSync();
-    return runGitSync();
+    downPending = true;
+    return pump();
   }
 
-  // Manual (botón "sincronizar"): sube siempre que config.enabled, aunque sea modo local.
-  function syncNow() {
-    reloadConfig();
-    if (running) {
-      dirty = true;
-      return Promise.resolve();
-    }
-    running = true;
-    dirty = false;
-    return runSync()
-      .catch(() => { /* el estado de error ya quedó registrado */ })
-      .finally(() => {
-        running = false;
-        if (dirty) {
-          dirty = false;
-          return syncNow();
-        }
-      });
-  }
-
-  // Automático: solo si la regla "modo Y proyecto" se cumple.
+  // Automático: solo si la regla "modo Y proyecto" se cumple. Programa el ciclo
+  // con debounce (60 s de calma; techo 5 min si el trabajo no para).
   function markDirty() {
     if (!isEnabled()) return;
+    pendingChanges = true;
     if (running) {
       dirty = true;
       return;
     }
-    syncNow();
+    const now = Date.now();
+    if (firstDirtyAt == null) firstDirtyAt = now;
+    if (status.state !== 'pending' && status.state !== 'syncing') {
+      setStatus('pending', { message: 'cambios pendientes de sincronizar' });
+    }
+    const waited = now - firstDirtyAt;
+    const delay = waited >= SYNC_MAX_WAIT_MS ? 0 : SYNC_IDLE_MS;
+    clearDirtyTimer();
+    dirtyTimer = setTimeout(() => {
+      dirtyTimer = null;
+      syncNow();
+    }, delay);
   }
 
+  // Al cerrar: intenta subir lo pendiente sin bloquear demasiado (main pone el
+  // tope de tiempo); lo que quede sin subir continúa en el próximo arranque
+  // (el primer sync sube el staging pendiente; --update nunca pisa nada).
   async function flush() {
-    if (running || status.state === 'pending') {
-      await syncNow().catch(() => {});
+    clearDirtyTimer();
+    if (running || dirty || status.state === 'pending') {
+      downPending = false;
+      dirty = true;
+      await pump().catch(() => {});
     }
   }
 
