@@ -573,6 +573,7 @@ input[type="range"].size-slider:active::-webkit-slider-thumb {
   transition: box-shadow 0.1s ease;
 }
 .balloon-block.dragging { cursor: grabbing; opacity: 0.9; }
+.balloon-block.dragging .balloon-editor { cursor: grabbing; }
 .balloon-block.selected .balloon-shape { box-shadow: 0 0 0 2px var(--color-accent); }
 .balloon-shape {
   width: 100%;
@@ -660,7 +661,9 @@ input[type="range"].size-slider:active::-webkit-slider-thumb {
   text-align: center;
   color: var(--color-text);
   padding: 8px;
+  cursor: grab;
 }
+.balloon-editor:focus { cursor: text; }
 .narration-editor {
   width: 100%;
   box-sizing: border-box;
