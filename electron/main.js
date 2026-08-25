@@ -101,9 +101,11 @@ app.on('before-quit', async (e) => {
   if (flushed) return;
   e.preventDefault();
   flushed = true;
+  // Cierre rápido: intenta subir lo pendiente con tope de ~3 s; si hay cola
+  // grande cierra igual y continúa en el próximo arranque (--update nunca pisa).
   await Promise.race([
     backup.flush(),
-    new Promise(res => setTimeout(res, 10000)),
+    new Promise(res => setTimeout(res, 3000)),
   ]);
   app.quit();
 });

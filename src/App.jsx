@@ -66,16 +66,19 @@ export default function App() {
   const userStartedRef = useRef(false)
 
   const reloadAllStores = async () => {
-    await useProjectStore.getState().load()
-    await useCharacterStore.getState().load()
-    await useBackgroundStore.getState().load()
-    await useObjectStore.getState().load()
-    await useBalloonStore.getState().load()
-    await useReferenceStore.getState().load()
-    await useStripStore.getState().load()
-    await useTiraStore.getState().load()
-    await usePaletteStore.getState().load()
-    await useAuthorStore.getState().load()
+    // En paralelo: cada store lee su carpeta; no hay dependencias entre ellos.
+    await Promise.all([
+      useProjectStore.getState().load(),
+      useCharacterStore.getState().load(),
+      useBackgroundStore.getState().load(),
+      useObjectStore.getState().load(),
+      useBalloonStore.getState().load(),
+      useReferenceStore.getState().load(),
+      useStripStore.getState().load(),
+      useTiraStore.getState().load(),
+      usePaletteStore.getState().load(),
+      useAuthorStore.getState().load(),
+    ])
   }
 
   const refreshAndReload = async () => {
@@ -110,12 +113,13 @@ export default function App() {
   }
 
   // Switch maestro del sidebar: encender = sincronizar ya (sube local + baja nube).
+  // No bloquea: la subida y la bajada corren en segundo plano con el aviso visible.
   const toggleSyncMode = async (nextMode) => {
     await applyMode(nextMode)
     await persistMode(activeProject, nextMode)
     if (nextMode === 'online') {
-      try { if (window.api?.backup?.syncNow) await window.api.backup.syncNow() } catch {}
-      await syncInBackground()
+      try { window.api?.backup?.syncNow?.() } catch {}
+      syncInBackground()
     }
   }
 
@@ -127,7 +131,11 @@ export default function App() {
       if (!active) return
       setBackupConfig(cfg)
       setBackupReady(true)
-      if (cfg?.mode === 'online') await syncInBackground()
+      if (cfg?.mode === 'online') {
+        await syncInBackground()
+        // Retoma lo que quedó sin subir si el cierre anterior fue rápido.
+        try { window.api?.backup?.syncNow?.() } catch {}
+      }
     })()
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
