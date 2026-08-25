@@ -18,15 +18,21 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
 
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
-    if (e.target.tagName === 'TEXTAREA') return
     if (isResizingRef.current) return
     if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
+    const startX = e.clientX
+    const startY = e.clientY
+    let moved = false
     dragStart.current = { mx: e.clientX, my: e.clientY, x: balloon.x, y: balloon.y }
 
     const handleMove = (ev) => {
+      if (!moved) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return
+        moved = true
+      }
       const canvas = blockRef.current?.parentElement
       if (!canvas) return
       const rect = canvas.getBoundingClientRect()
@@ -39,6 +45,9 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
     }
     const handleUp = () => {
       setDragging(false)
+      if (!moved && e.target.tagName === 'TEXTAREA') {
+        textRef.current?.focus()
+      }
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
@@ -101,8 +110,6 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
           value={balloon.text || ''}
           placeholder={balloon.label}
           onChange={e => onText?.(e.target.value)}
-          onMouseDown={e => e.stopPropagation()}
-          onPointerDown={e => e.stopPropagation()}
           onFocus={() => onSelect?.()}
           spellCheck={false}
           style={{
