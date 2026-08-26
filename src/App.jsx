@@ -81,23 +81,49 @@ export default function App() {
     ])
   }
 
-  const refreshAndReload = async () => {
-    try {
-      if (window.api?.backup?.refresh) await window.api.backup.refresh()
-    } catch (e) { console.error('actualizar desde la nube falló:', e) }
-    await reloadAllStores()
+  const reloadAllStoresIncremental = async (changed) => {
+    if (!changed || !Array.isArray(changed) || changed.length === 0) return reloadAllStores()
+    const subs = new Set(changed.map(p => String(p).split('/')[0]))
+    const loads = []
+    if (subs.has('projects')) loads.push(useProjectStore.getState().load())
+    if (subs.has('characters')) loads.push(useCharacterStore.getState().load())
+    if (subs.has('backgrounds')) loads.push(useBackgroundStore.getState().load())
+    if (subs.has('objects')) loads.push(useObjectStore.getState().load())
+    if (subs.has('balloons')) loads.push(useBalloonStore.getState().load())
+    if (subs.has('referenceDefs') || subs.has('references')) loads.push(useReferenceStore.getState().load())
+    if (subs.has('strips')) loads.push(useStripStore.getState().load())
+    if (subs.has('tiras')) loads.push(useTiraStore.getState().load())
+    if (subs.has('palettes')) loads.push(usePaletteStore.getState().load())
+    if (subs.has('authors')) loads.push(useAuthorStore.getState().load())
+    // references es carpeta de archivos sueltos, no store directo, pero si cambia solo refs no hace falta recargar stores
+    if (loads.length === 0) return
+    await Promise.all(loads)
   }
 
-  // Sincroniza en segundo plano: muestra un aviso "sincronizando..." mientras
-  // descarga la nube y recarga los stores, pero sin bloquear la navegación.
-  const syncInBackground = async () => {
-    if (syncing) return
-    setSyncing(true)
+  const refreshAndReload = async () => {
+    let changed = null
     try {
-      await refreshAndReload()
-    } finally {
+      if (window.api?.backup?.refresh) {
+        const res = await window.api.backup.refresh()
+        changed = res?.changed || null
+      }
+    } catch (e) { console.error('actualizar desde la nube falló:', e) }
+    if (changed) await reloadAllStoresIncremental(changed)
+    else await reloadAllStores()
+    return changed
+  }
+
+  // Sincroniza en segundo plano: muestra un aviso "actualizando..." mientras
+  // descarga la nube y recarga los stores, pero sin bloquear la navegación (stale-while-revalidate).
+  const syncingRef = useRef(false)
+  const syncInBackground = () => {
+    if (syncingRef.current) return
+    syncingRef.current = true
+    setSyncing(true)
+    refreshAndReload().finally(() => {
+      syncingRef.current = false
       setSyncing(false)
-    }
+    })
   }
 
   // Aplica un modo (online/local) al backup y a la UI.
@@ -132,7 +158,7 @@ export default function App() {
       setBackupConfig(cfg)
       setBackupReady(true)
       if (cfg?.mode === 'online') {
-        await syncInBackground()
+        syncInBackground()
         // Retoma lo que quedó sin subir si el cierre anterior fue rápido.
         try { window.api?.backup?.syncNow?.() } catch {}
       }
@@ -164,14 +190,14 @@ export default function App() {
       }
     } catch {}
     // Abre al toque con lo que hay local; la sincronización corre en segundo plano
-    // (aviso "sincronizando...") mientras el usuario ya navega.
+    // (aviso "actualizando...") mientras el usuario ya navega — stale-while-revalidate.
     setActiveProjectId(id)
     setSelectedStripId(null)
     setTiraReturnId(null)
     setView('strips')
     try { localStorage.setItem('doski:lastProject', id) } catch {}
     if (memorized === 'online') {
-      await syncInBackground()
+      syncInBackground()
     }
   }
 
@@ -468,7 +494,7 @@ export default function App() {
           boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
           pointerEvents: 'none',
         }}>
-          sincronizando...
+          actualizando...
         </div>
       )}
       {/* Chat de IA persistente: vive fuera del contenido que cambia al navegar,

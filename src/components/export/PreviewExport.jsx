@@ -156,20 +156,29 @@ export default function PreviewExport({ project, strips, characters, backgrounds
     })
   }, [visibleStrips, items])
 
-  // Carga las fuentes (data URL) de cada imagen del mosaico.
+  // Carga las fuentes (data URL) de cada imagen del mosaico (batch).
   const [srcs, setSrcs] = useState({})
   useEffect(() => {
     let active = true
     const load = async () => {
-      const next = {}
-      for (const it of allItems) {
-        if (!it.path || !window.api?.references) continue
+      const paths = allItems.map(it => it.path).filter(Boolean)
+      const uniq = [...new Set(paths)]
+      let map = {}
+      if (uniq.length && window.api?.references) {
         try {
-          const url = await window.api.references.read(it.path)
-          if (active && url) next[it.key] = url
+          if (window.api.references.readMany) map = await window.api.references.readMany(uniq)
+          else {
+            const results = await Promise.all(uniq.map(async p => [p, await window.api.references.read(p)]))
+            map = Object.fromEntries(results.filter(([, v]) => v))
+          }
         } catch {}
       }
-      if (active) setSrcs(next)
+      if (!active) return
+      const next = {}
+      for (const it of allItems) {
+        if (it.path && map[it.path]) next[it.key] = map[it.path]
+      }
+      setSrcs(next)
     }
     load()
     return () => { active = false }

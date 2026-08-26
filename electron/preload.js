@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('api', {
     choose: () => ipcRenderer.invoke('references:choose'),
     import: (data) => ipcRenderer.invoke('references:import', data),
     read: (filePath) => ipcRenderer.invoke('references:read', filePath),
+    readMany: (filePaths) => ipcRenderer.invoke('references:readMany', filePaths),
     openFolder: () => ipcRenderer.invoke('references:open-folder'),
     openUsedFolder: (fileNames) => ipcRenderer.invoke('references:open-used-folder', fileNames),
     saveSvg: (data) => ipcRenderer.invoke('references:save-svg', data),
