@@ -97,10 +97,13 @@ const useTiraStore = create((set, get) => ({
   // (y el backup) la protegen de borrado/duplicación.
   ensureDefault: async (projectId) => {
     if (!projectId) return
+    if (!get().loaded) return
     const reservedId = defaultTiraId(projectId, 'borrador')
+    const exists = get().tiras.some(t => t.projectId === projectId && t.id === reservedId)
     const legacy = get().tiras
       .filter(t => t.projectId === projectId && t.title === 'borrador' && t.id !== reservedId)
       .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+    if (!legacy.length && exists) return
     for (const extra of legacy.slice(1)) {
       await get().remove(extra.id)
     }
@@ -109,8 +112,8 @@ const useTiraStore = create((set, get) => ({
       await get().save({ ...main, id: reservedId, default: true })
       await get().remove(main.id)
     }
-    const exists = get().tiras.some(t => t.projectId === projectId && t.id === reservedId)
-    if (!exists) await get().create(projectId, 'borrador', reservedId)
+    const stillExists = get().tiras.some(t => t.projectId === projectId && t.id === reservedId)
+    if (!stillExists) await get().create(projectId, 'borrador', reservedId)
   },
 }))
 

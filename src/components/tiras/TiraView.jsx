@@ -60,19 +60,30 @@ export default function TiraView({ tira, strips, project, authors, onBack, onOpe
     setTimeout(() => setCopiedId(null), 1500)
   }
 
-  // En modo imágenes, carga las portadas de las viñetas para mostrarlas sueltas.
+  // En modo imágenes, carga las portadas de las viñetas para mostrarlas sueltas (batch).
   useEffect(() => {
     if (asCards) return
     let active = true
     const load = async () => {
-      const next = {}
-      for (const s of ordered) {
-        const r = coverOf(s)
-        if (r?.path && window.api?.references) {
-          try { const url = await window.api.references.read(r.path); if (active && url) next[coverKeyOf(s)] = url } catch {}
-        }
+      const entries = ordered.map(s => ({ s, r: coverOf(s) })).filter(x => x.r?.path)
+      const paths = entries.map(x => x.r.path)
+      let map = {}
+      if (paths.length && window.api?.references) {
+        try {
+          if (window.api.references.readMany) map = await window.api.references.readMany(paths)
+          else {
+            const results = await Promise.all(paths.map(async p => [p, await window.api.references.read(p)]))
+            map = Object.fromEntries(results.filter(([, v]) => v))
+          }
+        } catch {}
       }
-      if (active) setSrcs(next)
+      if (!active) return
+      const next = {}
+      for (const { s, r } of entries) {
+        const url = map[r.path]
+        if (url) next[coverKeyOf(s)] = url
+      }
+      setSrcs(next)
     }
     load()
     return () => { active = false }

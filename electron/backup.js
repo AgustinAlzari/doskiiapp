@@ -82,6 +82,7 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   let dirtyTimer = null;      // debounce del autoguardado
   let firstDirtyAt = null;    // desde cuándo hay cambios sin sincronizar
   let pendingChanges = false; // hay cambios esperando el ciclo de autoguardado
+  let lastChanged = [];       // último conjunto descargado para recarga incremental
 
   // Cadencia del autoguardado: sincroniza tras 1 min de calma; con trabajo
   // continuo, fuerza el ciclo como máximo cada 5 min.
@@ -586,17 +587,20 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   // Lista la nube, excluye tombstones y proyectos "solo local", y descarga lo
   // más nuevo SIN pisar trabajo local más actual (`--update`). Los archivos
   // locales que la nube reemplaza quedan respaldados en .sync-backup/cloud.
+  // Retorna { changed: string[] } para recarga incremental (stale-while-revalidate).
   async function refreshInternal() {
     if (!(await rcloneAvailable())) {
       setStatus('offline', { message: 'rclone no está instalado (instalá con: brew install rclone)' });
-      return;
+      return { changed: [] };
     }
     setStatus('syncing', { message: 'actualizando desde la nube...' });
+    let changed = []
     try {
       await rclone('copyto', `${config.rclone.remote}/${TOMB_FILE}`, TOMB_LOCAL).catch(() => {});
       const excluded = computeExcludedPaths();
       const cloudFiles = await listCloudFiles();
       const files = cloudFiles.filter(p => !excluded.has(p));
+      changed = files
       const backupDir = path.join(BASE, '.sync-backup', 'cloud');
       let replaced = 0;
       if (files.length) {
@@ -615,6 +619,7 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     } catch (err) {
       setStatus('error', { message: `rclone: ${String(err && err.message || err)}` });
     }
+    return { changed };
   }
 
   async function runGitSync() {
@@ -658,22 +663,24 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
     return config.provider === 'rclone' ? runRcloneSync() : runGitSync();
   }
 
-  // Cola ÚNICA para todas las operaciones de nube: sube primero lo pendiente y
-  // después baja. Nunca corren dos rclone en paralelo sobre los mismos datos.
+  // Cola ÚNICA para todas las operaciones de nube: prioriza bajada (download)
+  // para que abrir un proyecto muestre datos frescos rápido (stale-while-revalidate).
+  // Nunca corren dos rclone en paralelo sobre los mismos datos.
   async function pump() {
     if (running) return;
     running = true;
     clearDirtyTimer();
     try {
       while (dirty || downPending) {
-        if (dirty) {
+        if (downPending) {
+          downPending = false;
+          const res = await refreshInternal().catch(() => ({ changed: [] }));
+          lastChanged = res?.changed || []
+        } else if (dirty) {
           dirty = false;
           pendingChanges = false;
           firstDirtyAt = null;
           await performSync().catch(() => {});
-        } else {
-          downPending = false;
-          await refreshInternal().catch(() => {});
         }
       }
     } finally {
@@ -695,14 +702,31 @@ module.exports = function initBackup({ dataDir, appDataDir, getWindow }) {
   }
 
   // Bajada programada (abrir proyecto / arranque): pasa por la misma cola.
+  // Retorna { ...status, changed } para recarga incremental.
   async function refresh() {
     reloadConfig();
     if (!config.enabled) {
       setStatus('disabled', { message: 'backup desactivado en backup.json' });
-      return;
+      return { ...getStatus(), changed: [] };
     }
     downPending = true;
-    return pump();
+    await pump();
+    // si pump encoló por estar running, esperar a que termine la bajada
+    let waited = 0
+    while (running && waited < 30000) {
+      await new Promise(r => setTimeout(r, 120))
+      waited += 120
+    }
+    // si quedó pendiente por race, drenar
+    if (downPending || dirty) {
+      await pump();
+      waited = 0
+      while (running && waited < 30000) {
+        await new Promise(r => setTimeout(r, 120))
+        waited += 120
+      }
+    }
+    return { ...getStatus(), changed: lastChanged || [] };
   }
 
   // Automático: solo si la regla "modo Y proyecto" se cumple. Programa el ciclo

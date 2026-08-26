@@ -13,7 +13,9 @@ import TiraView from './tiras/TiraView'
 
 export default function StripList({ project, projectId, initialOpenTiraId = null, onNew, onEdit }) {
   const strips = useStripStore(s => s.strips)
-  const loaded = useStripStore(s => s.loaded)
+  const stripLoaded = useStripStore(s => s.loaded)
+  const tiraLoaded = useTiraStore(s => s.loaded)
+  const loaded = stripLoaded && tiraLoaded
   const remove = useStripStore(s => s.remove)
   const reorder = useStripStore(s => s.reorder)
   const duplicate = useStripStore(s => s.duplicate)
@@ -27,15 +29,19 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
   const saveProject = useProjectStore(s => s.save)
-  const scopedStrips = strips.filter(s => s.projectId === projectId)
-  const scopedTiras = tiras.filter(t => t.projectId === projectId)
+  const scopedStrips = useMemo(() => strips.filter(s => s.projectId === projectId), [strips, projectId])
+  const scopedTiras = useMemo(() => tiras.filter(t => t.projectId === projectId), [tiras, projectId])
 
-  // Tira "borrador" por defecto del proyecto.
-  useEffect(() => { ensureDefault(projectId) }, [projectId, ensureDefault])
-  // Viñetas dentro de alguna tira: "movidas" a subcarpeta → se ocultan de la lista
-  // general (madre); solo se ven sueltas las libres.
-  const inTiraIds = new Set(scopedTiras.flatMap(t => t.stripIds || []))
-  const looseStrips = scopedStrips.filter(s => !inTiraIds.has(s.id))
+  // Tira "borrador" por defecto del proyecto — solo cuando tiras ya cargadas para evitar duplicados.
+  useEffect(() => {
+    if (tiraLoaded) ensureDefault(projectId)
+  }, [projectId, ensureDefault, tiraLoaded])
+  // Viñetas dentro de alguna tira: "movidas" a subcarpeta → se ocultan de la lista general
+  const inTiraIds = useMemo(() => new Set(scopedTiras.flatMap(t => t.stripIds || [])), [scopedTiras])
+  const looseStrips = useMemo(() => {
+    if (!tiraLoaded) return []
+    return scopedStrips.filter(s => !inTiraIds.has(s.id))
+  }, [scopedStrips, inTiraIds, tiraLoaded])
   const hasAnyResult = scopedStrips.some(s => (s.results || []).length)
   const hasEmptyTira = scopedTiras.some(t => (t.stripIds || []).length === 0)
   const canOpenGallery = hasAnyResult || hasEmptyTira
@@ -101,11 +107,23 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   // Galería de todos los resultados del proyecto en el orden de la lista de viñetas.
   const openGallery = async () => {
     if (!window.api?.references) return
+    const allPaths = looseStrips.flatMap(s => (s.results || []).map(r => r.path).filter(Boolean))
+    let map = {}
+    if (allPaths.length) {
+      try {
+        if (window.api.references.readMany) {
+          map = await window.api.references.readMany(allPaths)
+        } else {
+          const entries = await Promise.all(allPaths.map(async p => [p, await window.api.references.read(p)]))
+          map = Object.fromEntries(entries.filter(([, v]) => v))
+        }
+      } catch {}
+    }
     const items = []
     for (const s of looseStrips) {
       const results = s.results || []
       for (let ri = 0; ri < results.length; ri++) {
-        const src = await window.api.references.read(results[ri].path)
+        const src = map[results[ri].path]
         if (src) {
           items.push({
             src,
@@ -168,7 +186,7 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   const onDragEnd = () => { setDragIdx(null); setInsertIdx(null) }
 
   // Tiras visibles en la sección (las que se pueden reordenar arrastrando).
-  const visibleTiras = scopedTiras.filter(t => (t.stripIds || []).length > 0 || editingTiraId === t.id)
+  const visibleTiras = useMemo(() => scopedTiras.filter(t => (t.stripIds || []).length > 0 || editingTiraId === t.id), [scopedTiras, editingTiraId])
   const onTiraDragStart = (e, idx) => {
     if (dragOriginRef.current?.closest?.('[data-no-drag]')) {
       e.preventDefault()
@@ -207,7 +225,28 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   }
   const onTiraDragEnd = () => { setTiraDragIdx(null); setTiraInsertIdx(null) }
 
-  if (!loaded) return <div style={{ color: 'var(--color-text-muted)', padding: 24 }}>cargando...</div>
+  if (!loaded) return (
+    <ChatLayout>
+      <div>
+        <div className="section-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 className="ui-h1" style={{ margin: 0 }}>viñetas</h1>
+        </div>
+        <div style={{ margin: '0 0 24px' }}>
+          <div className="label" style={{ marginBottom: 8 }}>tiras</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ width: 190, height: 110, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', opacity: 0.6 }} />
+            ))}
+          </div>
+        </div>
+        <div className="strip-grid">
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div key={i} style={{ height: 120, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', opacity: 0.5 }} />
+          ))}
+        </div>
+      </div>
+    </ChatLayout>
+  )
 
   if (openTira) {
     return (

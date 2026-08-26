@@ -588,7 +588,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       if (balloon.isExtra) {
         characters[charIdx] = { ...char, extraDialogues: (char.extraDialogues || []).filter((_, i) => i !== balloon.extraIdx) }
       } else {
-        characters[charIdx] = { ...char, dialogue: '', dialoguePos: null }
+        characters[charIdx] = { ...char, dialogue: '', dialogueOpen: false, dialoguePos: null, dialoguePosition: null }
       }
       panels[0] = { ...panels[0], characters }
       return { ...prev, panels }
@@ -620,15 +620,26 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
 
   const handleSave = async () => {
     setSaveState('saving')
-    await save(data)
+    await save(dataRef.current)
     setSaveState('saved')
     setTimeout(() => setSaveState(null), 2000)
   }
 
   // Autoguarda el título al salir del campo (o Enter): se persiste desde el editor.
   const autosaveTitle = () => {
-    if (data.title !== (strip?.title)) save(data)
+    if (dataRef.current.title !== (strip?.title)) save(dataRef.current)
   }
+
+  // Atrás y prompts siempre guardan antes de navegar (además del botón guardar).
+  const handleBack = useCallback(async () => {
+    try { await save(dataRef.current) } catch (e) { console.error('guardado automático falló:', e) }
+    onBack()
+  }, [save, onBack])
+
+  const handlePrompts = useCallback(async () => {
+    try { await save(dataRef.current) } catch (e) { console.error('guardado automático falló:', e) }
+    onShowPrompts(dataRef.current, characters, balloons)
+  }, [save, onShowPrompts, characters, balloons])
 
   const selectedCharData = selectedCharIdx != null ? panel?.characters[selectedCharIdx] : null
   const selectedCharDef = selectedCharData ? characters.find(c => c.id === selectedCharData.characterId) : null
@@ -672,7 +683,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', marginRight: chatOpen ? 520 : 0 }}>
       {/* Header */}
       <div className="section-header">
-        <button className="back-arrow" onClick={onBack}>←</button>
+        <button className="back-arrow" onClick={handleBack}>←</button>
         <input
           className="ui-h2"
           value={data.title}
@@ -705,7 +716,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         >
           {ASPECT_RATIOS.map(ar => <option key={ar.id} value={ar.id}>{aspectLabel(ar)}</option>)}
         </select>
-        <button className="btn btn-sm" onClick={() => onShowPrompts(data, characters, balloons)}>
+        <button className="btn btn-sm" onClick={handlePrompts}>
           prompts
         </button>
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saveState === 'saving'}>

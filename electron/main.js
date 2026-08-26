@@ -236,6 +236,22 @@ ipcMain.handle('references:read', async (_, filePath) => {
   return `data:${mime};base64,${fs.readFileSync(resolved).toString('base64')}`;
 });
 
+ipcMain.handle('references:readMany', async (_, filePaths) => {
+  if (!Array.isArray(filePaths) || filePaths.length === 0) return {}
+  const out = {}
+  await Promise.all(filePaths.map(async p => {
+    const resolved = resolveRefPath(p)
+    if (!resolved) return
+    try {
+      const buf = await fs.promises.readFile(resolved)
+      const ext = path.extname(resolved).toLowerCase()
+      const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png'
+      out[p] = `data:${mime};base64,${buf.toString('base64')}`
+    } catch {}
+  }))
+  return out
+});
+
 ipcMain.handle('references:open-folder', async () => shell.openPath(path.join(DATA_DIR, 'references')));
 
 // --- IPC: Open a temporary folder with the used references (symlinks, no duplication) ---
@@ -277,8 +293,9 @@ ipcMain.handle('backup:sync-now', async () => {
   return backup.getStatus();
 });
 ipcMain.handle('backup:refresh', async () => {
-  await backup.refresh();
-  return backup.getStatus();
+  const res = await backup.refresh();
+  // res ya trae { ...status, changed }
+  return res || backup.getStatus();
 });
 ipcMain.handle('backup:delete-remote', async (_, paths) => {
   backup.handleDeleted(Array.isArray(paths) ? paths : []);
