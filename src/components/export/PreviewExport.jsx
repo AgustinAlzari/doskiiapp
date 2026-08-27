@@ -3,7 +3,6 @@ import useStripStore from '../../store/stripStore'
 import useProjectStore from '../../store/projectStore'
 import useAuthorStore from '../../store/authorStore'
 import useTiraStore from '../../store/tiraStore'
-import usePreviewStore from '../../store/previewStore'
 import { exportCleanImage, exportCleanImages, resolveAuthor, slugify, FORMAT_EXT } from '../../services/imageExport'
 import ImagePreview from '../ImagePreview'
 import ChatLayout from '../chat/ChatLayout'
@@ -37,21 +36,12 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   const scopedTiras = tiras.filter(t => t.projectId === project?.id)
 
   // Tiras seleccionadas que se muestran en el mosaico (general = viñetas sueltas).
-  // No fuerza "general" por defecto: arranca con la última selección recordada
-  // para este proyecto (en la sesión). Si no hay nada recordado, cae en la
-  // primera tira con viñetas; solo si no hay ninguna, muestra "general".
-  const initialSelection = (() => {
-    const projId = project?.id
-    const stored = projId ? usePreviewStore.getState().getSelection(projId) : null
-    const inTiraAll = new Set(scopedTiras.flatMap(t => t.stripIds || []))
-    const gc = (strips || []).filter(s => s.projectId === projId && !inTiraAll.has(s.id)).length
-    const valid = new Set([...scopedTiras.map(t => t.id), ...(gc > 0 ? [GENERAL] : [])])
-    if (stored && stored.length && stored.every(id => valid.has(id))) return stored
-    const first = scopedTiras.find(t => (t.stripIds || []).length > 0)
-    if (first) return [first.id]
-    return gc > 0 ? [GENERAL] : []
-  })()
-  const [selectedTiras, setSelectedTiras] = useState(initialSelection)
+  // Arranca con las tiras marcadas "mostrar a preview" en viñetas (showInPreview),
+  // además de general: así el checkbox del sidebar se respeta en preview y export.
+  const [selectedTiras, setSelectedTiras] = useState(() => [
+    GENERAL,
+    ...tiras.filter(t => t.projectId === project?.id && t.showInPreview).map(t => t.id),
+  ])
 
   const stripsState = useStripStore(s => s.strips)
   const liveStrips = useMemo(
@@ -71,12 +61,6 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   }, [scopedTiras])
 
   const selectedSet = useMemo(() => new Set(selectedTiras), [selectedTiras])
-
-  // Recuerda la selección de tiras para este proyecto (sesión) para restaurarla
-  // al volver a preview desde otra pantalla.
-  useEffect(() => {
-    if (project?.id) usePreviewStore.getState().setSelection(project.id, selectedTiras)
-  }, [selectedTiras, project?.id])
 
   // Tiras seleccionadas que están vacías: se ven como tarjeta en el mosaico.
   const emptySelectedTiras = useMemo(

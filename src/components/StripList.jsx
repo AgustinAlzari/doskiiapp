@@ -25,7 +25,6 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   const createTira = useTiraStore(s => s.create)
   const reorderTira = useTiraStore(s => s.reorder)
   const ensureDefault = useTiraStore(s => s.ensureDefault)
-  const pruneEmptyTiras = useTiraStore(s => s.pruneEmptyTiras)
   const copyStrip = useClipboardStore(s => s.copy)
   const authors = useAuthorStore(s => s.authors)
   const projects = useProjectStore(s => s.projects)
@@ -37,12 +36,6 @@ export default function StripList({ project, projectId, initialOpenTiraId = null
   useEffect(() => {
     if (tiraLoaded) ensureDefault(projectId)
   }, [projectId, ensureDefault, tiraLoaded])
-
-  // Al salir de viñetas (navegar por el sidebar), poda las tiras vacías que no
-  // son la por defecto: así no quedan tiras fantasma sin viñetas.
-  useEffect(() => {
-    return () => { pruneEmptyTiras(projectId) }
-  }, [projectId, pruneEmptyTiras])
   // Viñetas dentro de alguna tira: "movidas" a subcarpeta → se ocultan de la lista general
   const inTiraIds = useMemo(() => new Set(scopedTiras.flatMap(t => t.stripIds || [])), [scopedTiras])
   const looseStrips = useMemo(() => {
