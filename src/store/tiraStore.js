@@ -90,16 +90,6 @@ const useTiraStore = create((set, get) => ({
     return targets
   },
 
-  // Borra las tiras vacías (sin viñetas) que no son la por defecto. Se usa al
-  // salir de la vista de viñetas para no dejar tiras fantasma (creadas pero
-  // nunca pobladas). La tira por defecto ("borrador") queda protegida.
-  pruneEmptyTiras: async (projectId) => {
-    const empties = get().tiras.filter(t =>
-      t.projectId === projectId && !isDefaultTira(t) && (t.stripIds || []).length === 0
-    )
-    for (const t of empties) await get().remove(t.id)
-  },
-
   // Asegura que el proyecto tenga su tira "borrador" por defecto. El id es
   // determinista (`borrador-<projectId>`) para que abrir un proyecto jamás cree
   // una copia: migra las "borrador" viejas (id random) al id reservado y borra
