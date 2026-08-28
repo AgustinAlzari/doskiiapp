@@ -50,6 +50,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const projectObjects = objects.filter(o => o.projectId === project?.id)
 
   const dataRef = useRef(strip)
+  const dirtyRef = useRef(false)
   const historyRef = useRef([])
   const lastEditRef = useRef({ time: 0 })
   const [undoSteps, setUndoSteps] = useState(0)
@@ -65,6 +66,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setDataState(p => {
       const next = typeof updaterOrValue === 'function' ? updaterOrValue(p) : updaterOrValue
       dataRef.current = next
+      dirtyRef.current = true
       return next
     })
   }, [])
@@ -99,6 +101,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     lastEditRef.current.time = 0
     setUndoSteps(historyRef.current.length)
     dataRef.current = prev
+    dirtyRef.current = true
     setDataState(prev)
     deselectAll()
   }, [deselectAll])
@@ -115,6 +118,16 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [undo])
+
+  // Al salir del editor (navegando por el sidebar a otra pantalla) se guarda el
+  // canvas si tuvo cambios: el progreso nunca se pierde al cambiar de vista.
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current) {
+        save(dataRef.current).catch(e => console.error('guardado automático al salir falló:', e))
+      }
+    }
+  }, [save])
 
   const panel = data.panels[0]
 

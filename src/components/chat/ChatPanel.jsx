@@ -21,6 +21,11 @@ export default function ChatPanel() {
     return () => wv.removeEventListener('new-window', onNewWindow)
   }, [webviewRef.current])
 
+  // Expone el webview para autopaste (PromptExporter lo busca vía DOM)
+  useEffect(() => {
+    if (webviewRef.current) webviewRef.current.id = 'doski-chat-webview'
+  }, [model?.url])
+
   // Dimensiona el webview con píxeles exactos (redondeados) para que su altura sea
   // estable: evita que la barra inferior del chat se recorte o titile bajo el cursor.
   useEffect(() => {
@@ -40,6 +45,7 @@ export default function ChatPanel() {
   const resetChat = () => {
     try { webviewRef.current?.reload() } catch {}
   }
+  const closeChat = () => useChatStore.getState().setOpen(false)
 
   return (
     <div style={{
@@ -104,12 +110,29 @@ export default function ChatPanel() {
         >
           ⟳
         </button>
+        <button
+          onClick={closeChat}
+          title="ocultar chat"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '2px 6px',
+            fontSize: 16,
+            lineHeight: 1,
+            cursor: 'pointer',
+            color: 'var(--color-text-muted)',
+            borderRadius: 4,
+          }}
+        >
+          ×
+        </button>
       </div>
 
       {/* Chat embarcado */}
       {model?.url ? (
         <div ref={areaRef} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           <webview
+            id="doski-chat-webview"
             ref={webviewRef}
             src={model.url}
             style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
