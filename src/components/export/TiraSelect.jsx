@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { coverOf } from '../../utils/stripCover'
-import { isDefaultTira } from '../../store/tiraStore'
 
 const GENERAL = '__general__'
 
@@ -30,8 +29,10 @@ export default function TiraSelect({ tiras, strips, value, onChange, onReorder }
     const opts = []
     if (generalCount > 0) opts.push({ id: GENERAL, title: 'general', count: generalCount })
     tiras.forEach((t, i) => {
+      // Solo las tiras con viñetas: una tira vacía (incluso la por defecto) no
+      // aporta nada y ensucia el menú con tiras fantasma.
       const hasStrips = (t.stripIds || []).length > 0
-      if (!hasStrips && isDefaultTira(t)) return
+      if (!hasStrips) return
       opts.push({ id: t.id, title: t.title || 'sin título', count: (t.stripIds || []).length, tiraIdx: i })
     })
     return opts

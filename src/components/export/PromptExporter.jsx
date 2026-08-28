@@ -8,6 +8,7 @@ import useReferenceStore from '../../store/referenceStore'
 import useChatStore from '../../store/chatStore'
 import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
+import { sendToChat, extractLastImageFromChat } from '../../services/chatAutopaste'
 
 const MAX_RESULTS = 2
 import ImagePreview from '../ImagePreview'
@@ -26,6 +27,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const [results, setResults] = useState([])
   const [coverIndex, setCoverIndex] = useState(-1)
   const [showRefs, setShowRefs] = useState(false)
+  const [sending, setSending] = useState({}) // key: `scene-0` / `lettering-0` -> bool
   const chatOpen = useChatStore(s => s.open)
 
   const chars = characters || []
@@ -159,6 +161,101 @@ export default function PromptExporter({ strip, characters, project, balloons })
     setTimeout(() => setCopied(null), 2000)
   }
 
+  // --- enviar al chat (autopaste) ---
+  const readImageDataUrl = async (filePath) => {
+    if (!filePath || !window.api?.references?.read) return null
+    try { return await window.api.references.read(filePath) } catch { return null }
+  }
+
+  const collectImageDataUrls = async (filePaths) => {
+    const out = []
+    for (const p of filePaths) {
+      const url = await readImageDataUrl(p)
+      if (url) out.push({ dataUrl: url, fileName: String(p).split('/').pop() || 'imagen.png' })
+    }
+    return out
+  }
+  const dedupPaths = (paths) => [...new Set(paths.filter(Boolean))]
+
+  const handleSendScene = async (idx, promptText, svgPath, refs) => {
+    const key = `scene-${idx}`
+    if (sending[key]) return
+    setSending(s => ({ ...s, [key]: true }))
+    try {
+      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
+      const allPaths = dedupPaths([...refPaths, svgPath])
+      const items = await collectImageDataUrls(allPaths)
+      console.log('[autopaste scene] paths', allPaths, 'items', items.length, items.map(i=>i.fileName))
+      // nonce para evitar dedupe de prompt idéntico en chatgpt
+      const uniquePrompt = promptText + `\n\n<!-- doski:${Date.now().toString(36)} -->`
+      const res = await sendToChat({ text: uniquePrompt, imageItems: items, newChat: true })
+      if (res?.error) {
+        console.warn('autopaste scene error', res)
+        await copyToClipboard(promptText, key)
+        alert(`no se pudo enviar automático (${res.error}): prompt copiado al portapapeles. pegalo manual en el chat.`)
+      } else if (items.length && (res?.pasted ?? 0) < items.length) {
+        console.warn('autopaste scene: no se pegaron todas las refs', res)
+        alert(`texto enviado, pero solo ${res?.pasted ?? 0}/${items.length} imágenes se adjuntaron. revisá el chat: si faltan, arrastralas manual desde "referencias de escena".`)
+        setCopied(key + '-sent')
+        setTimeout(() => setCopied(null), 2500)
+      } else {
+        if (res?.duplicateWarning) console.warn('chatgpt duplicate warning', res.duplicateWarning)
+        setCopied(key + '-sent')
+        setTimeout(() => setCopied(null), 2500)
+      }
+    } catch (e) {
+      console.error('handleSendScene', e)
+      await copyToClipboard(promptText, key)
+      alert(`no se pudo enviar automático (${e.message}): prompt copiado.`)
+    } finally {
+      setSending(s => ({ ...s, [key]: false }))
+    }
+  }
+
+  const handleSendLettering = async (idx, promptText, svgPath, refs) => {
+    const key = `lettering-${idx}`
+    if (sending[key]) return
+    // diálogos requiere imagen de escena aprobada (SCENE LOCK)
+    const cover = coverIndex >= 0 ? results[coverIndex] : null
+    if (!cover?.path) {
+      alert('no hay imagen de escena aprobada: generá la escena, pegá el resultado y tildá (✓) la imagen que va a preview antes de enviar diálogos. se suspende el envío.')
+      return
+    }
+    setSending(s => ({ ...s, [key]: true }))
+    try {
+      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
+      const allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
+      const items = await collectImageDataUrls(allPaths)
+      console.log('[autopaste lettering] cover', cover.path, 'refs', refPaths, 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName))
+      if (!items.length) {
+        alert('no se pudo leer la imagen de escena aprobada')
+        return
+      }
+      const uniquePrompt = promptText + `\n\n<!-- doski:${Date.now().toString(36)} -->`
+      const res = await sendToChat({ text: uniquePrompt, imageItems: items, newChat: true })
+      if (res?.error) {
+        console.warn('autopaste lettering error', res)
+        await copyToClipboard(promptText, key)
+        alert(`no se pudo enviar automático (${res.error}): prompt copiado al portapapeles.`)
+      } else if (items.length && (res?.pasted ?? 0) < items.length) {
+        console.warn('autopaste lettering: no se pegaron todas las refs', res)
+        alert(`texto enviado, pero solo ${res?.pasted ?? 0}/${items.length} imágenes se adjuntaron. si faltan, arrastralas manual.`)
+        setCopied(key + '-sent')
+        setTimeout(() => setCopied(null), 2500)
+      } else {
+        if (res?.duplicateWarning) console.warn('chatgpt duplicate warning', res.duplicateWarning)
+        setCopied(key + '-sent')
+        setTimeout(() => setCopied(null), 2500)
+      }
+    } catch (e) {
+      console.error('handleSendLettering', e)
+      await copyToClipboard(promptText, key)
+      alert(`no se pudo enviar automático (${e.message}): prompt copiado.`)
+    } finally {
+      setSending(s => ({ ...s, [key]: false }))
+    }
+  }
+
   const exportToFile = async (content, filename) => {
     if (window.api?.dialog) {
       const result = await window.api.dialog.save({
@@ -194,17 +291,44 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const pasteResult = async () => {
     if ((results || []).length >= MAX_RESULTS) return
     if (!window.api?.references?.paste) {
-      alert('reiniciá la app para activar "pegar resultado"')
+      alert('reiniciá la app para activar "pegar"')
       return
     }
     const baseName = `${(liveStrip?.id || 'strip').slice(0, 8)}-result${(results || []).length + 1}`
     const imported = await window.api.references.paste({ fileName: baseName })
     if (!imported) {
-      alert('no hay imagen en el portapapeles: copiá la imagen de la IA (⌘C) y volvé a intentar')
+      alert('no hay imagen en el portapapeles: copiá la imagen con ⌘C / clic derecho → copiar imagen y volvé a intentar')
       return
     }
     const next = [...(results || []), { id: crypto.randomUUID(), fileName: imported.fileName, path: imported.path, observations: '', pasted: true }]
     persistResults(next, next.length - 1)
+  }
+
+  const pasteFromChat = async () => {
+    if ((results || []).length >= MAX_RESULTS) return
+    const baseName = `${(liveStrip?.id || 'strip').slice(0, 8)}-result${(results || []).length + 1}`
+    try {
+      const b64 = await extractLastImageFromChat()
+      if (!b64) {
+        alert('no se encontró imagen en el chat: generá la imagen en chatgpt y esperá a que se vea completa antes de pegar')
+        return
+      }
+      if (!window.api?.references?.saveFile) {
+        alert('reiniciá la app para activar "pegar desde chat"')
+        return
+      }
+      const fileName = `${baseName}.png`
+      const saved = await window.api.references.saveFile({ fileName, data: b64 })
+      if (!saved?.path) {
+        alert('no se pudo guardar la imagen del chat')
+        return
+      }
+      const next = [...(results || []), { id: crypto.randomUUID(), fileName: saved.fileName || fileName, path: saved.path, observations: '', pasted: true }]
+      persistResults(next, next.length - 1)
+    } catch (e) {
+      console.error('pasteFromChat', e)
+      alert(`no se pudo pegar desde el chat: ${e.message}`)
+    }
   }
 
   const updateObservation = (id, observations) => {
@@ -326,8 +450,11 @@ export default function PromptExporter({ strip, characters, project, balloons })
               </button>
             </>
           )}
-          <button className="btn btn-sm" onClick={pasteResult} disabled={(results || []).length >= MAX_RESULTS}>
-            + pegar resultado
+          <button className="btn btn-sm" onClick={pasteResult} disabled={(results || []).length >= MAX_RESULTS} title="pega la imagen que copiaste con ⌘C / clic derecho → copiar imagen">
+            + pegar común
+          </button>
+          <button className="btn btn-sm" onClick={pasteFromChat} disabled={(results || []).length >= MAX_RESULTS} title="intenta copiar la última imagen generada que esté visible en el chat activo">
+            + pegar desde chat
           </button>
         </div>
         {(results || []).length >= MAX_RESULTS && (
@@ -337,7 +464,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
         )}
         {(results || []).length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            todavía no pegaste resultados: copiá la imagen del chat de IA (⌘C) y usá "+ pegar resultado".
+            todavía no pegaste resultados: usá "+ pegar común" si copiaste la imagen (⌘C), o "+ pegar desde chat" para traer la última generada del chat activo.
           </div>
         ) : (
           <>
@@ -445,15 +572,26 @@ export default function PromptExporter({ strip, characters, project, balloons })
             <div style={{ display: 'flex', gap: 20, alignItems: 'stretch' }}>
               {/* Columna escena */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>escena</span>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: 11 }}
-                    onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}
-                  >
-                    {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 11 }}
+                      onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}
+                    >
+                      {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ fontSize: 11 }}
+                      onClick={() => handleSendScene(i, scenePrompt, scenePath, sceneRefs)}
+                      disabled={!!sending[`scene-${i}`]}
+                      title={sceneRefs.length || scenePath ? `envía ${sceneRefs.length + (scenePath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}
+                    >
+                      {sending[`scene-${i}`] ? 'enviando…' : copied === `scene-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}
+                    </button>
+                  </div>
                 </div>
                 {/* Visual arriba */}
                 {scenePath && (
@@ -489,15 +627,26 @@ export default function PromptExporter({ strip, characters, project, balloons })
                 {/* Columna diálogos */}
                 {hasLettering(panel) && (
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>diálogos</span>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        style={{ fontSize: 11 }}
-                        onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}
-                      >
-                        {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11 }}
+                          onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}
+                        >
+                          {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          style={{ fontSize: 11 }}
+                          onClick={() => handleSendLettering(i, letteringPrompt, letteringPath, balloonRefsPanel)}
+                          disabled={!!sending[`lettering-${i}`]}
+                          title={balloonRefsPanel.length || letteringPath ? `envía ${balloonRefsPanel.length + (letteringPath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}
+                        >
+                          {sending[`lettering-${i}`] ? 'enviando…' : copied === `lettering-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}
+                        </button>
+                      </div>
                     </div>
                     {/* Visual arriba */}
                     {(letteringPath || balloonRefsPanel.length > 0) && (
