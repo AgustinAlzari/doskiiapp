@@ -6,9 +6,10 @@ import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
 import useAuthorStore from '../../store/authorStore'
 import useReferenceStore from '../../store/referenceStore'
 import useChatStore from '../../store/chatStore'
-import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
+import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, generatePureDialoguePrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
 import { sendToChat, extractLastImageFromChat } from '../../services/chatAutopaste'
+import { askConfirm } from '../../store/confirmStore'
 
 const MAX_RESULTS = 2
 import ImagePreview from '../ImagePreview'
@@ -215,27 +216,49 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const handleSendLettering = async (idx, promptText, svgPath, refs) => {
     const key = `lettering-${idx}`
     if (sending[key]) return
-    // diálogos requiere imagen de escena aprobada (SCENE LOCK)
+    // diálogos requiere imagen de escena aprobada (SCENE LOCK) — salvo diálogo puro sin escena
     const cover = coverIndex >= 0 ? results[coverIndex] : null
+    let effectivePrompt = promptText
+    let allPaths = []
+    let isPureDialogue = false
     if (!cover?.path) {
-      alert('no hay imagen de escena aprobada: generá la escena, pegá el resultado y tildá (✓) la imagen que va a preview antes de enviar diálogos. se suspende el envío.')
-      return
+      const ok = await askConfirm('¿es diálogo sin escena? no hay imagen de escena cargada y tildada. ¿querés enviar este diálogo como panel puro de texto, manteniendo las proporciones de la tira y sin imagen de base?', { confirmLabel: 'sí, puro diálogo' })
+      if (!ok) return
+      isPureDialogue = true
+      try {
+        const panel = strip.panels[idx]
+        effectivePrompt = generatePureDialoguePrompt(panel, chars, strip.generalStyle, bgs, objs, resolvedAspect, idx, strip, project, letteringLayoutFileNameFor(strip, idx), balloons, resolvedPalette)
+      } catch (e) {
+        console.warn('pure dialogue prompt fallback', e)
+        effectivePrompt = promptText.replace(
+          /SCENE LOCK:[^\n]*\n[^\n]*\n[^\n]*/,
+          `PURE DIALOGUE — NO SCENE IMAGE: panel de puro diálogo sin imagen de escena. no inventar fondo ni personajes. mantener proporciones ${resolvedAspect} y fondo blanco. prestar especial atención a fontSize/textX/textY y tamaños relativos — no agrandar texto por ausencia de elementos.`
+        )
+      }
+      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
+      allPaths = dedupPaths([...refPaths, svgPath])
+    } else {
+      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
+      allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
     }
     setSending(s => ({ ...s, [key]: true }))
     try {
-      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
-      const allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
       const items = await collectImageDataUrls(allPaths)
-      console.log('[autopaste lettering] cover', cover.path, 'refs', refPaths, 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName))
-      if (!items.length) {
+      console.log('[autopaste lettering] ' + (isPureDialogue ? 'pure dialogue' : 'cover ' + (cover?.path || 'none')), 'refs', (refs||[]).map(r=>r.fileName), 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName), 'pure', isPureDialogue)
+      if (!items.length && !isPureDialogue) {
         alert('no se pudo leer la imagen de escena aprobada')
         return
       }
-      const uniquePrompt = promptText + `\n\n<!-- doski:${Date.now().toString(36)} -->`
+      // para puro diálogo permitimos enviar solo texto + svg (si no hay refs, items puede tener solo svg)
+      if (!items.length && isPureDialogue) {
+        // enviar solo con svg si existe, si no solo texto
+        // collect ya intentó leer svg, si falla igual enviamos texto solo
+      }
+      const uniquePrompt = effectivePrompt + `\n\n<!-- doski:${Date.now().toString(36)} -->`
       const res = await sendToChat({ text: uniquePrompt, imageItems: items, newChat: true })
       if (res?.error) {
         console.warn('autopaste lettering error', res)
-        await copyToClipboard(promptText, key)
+        await copyToClipboard(effectivePrompt, key)
         alert(`no se pudo enviar automático (${res.error}): prompt copiado al portapapeles.`)
       } else if (items.length && (res?.pasted ?? 0) < items.length) {
         console.warn('autopaste lettering: no se pegaron todas las refs', res)
@@ -249,7 +272,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
       }
     } catch (e) {
       console.error('handleSendLettering', e)
-      await copyToClipboard(promptText, key)
+      await copyToClipboard(effectivePrompt, key)
       alert(`no se pudo enviar automático (${e.message}): prompt copiado.`)
     } finally {
       setSending(s => ({ ...s, [key]: false }))

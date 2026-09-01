@@ -951,6 +951,24 @@ export function generateLetteringPrompt(panel, characters = [], generalStyle, ba
   return withLegalNotice(lines).join('\n')
 }
 
+export function generatePureDialoguePrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, layoutFileName = null, balloons = [], paletteColors = null) {
+  const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
+  const layoutName = layoutFileName || layoutFileNameFor(strip, panelIndex)
+  const lines = [
+    `IMAGE FORMAT: ${ctx.ratioLabel}. The final canvas must have exactly a ${ctx.ratioLabel} width:height ratio. Do not generate any other ratio, and do not crop, distort, or rotate. Design the entire composition within this ${shapeFromRatio(ctx.ratioLabel)}.`,
+    `POSITIONAL LAYOUT: The file "${layoutName}" is a layout reference image showing the exact positions, sizes, and order of the lettering elements (balloons, narration, sound effects) on the canvas. Use it as a precise guide.`,
+    '',
+    ...chatTitleLines(strip),
+    `PURE DIALOGUE — NO SCENE IMAGE: This panel is dialogue-only and is NOT based on any scene image. No image is attached and none should be invented — do NOT add landscape, objects, characters, or background. Generate a clean panel with a plain white background, exactly ${ctx.ratioLabel}, respecting the tira proportions. Use "${layoutName}" solely as a positional guide for balloons and text. Pay special attention to the fontSize, textX, textY and relative size values in the lettering details — do NOT enlarge lettering or balloons beyond the specified sizes; the absence of other elements does not justify larger text. Keep generous white margins as indicated by the layout.`,
+    '',
+    ...letteringLines(ctx, panel, project, layoutName, balloons, generalStyle, paletteColors),
+    '',
+    `FINAL REMINDER — PURE DIALOGUE: Generate a clean white dialogue panel in ${ctx.ratioLabel}, with ONLY the lettering specified above (balloons, narration, sound effects, captions) at the exact coordinates given and following "${layoutName}" for placement. Do NOT add any scene imagery, landscape, characters or objects. DO NOT CHANGE THE ASPECT RATIO. Keep lettering at the indicated sizes — do not enlarge due to empty space.`,
+    letteringFinalCheck(panelUsesImageBalloon(panel, balloons), panelHasBubbleAnchored(panel, balloons)),
+  ]
+  return withLegalNotice(lines).join('\n')
+}
+
 export function generatePanelPrompt(panel, characters = [], generalStyle, backgrounds = [], objects = [], stripAspectRatio = null, panelIndex = 0, strip = null, project = null, balloons = [], paletteColors = null, author = null) {
   const ctx = computeContext(panel, characters, backgrounds, objects, stripAspectRatio, project)
   const layoutName = layoutFileNameFor(strip, panelIndex)
