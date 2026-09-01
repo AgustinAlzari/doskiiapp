@@ -236,10 +236,12 @@ export default function PromptExporter({ strip, characters, project, balloons })
         )
       }
       const refPaths = (refs || []).map(r => r.path).filter(Boolean)
-      allPaths = dedupPaths([...refPaths, svgPath])
+      const instancePaths = panelBalloonInstanceRefs(strip.panels[idx]).map(r => r.path).filter(Boolean)
+      allPaths = dedupPaths([...refPaths, ...instancePaths, svgPath])
     } else {
       const refPaths = (refs || []).map(r => r.path).filter(Boolean)
-      allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
+      const instancePaths = panelBalloonInstanceRefs(strip.panels[idx]).map(r => r.path).filter(Boolean)
+      allPaths = dedupPaths([cover.path, ...refPaths, ...instancePaths, svgPath])
     }
     setSending(s => ({ ...s, [key]: true }))
     try {
@@ -415,10 +417,25 @@ export default function PromptExporter({ strip, characters, project, balloons })
     })
     return refs
   }
+  const panelBalloonInstanceRefs = (panel) => {
+    const refs = []
+    const seen = new Set()
+    ;(panel.characters || []).forEach(c => {
+      if (c.imageRef?.path && !seen.has(c.imageRef.path)) { seen.add(c.imageRef.path); refs.push({ ...c.imageRef, entityName: 'globo imagen' }) }
+      ;(c.extraDialogues || []).forEach(e => {
+        if (e.imageRef?.path && !seen.has(e.imageRef.path)) { seen.add(e.imageRef.path); refs.push({ ...e.imageRef, entityName: 'globo imagen' }) }
+      })
+    })
+    ;(panel.globosX || []).forEach(g => {
+      if (g.imageRef?.path && !seen.has(g.imageRef.path)) { seen.add(g.imageRef.path); refs.push({ ...g.imageRef, entityName: 'globo imagen' }) }
+    })
+    return refs
+  }
 
   const usedFileNames = [...new Set([
     ...strip.panels.flatMap(p => panelSceneRefs(p).map(r => r.fileName)),
     ...strip.panels.flatMap(p => panelBalloonRefs(p).map(r => r.fileName)),
+    ...strip.panels.flatMap(p => panelBalloonInstanceRefs(p).map(r => r.fileName)),
     ...(results || []).map(r => r.fileName),
     ...Object.keys(svgPaths).map(key => {
       const [idx, mode] = key.split(':')
@@ -587,6 +604,8 @@ export default function PromptExporter({ strip, characters, project, balloons })
         const letteringPath = svgPaths[`${i}:lettering`]
         const sceneRefs = panelSceneRefs(panel)
         const balloonRefsPanel = panelBalloonRefs(panel)
+        const balloonInstanceRefsPanel = panelBalloonInstanceRefs(panel)
+        const allBalloonVisualRefs = [...balloonRefsPanel, ...balloonInstanceRefsPanel]
         return (
           <div key={panel.id} className="card" style={{ padding: 12 }}>
             <div style={{ marginBottom: 10 }}>
@@ -665,16 +684,16 @@ export default function PromptExporter({ strip, characters, project, balloons })
                           style={{ fontSize: 11 }}
                           onClick={() => handleSendLettering(i, letteringPrompt, letteringPath, balloonRefsPanel)}
                           disabled={!!sending[`lettering-${i}`]}
-                          title={balloonRefsPanel.length || letteringPath ? `envía ${balloonRefsPanel.length + (letteringPath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}
+                          title={allBalloonVisualRefs.length || letteringPath ? `envía ${allBalloonVisualRefs.length + (letteringPath ? 1 : 0)} imágenes + texto al chat — las de borde grueso van dentro del globo` : 'envía el prompt al chat'}
                         >
                           {sending[`lettering-${i}`] ? 'enviando…' : copied === `lettering-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}
                         </button>
                       </div>
                     </div>
                     {/* Visual arriba */}
-                    {(letteringPath || balloonRefsPanel.length > 0) && (
+                    {(letteringPath || allBalloonVisualRefs.length > 0) && (
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar)</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar) — borde grueso = dentro del globo</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                           {letteringPath && (
                             <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 6, background: 'white', width: 160 }}>
@@ -687,6 +706,14 @@ export default function PromptExporter({ strip, characters, project, balloons })
                                 {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
                               </div>
                               <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ref.fileName}>{ref.fileName}</div>
+                            </div>
+                          ))}
+                          {balloonInstanceRefsPanel.map(ref => (
+                            <div key={ref.path + '-inst'} style={{ width: 72 }}>
+                              <div style={{ height: 64, border: '2px solid var(--color-text)', borderRadius: 5, padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }} title="esta imagen va DENTRO del globo referido — se envía automático al chat">
+                                {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
+                              </div>
+                              <div style={{ fontSize: 9, color: 'var(--color-text)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }} title={`${ref.fileName} — dentro del globo (se envía al chat)`}>{ref.fileName} ↘ globo</div>
                             </div>
                           ))}
                         </div>

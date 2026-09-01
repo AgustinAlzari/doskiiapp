@@ -601,7 +601,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       if (balloon.isExtra) {
         characters[charIdx] = { ...char, extraDialogues: (char.extraDialogues || []).filter((_, i) => i !== balloon.extraIdx) }
       } else {
-        characters[charIdx] = { ...char, dialogue: '', dialogueOpen: false, dialoguePos: null, dialoguePosition: null }
+        characters[charIdx] = { ...char, dialogue: '', dialogueOpen: false, dialoguePos: null, dialoguePosition: null, imageRef: null }
       }
       panels[0] = { ...panels[0], characters }
       return { ...prev, panels }
@@ -609,6 +609,68 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedBalloon(null)
     setSelectedCharIdx(null)
   }, [])
+
+  const pasteDialogueBalloonImage = useCallback(async () => {
+    if (!selectedBalloon) return
+    if (!window.api?.references?.paste) {
+      alert('reiniciá la app para activar "pegar"')
+      return
+    }
+    const baseName = `balloon-${Date.now()}`
+    const imported = await window.api.references.paste({ fileName: baseName })
+    if (!imported) {
+      alert('no hay imagen en el portapapeles: copiá la imagen con ⌘C y volvé a intentar')
+      return
+    }
+    const imageRef = { fileName: imported.fileName, path: imported.path }
+    const charIdx = (data.panels[0]?.characters || []).findIndex(c => c.characterId === selectedBalloon.characterId)
+    if (charIdx < 0) return
+    if (selectedBalloon.isExtra) {
+      const char = data.panels[0].characters[charIdx]
+      const extras = [...(char.extraDialogues || [])]
+      if (!extras[selectedBalloon.extraIdx]) return
+      extras[selectedBalloon.extraIdx] = { ...extras[selectedBalloon.extraIdx], imageRef }
+      updateCharacterInPanel(0, charIdx, { extraDialogues: extras })
+    } else {
+      updateCharacterInPanel(0, charIdx, { imageRef })
+    }
+  }, [selectedBalloon, data.panels, updateCharacterInPanel])
+
+  const removeDialogueBalloonImage = useCallback(() => {
+    if (!selectedBalloon) return
+    const charIdx = (data.panels[0]?.characters || []).findIndex(c => c.characterId === selectedBalloon.characterId)
+    if (charIdx < 0) return
+    if (selectedBalloon.isExtra) {
+      const char = data.panels[0].characters[charIdx]
+      const extras = [...(char.extraDialogues || [])]
+      if (!extras[selectedBalloon.extraIdx]) return
+      const { imageRef: _omit, ...rest } = extras[selectedBalloon.extraIdx]
+      extras[selectedBalloon.extraIdx] = rest
+      updateCharacterInPanel(0, charIdx, { extraDialogues: extras })
+    } else {
+      updateCharacterInPanel(0, charIdx, { imageRef: null })
+    }
+  }, [selectedBalloon, data.panels, updateCharacterInPanel])
+
+  const pasteGloboXBalloonImage = useCallback(async () => {
+    if (selectedGloboXIdx == null) return
+    if (!window.api?.references?.paste) {
+      alert('reiniciá la app para activar "pegar"')
+      return
+    }
+    const baseName = `globox-${Date.now()}`
+    const imported = await window.api.references.paste({ fileName: baseName })
+    if (!imported) {
+      alert('no hay imagen en el portapapeles: copiá la imagen con ⌘C y volvé a intentar')
+      return
+    }
+    updateGloboXInPanel(0, selectedGloboXIdx, { imageRef: { fileName: imported.fileName, path: imported.path } })
+  }, [selectedGloboXIdx, updateGloboXInPanel])
+
+  const removeGloboXBalloonImage = useCallback(() => {
+    if (selectedGloboXIdx == null) return
+    updateGloboXInPanel(0, selectedGloboXIdx, { imageRef: null })
+  }, [selectedGloboXIdx, updateGloboXInPanel])
 
   // Connections
   const addConnection = useCallback((panelIdx, fromId, toId, toType = 'character') => {
@@ -673,10 +735,10 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       const extra = (char.extraDialogues || [])[selectedBalloon.extraIdx]
       if (!extra) return null
       const found = orderedForPanel.find(d => d.characterId === char.characterId && d.isExtra && d.extraIdx === selectedBalloon.extraIdx)
-      return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: extra.text || '', channel: extra.type || 'speech', balloonId: extra.balloonId || null, align: extra.align || 'center', fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, linked: extra.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: extra.type || 'speech' }
+      return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: extra.text || '', channel: extra.type || 'speech', balloonId: extra.balloonId || null, align: extra.align || 'center', fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, linked: extra.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: extra.type || 'speech', imageRef: extra.imageRef || null }
     }
     const found = orderedForPanel.find(d => d.characterId === char.characterId && !d.isExtra)
-    return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: char.dialogue || '', channel: char.dialogueType || 'speech', balloonId: char.balloonId || null, align: char.align || 'center', fontSize: char.fontSize, textX: char.textX, textY: char.textY, linked: char.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: char.dialogueType || 'speech' }
+    return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: char.dialogue || '', channel: char.dialogueType || 'speech', balloonId: char.balloonId || null, align: char.align || 'center', fontSize: char.fontSize, textX: char.textX, textY: char.textY, linked: char.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: char.dialogueType || 'speech', imageRef: char.imageRef || null }
   })()
 
   const selectedGloboXLabel = selectedGloboXIdx != null
@@ -815,6 +877,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       label={selectedDialogueBalloon.label}
                       characterName={selectedDialogueBalloon.characterName}
                       text={selectedDialogueBalloon.text}
+                      imageRef={selectedDialogueBalloon.imageRef || null}
                       balloonId={selectedDialogueBalloon.balloonId}
                       balloons={projectBalloons}
                       defaultBalloon={wildcardBalloon}
@@ -841,6 +904,21 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       onType={(id, kind) => applyDialogueBalloonUpdate(selectedBalloon.isExtra
                         ? { balloonId: id, type: kind === 'thought' ? 'thought' : 'speech' }
                         : { balloonId: id, dialogueType: kind === 'thought' ? 'thought' : 'speech' })}
+                      onText={(newText) => {
+                        const charIdx = (data.panels[0]?.characters || []).findIndex(c => c.characterId === selectedBalloon.characterId)
+                        if (charIdx < 0) return
+                        if (selectedBalloon.isExtra) {
+                          const char = data.panels[0].characters[charIdx]
+                          const extras = [...(char.extraDialogues || [])]
+                          if (!extras[selectedBalloon.extraIdx]) return
+                          extras[selectedBalloon.extraIdx] = { ...extras[selectedBalloon.extraIdx], text: newText }
+                          updateCharacterInPanel(0, charIdx, { extraDialogues: extras })
+                        } else {
+                          updateCharacterInPanel(0, charIdx, { dialogue: newText, dialogueOpen: true })
+                        }
+                      }}
+                      onImagePaste={pasteDialogueBalloonImage}
+                      onImageRemove={removeDialogueBalloonImage}
                       onRemove={() => removeDialogueBalloon(selectedBalloon)}
                       onClose={() => setSelectedBalloon(null)}
                     />
@@ -850,6 +928,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       kind="globox"
                       label={selectedGloboXLabel}
                       text={selectedGloboXData.text || ''}
+                      imageRef={selectedGloboXData.imageRef || null}
                       balloonId={selectedGloboXData.balloonId || null}
                       balloons={projectBalloons}
                       defaultBalloon={wildcardBalloon}
@@ -868,6 +947,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       onTextY={(textY) => updateGloboXInPanel(0, selectedGloboXIdx, { textY })}
                       onType={(id, kind) => updateGloboXInPanel(0, selectedGloboXIdx, { balloonId: id, channel: kind === 'thought' ? 'thought' : 'speech' })}
                       onAnchor={(anchor) => updateGloboXInPanel(0, selectedGloboXIdx, { anchor })}
+                      onText={(newText) => updateGloboXInPanel(0, selectedGloboXIdx, { text: newText })}
+                      onImagePaste={pasteGloboXBalloonImage}
+                      onImageRemove={removeGloboXBalloonImage}
                       onRemove={() => removeGloboXFromPanel(0, selectedGloboXIdx)}
                       onClose={() => setSelectedGloboXIdx(null)}
                     />
