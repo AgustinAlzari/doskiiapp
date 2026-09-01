@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import TextLayoutControls from './TextLayoutControls'
 
 const ANCHOR_DIRECTIONS = ['bottom', 'left', 'right', 'top']
@@ -15,6 +16,7 @@ export default function BalloonPropsPanel({
   dialogueType, onDialogueType,
   onAddDialogue,
   onText, onType, onAnchor, onRemove, onClose,
+  imageRef, onImagePaste, onImageRemove,
 }) {
   const anchorType = anchor?.type || 'none'
   const effectiveId = balloonId || defaultBalloon?.id || ''
@@ -29,6 +31,17 @@ export default function BalloonPropsPanel({
     const po = (panelObjects || []).find(o => o.objectId === id)
     return po ? (objects || []).find(o => o.id === po.objectId)?.name || '?' : '?'
   }
+
+  const [imagePreview, setImagePreview] = useState(null)
+  useEffect(() => {
+    let active = true
+    if (imageRef?.path && window.api?.references?.read) {
+      window.api.references.read(imageRef.path).then(url => { if (active) setImagePreview(url) })
+    } else {
+      setImagePreview(null)
+    }
+    return () => { active = false }
+  }, [imageRef?.path])
 
   return (
     <div className="character-props-panel" style={{ width: '100%', flexShrink: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'auto' }}>
@@ -121,16 +134,55 @@ export default function BalloonPropsPanel({
         </>
       )}
 
-      <TextLayoutControls
-        align={align || 'center'}
-        onAlignChange={onAlign}
-        fontSize={fontSize}
-        onFontSize={onFontSize}
-        textX={textX}
-        onTextX={onTextX}
-        textY={textY}
-        onTextY={onTextY}
-      />
+      {isImageBalloon ? (
+        <>
+          <div>
+            <label className="label">descripción de la imagen</label>
+            <textarea
+              className="input textarea"
+              value={text || ''}
+              onChange={e => onText?.(e.target.value)}
+              placeholder="qué se ve dentro del globo de imagen..."
+              rows={3}
+              style={{ fontSize: 12, lineHeight: 1.5 }}
+            />
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              se copia al prompt como descripción de la escena dentro del globo.
+            </div>
+          </div>
+          <div>
+            <label className="label">imagen de referencia</label>
+            {imagePreview ? (
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 6, background: 'white', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <img src={imagePreview} alt="ref" style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', alignSelf: 'center' }} />
+                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={imageRef?.fileName}>{imageRef?.fileName}</div>
+                <button className="btn btn-sm btn-ghost btn-danger" onClick={onImageRemove} style={{ fontSize: 11 }}>quitar imagen</button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', border: '1px dashed var(--color-border)', borderRadius: 6, padding: '12px 8px', textAlign: 'center', marginBottom: 8 }}>
+                sin imagen pegada
+              </div>
+            )}
+            <button className="btn btn-sm" onClick={onImagePaste} style={{ fontSize: 11 }}>
+              pegar img de ref
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              copiá una imagen con ⌘C y pegala acá. se vincula al prompt y se envía automático al chat.
+            </div>
+          </div>
+        </>
+      ) : (
+        <TextLayoutControls
+          align={align || 'center'}
+          onAlignChange={onAlign}
+          fontSize={fontSize}
+          onFontSize={onFontSize}
+          textX={textX}
+          onTextX={onTextX}
+          textY={textY}
+          onTextY={onTextY}
+        />
+      )}
 
       {kind === 'globox' && (
         <>

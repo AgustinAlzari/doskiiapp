@@ -214,14 +214,14 @@ export function orderedPanelDialogues(panel, characters = [], opts = {}) {
     if (item.dialogue || (includeEmpty && item.dialogueOpen)) {
       const base = defaultPos(item, k, total)
       const pos = item.dialoguePos ? { ...base, ...item.dialoguePos } : base
-      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, linked: item.linked !== false, align: item.align || DEFAULT_ALIGN, fontSize: item.fontSize, textX: item.textX, textY: item.textY, isExtra: false, extraIdx: null, order: 0, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, linked: item.linked !== false, align: item.align || DEFAULT_ALIGN, fontSize: item.fontSize, textX: item.textX, textY: item.textY, isExtra: false, extraIdx: null, order: 0, imageRef: item.imageRef || null, ...pos })
       k++
     }
     ;(item.extraDialogues || []).forEach((extra, eIdx) => {
-      if (!extra.text && !(includeEmpty && extra.open)) return
+      if (!extra.text && !(includeEmpty && extra.open) && !extra.imageRef) return
       const base = defaultPos(item, k, total)
       const pos = extra.pos ? { ...base, ...extra.pos } : base
-      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, linked: extra.linked !== false, align: extra.align || DEFAULT_ALIGN, fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, isExtra: true, extraIdx: eIdx, order: eIdx + 1, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, linked: extra.linked !== false, align: extra.align || DEFAULT_ALIGN, fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, isExtra: true, extraIdx: eIdx, order: eIdx + 1, imageRef: extra.imageRef || null, ...pos })
       k++
     })
   })
@@ -666,12 +666,15 @@ function globoXAnchorText(gx, ctx) {
   }
 }
 
-function imageBalloonContent(entity, text, project, generalStyle, paletteColors) {
+function imageBalloonContent(entity, text, project, generalStyle, paletteColors, imageRef = null) {
   const sceneText = (text?.trim() || '').trim()
   let content = sceneText
     ? `inside the balloon, draw this scene: "${sceneText}". `
     : `inside the balloon, draw the scene the author described for this balloon in the panel editor. `
-  content += `The scene MUST be drawn STRICTLY INSIDE the balloon, filling its interior; nothing may break out of the balloon outline. Do NOT place any text, letters, or typography inside or around this balloon.`
+  if (imageRef?.fileName) {
+    content += ` CRITICAL: Reference image "${imageRef.fileName}" is provided and MUST be rendered STRICTLY AND EXCLUSIVELY INSIDE this balloon — it goes DENTRO del globo referido, filling its interior exactly. Do NOT use it as background, scene, or separate element outside the balloon; it belongs ONLY inside this balloon. The text description (if any) and this image must be combined: the image is the primary visual source for what appears inside, guided by the text. Preserve its content faithfully inside the balloon shape.`
+  }
+  content += ` The scene MUST be drawn STRICTLY INSIDE the balloon, filling its interior; nothing may break out of the balloon outline. Do NOT place any text, letters, or typography inside or around this balloon.`
   const imgStyle = entity.imageStyle?.trim() || combineStyleText(projectStyleText(project), generalStyle) || ''
   if (imgStyle) content += ` Image style: ${imgStyle}.`
   const imgPal = (entity.imagePalette || []).filter(c => c.hex)
@@ -682,6 +685,9 @@ function imageBalloonContent(entity, text, project, generalStyle, paletteColors)
   } else {
     const projPal = paletteText(project, paletteColors)
     if (projPal) content += ` ${projPal}`
+  }
+  if (imageRef?.fileName) {
+    content += ` ATTACHED IMAGE FOR THIS BALLOON ONLY: "${imageRef.fileName}" — must be used as the interior image, strictly inside this balloon, not elsewhere. It is already attached to the request; render it inside.`
   }
   return `contains an IMAGE, not text: ${content}`
 }
@@ -802,7 +808,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       let styleRef = ''
       if (entity) styleRef = ` Balloon style entity: "${entity.name}".`
       const content = isImage
-        ? imageBalloonContent(entity, d.text, project, generalStyle, paletteColors)
+        ? imageBalloonContent(entity, d.text, project, generalStyle, paletteColors, d.imageRef || null)
         : (() => {
             const parts = markdownPromptParts(d.text, d.align)
             const extras = []
@@ -844,7 +850,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       const anchor = globoXAnchorText(g, ctx)
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
       const content = isImage
-        ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors)
+        ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors, g.imageRef || null)
         : (() => {
             const parts = markdownPromptParts(g.text, g.align)
             const extras = []
