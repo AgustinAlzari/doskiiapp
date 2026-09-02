@@ -37,7 +37,6 @@ const useTiraStore = create((set, get) => ({
 
   save: async (tira) => {
     const updated = { ...tira, updatedAt: new Date().toISOString(), savedAt: new Date().toISOString() }
-    if (window.api) await window.api.tiras.save(updated)
     set(state => {
       const idx = state.tiras.findIndex(t => t.id === updated.id)
       if (idx >= 0) {
@@ -47,6 +46,9 @@ const useTiraStore = create((set, get) => ({
       }
       return { tiras: [updated, ...state.tiras] }
     })
+    if (window.api) {
+      try { await window.api.tiras.save(updated) } catch (e) { console.error('tiras:save failed', e) }
+    }
     return updated
   },
 

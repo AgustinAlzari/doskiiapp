@@ -24,7 +24,7 @@ const useStripStore = create((set, get) => ({
 
   save: async (strip) => {
     const updated = { ...strip, updatedAt: new Date().toISOString(), savedAt: new Date().toISOString() }
-    if (window.api) await window.api.strips.save(updated)
+    // optimista: actualiza la UI al instante, sin esperar disco/nube
     set(state => {
       const idx = state.strips.findIndex(s => s.id === updated.id)
       if (idx >= 0) {
@@ -34,6 +34,9 @@ const useStripStore = create((set, get) => ({
       }
       return { strips: [updated, ...state.strips] }
     })
+    if (window.api) {
+      try { await window.api.strips.save(updated) } catch (e) { console.error('strips:save failed', e) }
+    }
     return updated
   },
 

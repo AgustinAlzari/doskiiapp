@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import useChatStore from '../../store/chatStore'
+import useMuseUiStore from '../../store/museUiStore'
+import usePromptIterationStore from '../../store/promptIterationStore'
+import useStripStore from '../../store/stripStore'
+import ApiPreview from '../prompt/ApiPreview'
 
 export default function ChatPanel() {
   const models = useChatStore(s => s.models)
@@ -9,6 +13,12 @@ export default function ChatPanel() {
   const model = useChatStore(s => s.favoriteModel())
   const webviewRef = useRef(null)
   const areaRef = useRef(null)
+  const museHasKey = useMuseUiStore(s => s.hasKey())
+  const chatMode = useMuseUiStore(s => s.chatMode)
+  const setChatMode = useMuseUiStore(s => s.setChatMode)
+  const activeStripId = useMuseUiStore(s => s.activeStripId)
+  const activePanelId = useMuseUiStore(s => s.activePanelId)
+  const byPanel = usePromptIterationStore(s => s.byPanel)
 
   useEffect(() => {
     const wv = webviewRef.current
@@ -21,13 +31,10 @@ export default function ChatPanel() {
     return () => wv.removeEventListener('new-window', onNewWindow)
   }, [webviewRef.current])
 
-  // Expone el webview para autopaste (PromptExporter lo busca vía DOM)
   useEffect(() => {
     if (webviewRef.current) webviewRef.current.id = 'doski-chat-webview'
   }, [model?.url])
 
-  // Dimensiona el webview con píxeles exactos (redondeados) para que su altura sea
-  // estable: evita que la barra inferior del chat se recorte o titile bajo el cursor.
   useEffect(() => {
     const wv = webviewRef.current
     const area = areaRef.current
@@ -61,7 +68,6 @@ export default function ChatPanel() {
       flexDirection: 'column',
       paddingBottom: 10,
     }}>
-      {/* Encabezado alineado con el de prompts */}
       <div
         className="editor-header"
         style={{
@@ -77,23 +83,36 @@ export default function ChatPanel() {
         <span className="ui-h2" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
           modelo
         </span>
-        <select
-          className="ui-h2"
-          value={favoriteModelId}
-          onChange={e => setFavorite(e.target.value)}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            padding: 0,
-            height: 28,
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-          title="elegí el modelo de IA (favorito)"
-        >
-          {models.map(m => <option key={m.id} value={m.id}>{String(m.name).toLowerCase()}</option>)}
-        </select>
+        {museHasKey && chatMode === 'api' ? (
+          <span className="ui-h2" style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>api preview</span>
+        ) : (
+          <select
+            className="ui-h2"
+            value={favoriteModelId}
+            onChange={e => setFavorite(e.target.value)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              padding: 0,
+              height: 28,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+            title="elegí el modelo de IA (favorito)"
+          >
+            {models.map(m => <option key={m.id} value={m.id}>{String(m.name).toLowerCase()}</option>)}
+          </select>
+        )}
         <span style={{ flex: 1 }} />
+        {museHasKey && (
+          <button
+            onClick={() => setChatMode(chatMode === 'api' ? 'webview' : 'api')}
+            title={chatMode === 'api' ? 'ver chat web' : 'ver api preview'}
+            style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}
+          >
+            {chatMode === 'api' ? 'chat' : 'api'}
+          </button>
+        )}
         <button
           onClick={resetChat}
           title="reiniciar la conversación"
@@ -128,8 +147,34 @@ export default function ChatPanel() {
         </button>
       </div>
 
-      {/* Chat embarcado */}
-      {model?.url ? (
+      {museHasKey && chatMode === 'api' ? (
+        (() => {
+          const key = activeStripId && activePanelId ? `${activeStripId}:${activePanelId}` : null
+          const entry = key ? byPanel[key] : null
+          const iterations = entry?.scene.iterations || []
+          const currentId = entry?.scene.currentId
+          const approvedId = entry?.scene.approvedId
+          const handleApprove = (id) => {
+            usePromptIterationStore.getState().approve(activeStripId, activePanelId, 'scene', id)
+            try {
+              const it = (usePromptIterationStore.getState().byPanel[key]?.scene.iterations || []).find(x => x.id === id)
+              if (it?.imagePath) {
+                const strip = useStripStore.getState().strips.find(s => s.id === activeStripId)
+                if (!strip) return
+                const fileName = String(it.imagePath).split('/').pop()
+                const next = [...(strip.results || []), { id: crypto.randomUUID(), fileName, path: it.imagePath, observations: `aprobado api ${it.model || ''}`, pasted: false }]
+                const coverIdx = next.length - 1
+                useStripStore.getState().save({ ...strip, results: next, resultCoverIndex: coverIdx })
+              }
+            } catch {}
+          }
+          return (
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12 }}>
+              {!key ? <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>abrí una viñeta en prompts para ver el preview api</div> : <ApiPreview iterations={iterations} currentId={currentId} approvedId={approvedId} onSelect={id => usePromptIterationStore.getState().setCurrent(activeStripId, activePanelId, 'scene', id)} onApprove={handleApprove} />}
+            </div>
+          )
+        })()
+      ) : model?.url ? (
         <div ref={areaRef} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           <webview
             id="doski-chat-webview"

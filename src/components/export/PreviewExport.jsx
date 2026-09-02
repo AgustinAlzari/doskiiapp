@@ -173,28 +173,46 @@ export default function PreviewExport({ project, strips, characters, backgrounds
   }, [visibleStrips, items])
 
   // Carga las fuentes (data URL) de cada imagen del mosaico (batch).
+  // Cache incremental: el desplegable muestra al instante lo ya cargado.
   const [srcs, setSrcs] = useState({})
+  const pathCacheRef = useRef({}) // path -> dataUrl
   useEffect(() => {
     let active = true
+    const paths = allItems.map(it => it.path).filter(Boolean)
+    const uniq = [...new Set(paths)]
+    // pinta inmediato lo cacheado
+    const immediate = {}
+    for (const it of allItems) {
+      const hit = pathCacheRef.current[it.path]
+      if (hit) immediate[it.key] = hit
+    }
+    if (Object.keys(immediate).length) {
+      setSrcs(prev => {
+        let same = true
+        for (const k in immediate) if (prev[k] !== immediate[k]) { same = false; break }
+        return same ? prev : { ...prev, ...immediate }
+      })
+    }
+    const toFetch = uniq.filter(p => !pathCacheRef.current[p])
+    if (toFetch.length === 0) return () => { active = false }
     const load = async () => {
-      const paths = allItems.map(it => it.path).filter(Boolean)
-      const uniq = [...new Set(paths)]
       let map = {}
-      if (uniq.length && window.api?.references) {
+      if (window.api?.references) {
         try {
-          if (window.api.references.readMany) map = await window.api.references.readMany(uniq)
+          if (window.api.references.readMany) map = await window.api.references.readMany(toFetch)
           else {
-            const results = await Promise.all(uniq.map(async p => [p, await window.api.references.read(p)]))
+            const results = await Promise.all(toFetch.map(async p => [p, await window.api.references.read(p)]))
             map = Object.fromEntries(results.filter(([, v]) => v))
           }
         } catch {}
       }
       if (!active) return
+      for (const p in map) pathCacheRef.current[p] = map[p]
       const next = {}
       for (const it of allItems) {
         if (it.path && map[it.path]) next[it.key] = map[it.path]
       }
-      setSrcs(next)
+      if (Object.keys(next).length) setSrcs(prev => ({ ...prev, ...next }))
     }
     load()
     return () => { active = false }
