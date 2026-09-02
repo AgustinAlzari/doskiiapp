@@ -40,7 +40,8 @@ export const makeDefaultProject = () => ({
   authorId: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-      savedAt: new Date().toISOString(),
+  savedAt: new Date().toISOString(),
+  settings: { maxRefs: 5, alwaysIncludeLayout: true },
 })
 
 const upsert = (list, item) => {
@@ -81,7 +82,17 @@ const useProjectStore = create((set, get) => ({
       createdAt: project.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       savedAt: new Date().toISOString(),
+      settings: {
+        maxRefs: 5,
+        alwaysIncludeLayout: true,
+        ...(project.settings || {}),
+        ...(project.settings ? {} : {}),
+      },
     }
+    // normalizar settings
+    if (typeof updated.settings.maxRefs !== 'number' || updated.settings.maxRefs < 1) updated.settings.maxRefs = 5
+    if (updated.settings.maxRefs > 8) updated.settings.maxRefs = 8
+    if (typeof updated.settings.alwaysIncludeLayout !== 'boolean') updated.settings.alwaysIncludeLayout = true
     if (window.api?.projects) await window.api.projects.save(updated)
     set(state => ({ projects: upsert(state.projects, updated) }))
     await ensureWildcards([updated])
@@ -130,6 +141,12 @@ const useProjectStore = create((set, get) => ({
   },
 
   migrate: async () => {
+    // migrar settings faltantes
+    for (const p of get().projects) {
+      if (!p.settings || typeof p.settings.maxRefs !== 'number') {
+        await get().save({ ...p, settings: { maxRefs: 5, alwaysIncludeLayout: true, ...(p.settings || {}) } })
+      }
+    }
     const defaultId = get().projects[0]?.id
     if (!defaultId) return
     const migrate = async (store, key) => {

@@ -6,10 +6,14 @@ import usePaletteStore, { resolvePaletteColors } from '../../store/paletteStore'
 import useAuthorStore from '../../store/authorStore'
 import useReferenceStore from '../../store/referenceStore'
 import useChatStore from '../../store/chatStore'
-import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, generatePureDialoguePrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
+import { generateAllPanelsPrompt, generateScenePrompt, generateLetteringPrompt, usedBalloonEntityIds, sceneLayoutFileNameFor, letteringLayoutFileNameFor } from '../../services/promptGenerator'
 import { generateLayoutSVG } from '../../services/layoutSvg'
 import { sendToChat, extractLastImageFromChat } from '../../services/chatAutopaste'
-import { askConfirm } from '../../store/confirmStore'
+import useMuseUiStore from '../../store/museUiStore'
+import usePromptIterationStore from '../../store/promptIterationStore'
+import { getMuseSecrets } from '../../services/museSecrets'
+import { generateMuseImage, extractImageResult, buildDataUrlFromBase64 } from '../../services/museImageService'
+import ModelPicker from '../models/ModelPicker'
 
 const MAX_RESULTS = 2
 import ImagePreview from '../ImagePreview'
@@ -29,7 +33,28 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const [coverIndex, setCoverIndex] = useState(-1)
   const [showRefs, setShowRefs] = useState(false)
   const [sending, setSending] = useState({}) // key: `scene-0` / `lettering-0` -> bool
+  const [apiGenerating, setApiGenerating] = useState({}) // key -> bool
+  const [corrections, setCorrections] = useState({}) // key -> string
+  const [iterPrev, setIterPrev] = useState({}) // key -> iterId or 'none'
+  const [iterExtraRefs, setIterExtraRefs] = useState({}) // key -> string[] (paths)
+  const [showIterPicker, setShowIterPicker] = useState(null) // key or null
+  const [iterIncludeLayout, setIterIncludeLayout] = useState({}) // key -> bool (default true)
+  const [iterSelectedRefs, setIterSelectedRefs] = useState({}) // key -> Set<string> (paths) — null = all
   const chatOpen = useChatStore(s => s.open)
+  const museHasKey = useMuseUiStore(s => s.hasKey())
+  const museModel = useMuseUiStore(s => s.selectedModel)
+  const setMuseModel = useMuseUiStore(s => s.setModel)
+  const viaByKey = useMuseUiStore(s => s.viaByKey)
+  const setVia = useMuseUiStore(s => s.setVia)
+  const setChatMode = useMuseUiStore(s => s.setChatMode)
+  const setActivePanel = useMuseUiStore(s => s.setActivePanel)
+  const promptIterStore = usePromptIterationStore()
+  const reasoningEffort = useMuseUiStore(s => s.reasoningEffort)
+  const setReasoningEffort = useMuseUiStore(s => s.setReasoningEffort)
+  const aspectToSize = (aspectId) => {
+    const map = { hd: '1536x1024', 'square': '1024x1024', 'vertical': '1024x1536', 'portrait-hd': '1024x1536', 'ig-45': '1024x1280', 'ig-11': '1024x1024', 'ig-916': '1080x1920', 'ig-191': '1536x1024' }
+    return map[aspectId] || '1024x1024'
+  }
 
   const chars = characters || []
   const bgs = backgrounds || []
@@ -79,6 +104,11 @@ export default function PromptExporter({ strip, characters, project, balloons })
     setCoverIndex(strip?.resultCoverIndex ?? -1)
     setSvgPaths({})
     generateVectors()
+    // migrar legado a promptIterationStore y setear panel activo para ApiPreview
+    try {
+      promptIterStore.migrateFromStrip(strip)
+      if (strip?.panels?.[0]?.id) setActivePanel(strip.id, strip.panels[0].id)
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strip?.id])
 
@@ -117,13 +147,19 @@ export default function PromptExporter({ strip, characters, project, balloons })
       const url = URL.createObjectURL(svgBlob)
       const img = new Image()
       img.onload = async () => {
+        const vb = svgString.match(/viewBox="0 0 (\d+) (\d+)"/)
+        const vbW = vb ? parseInt(vb[1], 10) : 400
+        const vbH = vb ? parseInt(vb[2], 10) : 400
+        const max = 800
+        const w = max
+        const h = Math.round(max * (vbH / vbW))
         const canvas = document.createElement('canvas')
-        canvas.width = 800
-        canvas.height = 800
+        canvas.width = w
+        canvas.height = h
         const ctx = canvas.getContext('2d')
         ctx.fillStyle = 'white'
-        ctx.fillRect(0, 0, 800, 800)
-        ctx.drawImage(img, 0, 0, 800, 800)
+        ctx.fillRect(0, 0, w, h)
+        ctx.drawImage(img, 0, 0, w, h)
         URL.revokeObjectURL(url)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
         const base64 = dataUrl.split(',')[1]
@@ -177,6 +213,16 @@ export default function PromptExporter({ strip, characters, project, balloons })
     return out
   }
   const dedupPaths = (paths) => [...new Set(paths.filter(Boolean))]
+  const getMaxRefs = () => {
+    const v = project?.settings?.maxRefs
+    if (typeof v === 'number' && v >= 1 && v <= 8) return v
+    return 5
+  }
+  const getViaKey = (idx, mode) => `${strip.id}:${idx}:${mode}`
+  const isApiVia = (idx, mode) => {
+    const k = getViaKey(idx, mode)
+    return viaByKey[k] === 'api' && museHasKey
+  }
 
   const handleSendScene = async (idx, promptText, svgPath, refs) => {
     const key = `scene-${idx}`
@@ -216,51 +262,27 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const handleSendLettering = async (idx, promptText, svgPath, refs) => {
     const key = `lettering-${idx}`
     if (sending[key]) return
-    // diálogos requiere imagen de escena aprobada (SCENE LOCK) — salvo diálogo puro sin escena
+    // diálogos requiere imagen de escena aprobada (SCENE LOCK)
     const cover = coverIndex >= 0 ? results[coverIndex] : null
-    let effectivePrompt = promptText
-    let allPaths = []
-    let isPureDialogue = false
     if (!cover?.path) {
-      const ok = await askConfirm('¿es diálogo sin escena? no hay imagen de escena cargada y tildada. ¿querés enviar este diálogo como panel puro de texto, manteniendo las proporciones de la tira y sin imagen de base?', { confirmLabel: 'sí, puro diálogo' })
-      if (!ok) return
-      isPureDialogue = true
-      try {
-        const panel = strip.panels[idx]
-        effectivePrompt = generatePureDialoguePrompt(panel, chars, strip.generalStyle, bgs, objs, resolvedAspect, idx, strip, project, letteringLayoutFileNameFor(strip, idx), balloons, resolvedPalette)
-      } catch (e) {
-        console.warn('pure dialogue prompt fallback', e)
-        effectivePrompt = promptText.replace(
-          /SCENE LOCK:[^\n]*\n[^\n]*\n[^\n]*/,
-          `PURE DIALOGUE — NO SCENE IMAGE: panel de puro diálogo sin imagen de escena. no inventar fondo ni personajes. mantener proporciones ${resolvedAspect} y fondo blanco. prestar especial atención a fontSize/textX/textY y tamaños relativos — no agrandar texto por ausencia de elementos.`
-        )
-      }
-      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
-      const instancePaths = panelBalloonInstanceRefs(strip.panels[idx]).map(r => r.path).filter(Boolean)
-      allPaths = dedupPaths([...refPaths, ...instancePaths, svgPath])
-    } else {
-      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
-      const instancePaths = panelBalloonInstanceRefs(strip.panels[idx]).map(r => r.path).filter(Boolean)
-      allPaths = dedupPaths([cover.path, ...refPaths, ...instancePaths, svgPath])
+      alert('no hay imagen de escena aprobada: generá la escena, pegá el resultado y tildá (✓) la imagen que va a preview antes de enviar diálogos. se suspende el envío.')
+      return
     }
     setSending(s => ({ ...s, [key]: true }))
     try {
+      const refPaths = (refs || []).map(r => r.path).filter(Boolean)
+      const allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
       const items = await collectImageDataUrls(allPaths)
-      console.log('[autopaste lettering] ' + (isPureDialogue ? 'pure dialogue' : 'cover ' + (cover?.path || 'none')), 'refs', (refs||[]).map(r=>r.fileName), 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName), 'pure', isPureDialogue)
-      if (!items.length && !isPureDialogue) {
+      console.log('[autopaste lettering] cover', cover.path, 'refs', refPaths, 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName))
+      if (!items.length) {
         alert('no se pudo leer la imagen de escena aprobada')
         return
       }
-      // para puro diálogo permitimos enviar solo texto + svg (si no hay refs, items puede tener solo svg)
-      if (!items.length && isPureDialogue) {
-        // enviar solo con svg si existe, si no solo texto
-        // collect ya intentó leer svg, si falla igual enviamos texto solo
-      }
-      const uniquePrompt = effectivePrompt + `\n\n<!-- doski:${Date.now().toString(36)} -->`
+      const uniquePrompt = promptText + `\n\n<!-- doski:${Date.now().toString(36)} -->`
       const res = await sendToChat({ text: uniquePrompt, imageItems: items, newChat: true })
       if (res?.error) {
         console.warn('autopaste lettering error', res)
-        await copyToClipboard(effectivePrompt, key)
+        await copyToClipboard(promptText, key)
         alert(`no se pudo enviar automático (${res.error}): prompt copiado al portapapeles.`)
       } else if (items.length && (res?.pasted ?? 0) < items.length) {
         console.warn('autopaste lettering: no se pegaron todas las refs', res)
@@ -274,10 +296,132 @@ export default function PromptExporter({ strip, characters, project, balloons })
       }
     } catch (e) {
       console.error('handleSendLettering', e)
-      await copyToClipboard(effectivePrompt, key)
+      await copyToClipboard(promptText, key)
       alert(`no se pudo enviar automático (${e.message}): prompt copiado.`)
     } finally {
       setSending(s => ({ ...s, [key]: false }))
+    }
+  }
+
+  // --- Generate via API (Muse) — mvp escena solo ---
+  const handleGenerateApi = async (idx, mode, promptText, svgPath, refs, opts = {}) => {
+    const key = `${mode}-${idx}`
+    if (apiGenerating[key]) return
+    const { apiKey, provider } = getMuseSecrets()
+    if (!apiKey) { alert('configurá tu MODEL_API_KEY en modelos → muse api'); return }
+    const maxRefs = getMaxRefs()
+    const alwaysLayout = project?.settings?.alwaysIncludeLayout !== false
+    // respetar tildado: layout y refs
+    const includeLayout = iterIncludeLayout[key] !== undefined ? !!iterIncludeLayout[key] : alwaysLayout
+    const selectedSet = iterSelectedRefs[key] // Set<string> | undefined (undefined = todos)
+    let refPaths = (refs || []).map(r => r.path).filter(Boolean)
+    if (selectedSet) {
+      const sel = new Set(selectedSet)
+      refPaths = refPaths.filter(p => sel.has(p))
+    }
+    // incluir layout según tildado
+    const layoutPaths = includeLayout && svgPath ? [svgPath] : []
+    if (mode === 'lettering') {
+      const cover = coverIndex >= 0 ? results[coverIndex] : null
+      if (!cover?.path) { alert('no hay imagen de escena aprobada para diálogos'); return }
+      refPaths = [cover.path, ...refPaths]
+    }
+    let allPaths = dedupPaths([...refPaths, ...layoutPaths])
+    if (allPaths.length > maxRefs) {
+      const keep = allPaths.slice(0, maxRefs)
+      allPaths = keep
+    }
+    let items = await collectImageDataUrls(allPaths)
+    const panel = strip.panels[idx]
+    const iterKey = `${strip.id}:${panel.id}`
+    const entry = promptIterStore.byPanel[iterKey]
+    const allIters = entry?.[mode]?.iterations || []
+    const lastIter = allIters.slice(-1)[0]
+    const previousResponseId = lastIter?.responseId || entry?.museConversation?.lastResponseId || null
+    const correction = opts.correctionText?.trim()
+    const effectivePrompt = correction ? `${promptText}\n\nCorrección: ${correction}` : promptText
+    // selección de imagen previa tildada (si el usuario eligió, usar esa; si eligió 'none', no reenviar)
+    const k = `${mode}-${idx}`
+    const chosenPrevId = iterPrev[k]
+    let chosenIter = null
+    if (chosenPrevId === 'none') chosenIter = null
+    else if (chosenPrevId) chosenIter = allIters.find(x => x.id === chosenPrevId) || lastIter
+    else chosenIter = lastIter
+    // extra refs agregadas en iteración
+    const extraPaths = iterExtraRefs[k] || []
+    if (extraPaths.length) {
+      // añadir al inicio respetando maxRefs
+      for (const p of extraPaths) {
+        if (items.length >= maxRefs) break
+        if (!items.some(it => it.fileName === String(p).split('/').pop())) {
+          const url = await readImageDataUrl(p)
+          if (url) items = [{ dataUrl: url, fileName: String(p).split('/').pop() }, ...items]
+        }
+      }
+    }
+    if (chosenIter) {
+      const srcIter = chosenIter
+      if (srcIter?.imageDataUrl) {
+        const prevItem = { dataUrl: srcIter.imageDataUrl, fileName: srcIter.imagePath ? String(srcIter.imagePath).split('/').pop() : `prev-${mode}-${srcIter.id.slice(0, 6)}.webp` }
+        if (!items.some(it => it.fileName === prevItem.fileName)) {
+          if (items.length >= maxRefs) items = items.slice(0, maxRefs - 1)
+          items = [prevItem, ...items]
+        }
+      } else if (srcIter?.imagePath) {
+        const prevUrl = await readImageDataUrl(srcIter.imagePath)
+        if (prevUrl) {
+          const prevItem = { dataUrl: prevUrl, fileName: String(srcIter.imagePath).split('/').pop() }
+          if (!items.some(it => it.fileName === prevItem.fileName)) {
+            if (items.length >= maxRefs) items = items.slice(0, maxRefs - 1)
+            items = [prevItem, ...items]
+          }
+        }
+      }
+    }
+    const dataUrls = items.map(i => i.dataUrl)
+    setApiGenerating(s => ({ ...s, [key]: true }))
+    setActivePanel(strip.id, panel.id)
+    setChatMode('api')
+    useChatStore.getState().setOpen(true)
+    try {
+      const model = museModel || 'muse-image-1.0'
+      console.log(`[muse api generate] mode=${mode} refs=${items.length}/${maxRefs} prev=${previousResponseId || 'none'} reasoning=${reasoningEffort}`)
+      const resp = await generateMuseImage({ apiKey, provider, model, promptText: effectivePrompt, imageDataUrls: dataUrls, previousResponseId, layoutFileName: mode === 'scene' ? sceneLayoutFileNameFor(strip, idx) : letteringLayoutFileNameFor(strip, idx), reasoningEffort })
+      const { base64, responseId, usage } = extractImageResult(resp)
+      const dataUrl = buildDataUrlFromBase64(base64, 'image/webp')
+      const strip8 = strip.id.slice(0, 8)
+      const iterN = (entry?.[mode]?.iterations?.length || 0) + 1
+      const fileName = `${strip8}-${mode}-iter${iterN}.webp`
+      const b64 = dataUrl.split(',')[1]
+      const saved = window.api?.references?.saveFile ? await window.api.references.saveFile({ fileName, data: b64 }) : null
+      const imagePath = saved?.path || null
+      const imageDataUrl = dataUrl
+      const rawReason = (resp.output || []).find(o => o.type === 'reasoning')?.summary
+      const reasoning = Array.isArray(rawReason) ? rawReason.map(r => r.text || JSON.stringify(r)).join('\n') : (typeof rawReason === 'string' ? rawReason : rawReason ? String(rawReason) : '')
+      if (mode === 'scene') {
+        promptIterStore.addSceneIteration(strip.id, panel.id, { promptText: effectivePrompt, refs: items.map(i => i.fileName), imageDataUrl, imagePath, responseId, usage, model, reasoning })
+      } else {
+        if (promptIterStore.addSceneIteration) {
+          promptIterStore.addSceneIteration(strip.id, panel.id, { promptText: effectivePrompt, refs: items.map(i => i.fileName), imageDataUrl, imagePath, responseId, usage, model, reasoning })
+        }
+      }
+      // no auto-pegar a strip.results — queda en iteraciones hasta que el usuario apruebe
+    } catch (e) {
+      console.error('muse generate failed', e)
+      alert(`muse api error: ${e.message}`)
+    } finally {
+      setApiGenerating(s => ({ ...s, [key]: false }))
+    }
+  }
+  const handleApproveApi = async (stripId, panelId, mode, iterId) => {
+    promptIterStore.approve(stripId, panelId, mode, iterId)
+    const entry = promptIterStore.byPanel[`${stripId}:${panelId}`]
+    const it = entry?.[mode]?.iterations.find(x => x.id === iterId)
+    if (it?.imagePath) {
+      const fileName = String(it.imagePath).split('/').pop()
+      const next = [...(results || []), { id: crypto.randomUUID(), fileName, path: it.imagePath, observations: `aprobado api ${it.model || ''}`, pasted: false }]
+      if (next.length > MAX_RESULTS) next.shift()
+      persistResults(next, next.length - 1)
     }
   }
 
@@ -415,19 +559,24 @@ export default function PromptExporter({ strip, characters, project, balloons })
         refs.push({ ...r, entityName: entity.name })
       })
     })
-    return refs
-  }
-  const panelBalloonInstanceRefs = (panel) => {
-    const refs = []
-    const seen = new Set()
+    // imágenes cargadas dentro del globo (prompt img) — character.dialogue / extraDialogues / globosX
     ;(panel.characters || []).forEach(c => {
-      if (c.imageRef?.path && !seen.has(c.imageRef.path)) { seen.add(c.imageRef.path); refs.push({ ...c.imageRef, entityName: 'globo imagen' }) }
+      if (c.imageRef?.path) {
+        const k = c.imageRef.path || c.imageRef.fileName
+        if (!seen.has(k)) { seen.add(k); refs.push({ ...c.imageRef, entityName: 'prompt img' }) }
+      }
       ;(c.extraDialogues || []).forEach(e => {
-        if (e.imageRef?.path && !seen.has(e.imageRef.path)) { seen.add(e.imageRef.path); refs.push({ ...e.imageRef, entityName: 'globo imagen' }) }
+        if (e.imageRef?.path) {
+          const k = e.imageRef.path || e.imageRef.fileName
+          if (!seen.has(k)) { seen.add(k); refs.push({ ...e.imageRef, entityName: 'prompt img' }) }
+        }
       })
     })
     ;(panel.globosX || []).forEach(g => {
-      if (g.imageRef?.path && !seen.has(g.imageRef.path)) { seen.add(g.imageRef.path); refs.push({ ...g.imageRef, entityName: 'globo imagen' }) }
+      if (g.imageRef?.path) {
+        const k = g.imageRef.path || g.imageRef.fileName
+        if (!seen.has(k)) { seen.add(k); refs.push({ ...g.imageRef, entityName: 'prompt img' }) }
+      }
     })
     return refs
   }
@@ -435,7 +584,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
   const usedFileNames = [...new Set([
     ...strip.panels.flatMap(p => panelSceneRefs(p).map(r => r.fileName)),
     ...strip.panels.flatMap(p => panelBalloonRefs(p).map(r => r.fileName)),
-    ...strip.panels.flatMap(p => panelBalloonInstanceRefs(p).map(r => r.fileName)),
     ...(results || []).map(r => r.fileName),
     ...Object.keys(svgPaths).map(key => {
       const [idx, mode] = key.split(':')
@@ -604,8 +752,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
         const letteringPath = svgPaths[`${i}:lettering`]
         const sceneRefs = panelSceneRefs(panel)
         const balloonRefsPanel = panelBalloonRefs(panel)
-        const balloonInstanceRefsPanel = panelBalloonInstanceRefs(panel)
-        const allBalloonVisualRefs = [...balloonRefsPanel, ...balloonInstanceRefsPanel]
         return (
           <div key={panel.id} className="card" style={{ padding: 12 }}>
             <div style={{ marginBottom: 10 }}>
@@ -614,27 +760,84 @@ export default function PromptExporter({ strip, characters, project, balloons })
             <div style={{ display: 'flex', gap: 20, alignItems: 'stretch' }}>
               {/* Columna escena */}
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>escena</span>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ fontSize: 11 }}
-                      onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}
-                    >
-                      {copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      style={{ fontSize: 11 }}
-                      onClick={() => handleSendScene(i, scenePrompt, scenePath, sceneRefs)}
-                      disabled={!!sending[`scene-${i}`]}
-                      title={sceneRefs.length || scenePath ? `envía ${sceneRefs.length + (scenePath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}
-                    >
-                      {sending[`scene-${i}`] ? 'enviando…' : copied === `scene-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}
-                    </button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* toggle via */}
+                    {museHasKey && (
+                      <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 6, overflow: 'hidden' }}>
+                        <button onClick={() => { setVia(getViaKey(i, 'scene'), 'chatbot'); setChatMode('webview') }} style={{ fontSize: 10, padding: '2px 6px', background: !isApiVia(i, 'scene') ? 'var(--color-text)' : 'transparent', color: !isApiVia(i, 'scene') ? '#fff' : 'var(--color-text)', border: 'none', cursor: 'pointer' }}>chat</button>
+                        <button onClick={() => { setVia(getViaKey(i, 'scene'), 'api'); setChatMode('api'); setActivePanel(strip.id, panel.id) }} style={{ fontSize: 10, padding: '2px 6px', background: isApiVia(i, 'scene') ? 'var(--color-text)' : 'transparent', color: isApiVia(i, 'scene') ? '#fff' : 'var(--color-text)', border: 'none', cursor: 'pointer' }}>api</button>
+                      </div>
+                    )}
+                    {isApiVia(i, 'scene') ? (
+                      <>
+                        <div style={{ width: 140 }}><ModelPicker value={museModel} onChange={setMuseModel} filter="image" /></div>
+                        <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => handleGenerateApi(i, 'scene', scenePrompt, scenePath, sceneRefs)} disabled={!!apiGenerating[`scene-${i}`]}>
+                          {apiGenerating[`scene-${i}`] ? 'generando…' : 'generate via api'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard(scenePrompt, `scene-${i}`)}>{copied === `scene-${i}` ? 'copiado ✓' : 'copiar escena'}</button>
+                        <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => handleSendScene(i, scenePrompt, scenePath, sceneRefs)} disabled={!!sending[`scene-${i}`]} title={sceneRefs.length || scenePath ? `envía ${sceneRefs.length + (scenePath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}>{sending[`scene-${i}`] ? 'enviando…' : copied === `scene-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}</button>
+                      </>
+                    )}
                   </div>
                 </div>
+                {isApiVia(i, 'scene') && (
+                  <>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>max refs {getMaxRefs()} · layout siempre {project?.settings?.alwaysIncludeLayout !== false ? 'sí' : 'no'} · {sceneRefs.length + (scenePath ? 1 : 0)}/{getMaxRefs()} usados</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>razonamiento</span>
+                      <select value={reasoningEffort} onChange={e => setReasoningEffort(e.target.value)} className="input" style={{ height: 24, fontSize: 11, padding: '0 6px' }}>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                        <option value="minimal">minimal</option>
+                      </select>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 6 }}>proporción {(strip.aspectRatio || project?.defaultAspectRatio || 'hd')} de la viñeta</span>
+                    </div>
+                    {(() => {
+                      const k = `scene-${i}`
+                      const iters = promptIterStore.byPanel[`${strip.id}:${panel.id}`]?.scene.iterations || []
+                      const hasIter = iters.length > 0
+                      const extra = iterExtraRefs[k] || []
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                          {/* refs extra para iteración */}
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>refs extra {extra.length ? `(${extra.length})` : ''}</span>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setShowIterPicker(k)}>agregar referencia</button>
+                            {extra.map(p => (
+                              <span key={p} style={{ fontSize: 10, background: 'var(--color-border)', borderRadius: 10, padding: '1px 6px', display: 'inline-flex', gap: 4, alignItems: 'center' }}>{String(p).split('/').pop()} <span style={{ cursor: 'pointer' }} onClick={() => setIterExtraRefs(s => ({ ...s, [k]: (s[k]||[]).filter(x => x !== p) }))}>×</span></span>
+                            ))}
+                          </div>
+                          {hasIter ? (
+                            <>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>imagen previa</span>
+                                <label style={{ fontSize: 10, display: 'flex', gap: 3, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={!iterPrev[k] || iterPrev[k] === iters[iters.length-1]?.id} onChange={() => setIterPrev(s => ({ ...s, [k]: iters[iters.length-1]?.id }))} />última</label>
+                                <label style={{ fontSize: 10, display: 'flex', gap: 3, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={iterPrev[k] === 'none'} onChange={() => setIterPrev(s => ({ ...s, [k]: 'none' }))} />ninguna</label>
+                                {iters.map((it, idx) => (
+                                  <label key={it.id} style={{ fontSize: 10, display: 'flex', gap: 3, alignItems: 'center', cursor: 'pointer', opacity: iterPrev[k] === it.id ? 1 : 0.7 }}><input type="radio" checked={iterPrev[k] === it.id} onChange={() => setIterPrev(s => ({ ...s, [k]: it.id }))} />{idx + 1}</label>
+                                ))}
+                              </div>
+                              <textarea className="input" value={corrections[k] || ''} onChange={e => setCorrections(s => ({ ...s, [k]: e.target.value }))} placeholder="corrección para refinar: pies, tamaño, calidad..." style={{ minHeight: 48, fontSize: 11 }} />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-sm" style={{ fontSize: 11 }} disabled={!!apiGenerating[k]} onClick={() => handleGenerateApi(i, 'scene', scenePrompt, scenePath, sceneRefs, { correctionText: corrections[k] })}>
+                                  {apiGenerating[k] ? 'generando…' : 'refinar'}
+                                </button>
+                                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => setCorrections(s => ({ ...s, [k]: '' }))}>limpiar</button>
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>refinar reenvía la imagen tildada + refs + layout.</div>
+                            </>
+                          ) : null}
+                        </div>
+                      )
+                    })()}
+                  </>
+                )}
                 {/* Visual arriba */}
                 {scenePath && (
                   <div>
@@ -669,31 +872,64 @@ export default function PromptExporter({ strip, characters, project, balloons })
                 {/* Columna diálogos */}
                 {hasLettering(panel) && (
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-3)' }}>diálogos</span>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ fontSize: 11 }}
-                          onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}
-                        >
-                          {copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}
-                        </button>
-                        <button
-                          className="btn btn-sm"
-                          style={{ fontSize: 11 }}
-                          onClick={() => handleSendLettering(i, letteringPrompt, letteringPath, balloonRefsPanel)}
-                          disabled={!!sending[`lettering-${i}`]}
-                          title={allBalloonVisualRefs.length || letteringPath ? `envía ${allBalloonVisualRefs.length + (letteringPath ? 1 : 0)} imágenes + texto al chat — las de borde grueso van dentro del globo` : 'envía el prompt al chat'}
-                        >
-                          {sending[`lettering-${i}`] ? 'enviando…' : copied === `lettering-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}
-                        </button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {museHasKey && (
+                          <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 6, overflow: 'hidden' }}>
+                            <button onClick={() => { setVia(getViaKey(i, 'lettering'), 'chatbot'); setChatMode('webview') }} style={{ fontSize: 10, padding: '2px 6px', background: !isApiVia(i, 'lettering') ? 'var(--color-text)' : 'transparent', color: !isApiVia(i, 'lettering') ? '#fff' : 'var(--color-text)', border: 'none', cursor: 'pointer' }}>chat</button>
+                            <button onClick={() => { setVia(getViaKey(i, 'lettering'), 'api'); setChatMode('api'); setActivePanel(strip.id, panel.id) }} style={{ fontSize: 10, padding: '2px 6px', background: isApiVia(i, 'lettering') ? 'var(--color-text)' : 'transparent', color: isApiVia(i, 'lettering') ? '#fff' : 'var(--color-text)', border: 'none', cursor: 'pointer' }}>api</button>
+                          </div>
+                        )}
+                        {isApiVia(i, 'lettering') ? (
+                          <>
+                            <div style={{ width: 140 }}><ModelPicker value={museModel} onChange={setMuseModel} filter="image" /></div>
+                            <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => handleGenerateApi(i, 'lettering', letteringPrompt, letteringPath, balloonRefsPanel)} disabled={!!apiGenerating[`lettering-${i}`]}>
+                              {apiGenerating[`lettering-${i}`] ? 'generando…' : 'generate via api'}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard(letteringPrompt, `lettering-${i}`)}>{copied === `lettering-${i}` ? 'copiado ✓' : 'copiar diálogos'}</button>
+                            <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => handleSendLettering(i, letteringPrompt, letteringPath, balloonRefsPanel)} disabled={!!sending[`lettering-${i}`]} title={balloonRefsPanel.length || letteringPath ? `envía ${balloonRefsPanel.length + (letteringPath ? 1 : 0)} imágenes + texto al chat` : 'envía el prompt al chat'}>{sending[`lettering-${i}`] ? 'enviando…' : copied === `lettering-${i}-sent` ? 'enviado ✓' : 'enviar al chat'}</button>
+                          </>
+                        )}
                       </div>
                     </div>
+                    {isApiVia(i, 'lettering') && (
+                      <>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>max refs {getMaxRefs()} · {(() => { const c = coverIndex >= 0 ? 1 : 0; return `${balloonRefsPanel.length + c + (letteringPath ? 1 : 0)}/${getMaxRefs()} usados${c ? ' (incluye cover)' : ''}` })()}</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                          <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>razonamiento</span>
+                          <select value={reasoningEffort} onChange={e => setReasoningEffort(e.target.value)} className="input" style={{ height: 24, fontSize: 11, padding: '0 6px' }}>
+                            <option value="low">low</option>
+                            <option value="medium">medium</option>
+                            <option value="high">high</option>
+                            <option value="minimal">minimal</option>
+                          </select>
+                          <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 6 }}>proporción {(strip.aspectRatio || project?.defaultAspectRatio || 'hd')} de la viñeta</span>
+                        </div>
+                        {(() => {
+                          const k = `lettering-${i}`
+                          const hasIter = (promptIterStore.byPanel[`${strip.id}:${panel.id}`]?.scene.iterations.length || 0) > 0
+                          return hasIter ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                              <textarea className="input" value={corrections[k] || ''} onChange={e => setCorrections(s => ({ ...s, [k]: e.target.value }))} placeholder="corrección: respetar pies de la referencia, tamaño exacto..." style={{ minHeight: 48, fontSize: 11 }} />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-sm" style={{ fontSize: 11 }} disabled={!!apiGenerating[k]} onClick={() => handleGenerateApi(i, 'lettering', letteringPrompt, letteringPath, balloonRefsPanel, { correctionText: corrections[k] })}>
+                                  {apiGenerating[k] ? 'generando…' : 'refinar'}
+                                </button>
+                                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => setCorrections(s => ({ ...s, [k]: '' }))}>limpiar</button>
+                              </div>
+                            </div>
+                          ) : null
+                        })()}
+                      </>
+                    )}
                     {/* Visual arriba */}
-                    {(letteringPath || allBalloonVisualRefs.length > 0) && (
+                    {(letteringPath || balloonRefsPanel.length > 0) && (
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar) — borde grueso = dentro del globo</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>layout diálogos + ejemplos de globo (arrastrar)</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                           {letteringPath && (
                             <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: 6, background: 'white', width: 160 }}>
@@ -706,14 +942,6 @@ export default function PromptExporter({ strip, characters, project, balloons })
                                 {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
                               </div>
                               <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ref.fileName}>{ref.fileName}</div>
-                            </div>
-                          ))}
-                          {balloonInstanceRefsPanel.map(ref => (
-                            <div key={ref.path + '-inst'} style={{ width: 72 }}>
-                              <div style={{ height: 64, border: '2px solid var(--color-text)', borderRadius: 5, padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }} title="esta imagen va DENTRO del globo referido — se envía automático al chat">
-                                {window.api?.references?.read && <ReferenceThumbnail reference={ref} />}
-                              </div>
-                              <div style={{ fontSize: 9, color: 'var(--color-text)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }} title={`${ref.fileName} — dentro del globo (se envía al chat)`}>{ref.fileName} ↘ globo</div>
                             </div>
                           ))}
                         </div>

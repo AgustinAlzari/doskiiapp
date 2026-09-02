@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useChatStore from '../store/chatStore'
 import { askConfirm } from '../store/confirmStore'
 import ChatLayout from './chat/ChatLayout'
+import { getMuseSecrets, setMuseSecrets } from '../services/museSecrets'
+import ModelPicker from './models/ModelPicker'
+import useMuseUiStore from '../store/museUiStore'
 
 export default function ModelList() {
   const models = useChatStore(s => s.models)
@@ -12,6 +15,10 @@ export default function ModelList() {
 
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
+  const [museKey, setMuseKey] = useState(() => getMuseSecrets().apiKey)
+  const [museProvider, setMuseProvider] = useState(() => getMuseSecrets().provider)
+  const museModel = useMuseUiStore(s => s.selectedModel)
+  const setMuseModel = useMuseUiStore(s => s.setModel)
 
   const handleAdd = (e) => {
     e.preventDefault()
@@ -33,6 +40,25 @@ export default function ModelList() {
       <div style={{ maxWidth: 560 }}>
         <div className="section-header" style={{ justifyContent: 'space-between' }}>
           <h1 className="ui-h1">modelos</h1>
+        </div>
+
+        {/* Muse API — localStorage MVP */}
+        <div className="card" style={{ padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>muse api — image_generation</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>mvp guarda en localStorage. escalado futuro: safeStorage por autor (ver plan-lab1 §4.1).</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select className="input" value={museProvider} onChange={e => setMuseProvider(e.target.value)} style={{ height: 28, fontSize: 12 }}>
+              <option value="meta">meta</option>
+              <option value="zen">zen (opencode)</option>
+            </select>
+            <input className="input" type="password" style={{ flex: 1, minWidth: 220 }} value={museKey} onChange={e => setMuseKey(e.target.value)} placeholder="MODEL_API_KEY (LLM|...)" />
+            <button className="btn btn-sm" onClick={() => { setMuseSecrets({ provider: museProvider, apiKey: museKey }); alert(museKey ? 'key guardada ✓' : 'key borrada') }}>guardar</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>modelo</span>
+            <div style={{ flex: 1, minWidth: 220 }}><ModelPicker value={museModel} onChange={setMuseModel} filter="image" /></div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>👁️ = puede ver (vision). solo image_generation para mvp.</div>
         </div>
 
       {/* Nuevo modelo */}
