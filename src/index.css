@@ -678,6 +678,11 @@ input[type="range"].size-slider:active::-webkit-slider-thumb {
   color: var(--color-text);
   padding: 2px 6px;
   min-height: 24px;
+  overflow: hidden;
+  height: auto;
+  display: block;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 /* ── SFX Block ── */

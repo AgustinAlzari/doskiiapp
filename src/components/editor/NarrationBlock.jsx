@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 
 export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove, onResize, onRemove, onText }) {
   const blockRef = useRef(null)
@@ -12,6 +12,43 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
   useEffect(() => {
     if (isSelected && textRef.current) textRef.current.focus()
   }, [isSelected])
+
+  const autoGrow = useCallback(() => {
+    if (isResizingRef.current) return
+    const ta = textRef.current
+    const block = blockRef.current
+    if (!ta || !block) return
+    ta.style.height = 'auto'
+    const scrollH = ta.scrollHeight
+    ta.style.height = scrollH + 'px'
+    const canvas = block.parentElement
+    if (!canvas) return
+    const canvasH = canvas.getBoundingClientRect().height
+    if (!canvasH) return
+    const header = block.querySelector('.char-block-header')
+    const headerH = header ? header.offsetHeight : 0
+    const neededPx = headerH + scrollH + 4
+    const neededFrac = neededPx / canvasH
+    if (neededFrac > (panelNarr.height || 0) + 0.005) {
+      const clamped = Math.min(1.6, Math.max(0.06, neededFrac))
+      if (Math.abs(clamped - (panelNarr.height || 0)) > 0.005) onResize({ height: clamped })
+    }
+  }, [panelNarr.height, onResize])
+
+  useLayoutEffect(() => {
+    autoGrow()
+  }, [panelNarr.text, panelNarr.width, panelNarr.fontSize, panelNarr.textX, panelNarr.textY, panelNarr.align, autoGrow])
+
+  useEffect(() => {
+    const ta = textRef.current
+    const block = blockRef.current
+    if (!ta || !block) return
+    const canvas = block.parentElement
+    const ro = new ResizeObserver(() => autoGrow())
+    ro.observe(ta)
+    if (canvas) ro.observe(canvas)
+    return () => ro.disconnect()
+  }, [autoGrow])
 
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
@@ -76,6 +113,11 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
     <div onPointerDown={e => handleResizeDown(e, corner)} style={{ position: 'absolute', width: 12, height: 12, cursor: corner === 'top-left' || corner === 'bottom-right' ? 'nwse-resize' : 'nesw-resize', background: 'var(--color-border)', opacity: 0.65, zIndex: 21, ...style }} />
   )
 
+  const handleText = useCallback((e) => {
+    onText?.(e.target.value)
+    requestAnimationFrame(() => autoGrow())
+  }, [onText, autoGrow])
+
   return (
     <div
       ref={blockRef}
@@ -84,7 +126,8 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         left: `${panelNarr.x * 100}%`,
         top: `${panelNarr.y * 100}%`,
         width: `${panelNarr.width * 100}%`,
-        height: `${panelNarr.height * 100}%`,
+        minHeight: `${panelNarr.height * 100}%`,
+        height: 'auto',
         zIndex: isSelected ? 9999 : 2 + (panelNarr.z ?? 0),
       }}
       onMouseDown={handleMouseDown}
@@ -100,14 +143,23 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
           className="narration-editor"
           value={panelNarr.text || ''}
           placeholder="texto del narrador..."
-          onChange={e => onText?.(e.target.value)}
+          rows={1}
+          onChange={handleText}
+          onInput={() => requestAnimationFrame(() => autoGrow())}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
           onFocus={() => onSelect?.()}
           spellCheck={false}
           style={{
             fontSize: `${Math.round(((panelNarr.fontSize ?? 1) * 10))}px`,
-            textAlign: (panelNarr.textX ?? 0) < 0 ? 'left' : (panelNarr.textX ?? 0) > 0 ? 'right' : 'center',
+            textAlign: panelNarr.align || 'center',
+            paddingTop: '6px',
+            paddingBottom: '6px',
+            paddingLeft: `${Math.round(((panelNarr.textX ?? 0) * 40)) + 6}px`,
+            paddingRight: `${Math.max(0, 6 - Math.round((panelNarr.textX ?? 0) * 40))}px`,
+            transform: `translateY(${Math.round(((panelNarr.textY ?? 0) * 40))}px)`,
+            overflow: 'hidden',
+            height: 'auto',
           }}
         />
 
