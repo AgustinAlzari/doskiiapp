@@ -214,14 +214,14 @@ export function orderedPanelDialogues(panel, characters = [], opts = {}) {
     if (item.dialogue || (includeEmpty && item.dialogueOpen)) {
       const base = defaultPos(item, k, total)
       const pos = item.dialoguePos ? { ...base, ...item.dialoguePos } : base
-      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, linked: item.linked !== false, align: item.align || DEFAULT_ALIGN, fontSize: item.fontSize, textX: item.textX, textY: item.textY, isExtra: false, extraIdx: null, order: 0, imageRef: item.imageRef || null, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: item.dialogue, type: typeName(item.dialogueType), balloonId: item.balloonId || null, linked: item.linked !== false, align: item.align || DEFAULT_ALIGN, fontSize: item.fontSize, textX: item.textX, textY: item.textY, bgColor: item.bgColor || null, isExtra: false, extraIdx: null, order: 0, imageRef: item.imageRef || null, ...pos })
       k++
     }
     ;(item.extraDialogues || []).forEach((extra, eIdx) => {
       if (!extra.text && !(includeEmpty && extra.open) && !extra.imageRef) return
       const base = defaultPos(item, k, total)
       const pos = extra.pos ? { ...base, ...extra.pos } : base
-      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, linked: extra.linked !== false, align: extra.align || DEFAULT_ALIGN, fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, isExtra: true, extraIdx: eIdx, order: eIdx + 1, imageRef: extra.imageRef || null, ...pos })
+      push({ characterId: item.characterId, charIdx, name, text: extra.text, type: typeName(extra.type), balloonId: extra.balloonId || null, linked: extra.linked !== false, align: extra.align || DEFAULT_ALIGN, fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, bgColor: extra.bgColor || null, isExtra: true, extraIdx: eIdx, order: eIdx + 1, imageRef: extra.imageRef || null, ...pos })
       k++
     })
   })
@@ -349,6 +349,7 @@ function entityDescPieces(entity) {
   const pieces = []
   if (entity.promptText?.trim()) pieces.push(entity.promptText.trim().replace(/[.\s]+$/, ''))
   if (entity.text?.trim()) pieces.push(`Default text: "${entity.text.trim()}" (used only when the panel text is empty)`)
+  if (entity.bgColor && /^#[0-9a-fA-F]{6}$/.test(entity.bgColor)) pieces.push(`Background color: ${entity.bgColor} — MUST be rendered as a solid flat fill inside the balloon interior, exactly this hex color, uniform, no gradient, no transparency, no shading variation. This is a deliberate artistic choice and must be strictly respected and prominently visible in the final rendering.`)
   if (entity.referenceImages?.length) pieces.push(`use the attached reference image "${entity.referenceImages[0].fileName}" exactly as the balloon graphic`)
   return pieces
 }
@@ -807,6 +808,8 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       lastByChar[d.name] = d.number
       let styleRef = ''
       if (entity) styleRef = ` Balloon style entity: "${entity.name}".`
+      const effectiveBg = d.bgColor && /^#[0-9a-fA-F]{6}$/.test(d.bgColor) ? d.bgColor : (entity?.bgColor && /^#[0-9a-fA-F]{6}$/.test(entity.bgColor) ? entity.bgColor : null)
+      const bgColorText = effectiveBg ? ` Background color: ${effectiveBg} — CRITICAL: Must be rendered as a solid flat fill inside the balloon interior, exactly this hex color, uniform, no gradient, no transparency, no shading variation, prominently visible. This is a deliberate artistic choice and must be strictly respected.` : ''
       const content = isImage
         ? imageBalloonContent(entity, d.text, project, generalStyle, paletteColors, d.imageRef || null)
         : (() => {
@@ -829,9 +832,9 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
           : ` Its tail must point to the head of the speaker (${d.name}).`)
       const tabId = d.linked === false ? `${d.number} suelto` : `${d.number}`
       if (idx === 0) {
-        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") speaks FIRST: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") speaks FIRST: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${bgColorText}${anchor}`)
       } else {
-        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") responds: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linkage}${styleRef}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") responds: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linkage}${styleRef}${bgColorText}${anchor}`)
       }
     })
 
@@ -849,6 +852,8 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       const channel = isImage ? 'image' : (DIALOGUE_TYPE_LABELS[g.channel] || g.channel || 'speech')
       const anchor = globoXAnchorText(g, ctx)
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
+      const effectiveBg = g.bgColor && /^#[0-9a-fA-F]{6}$/.test(g.bgColor) ? g.bgColor : (entity?.bgColor && /^#[0-9a-fA-F]{6}$/.test(entity.bgColor) ? entity.bgColor : null)
+      const bgColorText = effectiveBg ? ` Background color: ${effectiveBg} — CRITICAL: Must be rendered as a solid flat fill inside the balloon interior, exactly this hex color, uniform, no gradient, prominently visible.` : ''
       const content = isImage
         ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors, g.imageRef || null)
         : (() => {
@@ -872,7 +877,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
               : ` Connect it to its anchor by a trail of THREE small bubbles decreasing in size, pointing directly at the anchor, always visibly connected — NEVER hanging loose or disconnected.`
           })()
         : ''
-      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and ${content} Channel: ${channel}.${isImage ? '' : channelStyleText(g.channel)} Its ${anchor}.${bubbleTrail}${styleRef}`)
+      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and ${content} Channel: ${channel}.${isImage ? '' : channelStyleText(g.channel)} Its ${anchor}.${bubbleTrail}${styleRef}${bgColorText}`)
     })
   }
 

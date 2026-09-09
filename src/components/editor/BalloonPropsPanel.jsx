@@ -11,6 +11,7 @@ export default function BalloonPropsPanel({
   anchor, panelCharacters, panelObjects, characters, objects,
   align, onAlign,
   fontSize, onFontSize, textX, onTextX, textY, onTextY,
+  bgColor, onBgColor,
   linked, onLinked,
   speaksFirst, onSpeaksFirst,
   dialogueType, onDialogueType,
@@ -182,6 +183,29 @@ export default function BalloonPropsPanel({
           textY={textY}
           onTextY={onTextY}
         />
+      )}
+
+      {!isImageBalloon && (
+        <div>
+          <label className="label">color de fondo del globo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(bgColor) ? bgColor : (effective?.bgColor && /^#[0-9a-fA-F]{6}$/.test(effective.bgColor) ? effective.bgColor : '#ffffff')}
+              onChange={e => onBgColor?.(e.target.value)}
+              style={{ width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', padding: 2 }}
+            />
+            <input
+              className="input"
+              value={bgColor || ''}
+              onChange={e => onBgColor?.(e.target.value)}
+              placeholder={effective?.bgColor || '#ffffff'}
+              style={{ width: 130, height: 28, fontSize: 12 }}
+            />
+            <button className="btn btn-sm" onClick={() => onBgColor?.('')} title="usar color por defecto del estilo de globo">defecto</button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>se refuerza en el prompt final como color de relleno</div>
+        </div>
       )}
 
       {kind === 'globox' && (

@@ -78,6 +78,7 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
   const [name, setName] = useState(balloon?.name || '')
   const [kind, setKind] = useState(balloon?.kind || 'speech')
   const [color, setColor] = useState(balloon?.color || '#7a7a7a')
+  const [bgColor, setBgColor] = useState(balloon?.bgColor || '#ffffff')
   const [text, setText] = useState(balloon?.text || '')
   const [promptText, setPromptText] = useState(balloon?.promptText || '')
   const [referenceImages, setReferenceImages] = useState(balloon?.referenceImages || [])
@@ -111,14 +112,14 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
     ...balloon,
     id: savedId || crypto.randomUUID(),
     projectId: balloon?.projectId || projectId,
-    name, kind, color, text, promptText, referenceImages, laws,
+    name, kind, color, bgColor, text, promptText, referenceImages, laws,
     imageStyle, imagePalette, imageColorMode, imagePaletteId, inheritStyle, inheritPalette,
   })
   const { goBack } = useAutoSaveBack({
     save,
     remove,
     payload,
-    fields: ['name', 'kind', 'color', 'text', 'promptText', 'referenceImages', 'laws', 'imageStyle', 'imagePalette', 'imageColorMode', 'imagePaletteId', 'inheritStyle', 'inheritPalette'],
+    fields: ['name', 'kind', 'color', 'bgColor', 'text', 'promptText', 'referenceImages', 'laws', 'imageStyle', 'imagePalette', 'imageColorMode', 'imagePaletteId', 'inheritStyle', 'inheritPalette'],
     hasContent: !!name.trim(),
     getStored: (id) => balloons.find(b => b.id === id) || null,
     onBack: onCancel,
@@ -172,6 +173,29 @@ export default function BalloonForm({ balloon, projectId, onCancel }) {
               style={{ width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', padding: 2 }}
             />
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{color}</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">color de fondo del globo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(bgColor) ? bgColor : '#ffffff'}
+              onChange={e => setBgColor(e.target.value)}
+              style={{ width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', padding: 2 }}
+            />
+            <input
+              className="input"
+              value={bgColor}
+              onChange={e => setBgColor(e.target.value)}
+              placeholder="#ffffff"
+              style={{ width: 130, height: 28, fontSize: 12 }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>se refuerza en el prompt final</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+            color de relleno del globo (fondo). se aplica al render y se destaca en el prompt.
           </div>
         </div>
 

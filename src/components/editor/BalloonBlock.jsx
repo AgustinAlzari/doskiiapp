@@ -89,6 +89,7 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
     <div onPointerDown={e => handleResizeDown(e, corner)} style={{ position: 'absolute', width: 12, height: 12, cursor: corner === 'top-left' || corner === 'bottom-right' ? 'nwse-resize' : 'nesw-resize', background: 'var(--color-border)', opacity: 0.65, zIndex: 21, ...style }} />
   )
 
+  const bg = balloon.bgColor || balloon.effectiveBgColor || null
   return (
     <div
       ref={blockRef}
@@ -103,7 +104,7 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
       onMouseDown={handleMouseDown}
       title={`${balloon.label} — globo ${balloon.number}`}
     >
-      <div className="balloon-shape">
+      <div className="balloon-shape" style={bg && /^#[0-9a-fA-F]{6}$/.test(bg) ? { background: bg } : undefined}>
         <textarea
           ref={textRef}
           className="balloon-editor"
@@ -115,9 +116,11 @@ export default function BalloonBlock({ balloon, isSelected, onSelect, onMove, on
           style={{
             fontSize: `${Math.round(((balloon.fontSize ?? 1) * 11))}px`,
             textAlign: balloon.align || 'center',
-            paddingTop: `${Math.round(((balloon.textY ?? 0) * 40)) + 6}px`,
             paddingLeft: `${Math.round(((balloon.textX ?? 0) * 40)) + 6}px`,
             paddingRight: `${Math.max(0, 6 - Math.round((balloon.textX ?? 0) * 40))}px`,
+            paddingTop: '6px',
+            paddingBottom: '6px',
+            transform: `translateY(${Math.round(((balloon.textY ?? 0) * 70))}px)`,
           }}
         />
       </div>

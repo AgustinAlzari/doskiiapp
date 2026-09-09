@@ -97,7 +97,7 @@ function BehindOutline({ el, onSelect, onMove }) {
   )
 }
 
-export default function PanelCanvas({ panel, characters, objects, backgrounds, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, selectedBackground, onSelectBackground, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onTextBalloon, onMoveGloboX, onResizeGloboX, onTextGloboX, onTextNarr, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
+export default function PanelCanvas({ panel, characters, objects, backgrounds, balloons, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, selectedBackground, onSelectBackground, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onTextBalloon, onMoveGloboX, onResizeGloboX, onTextGloboX, onTextNarr, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
   const [connDrag, setConnDrag] = useState(null)
   const canvasRef2 = useRef(null)
   const wrapperRef = useRef(null)
@@ -135,7 +135,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
   const panelSfx = panel.sfx || []
   const panelBackground = panel.background || (panel.backgroundId ? { x: 0.05, y: 0.1, width: 0.9, height: 0.45 } : null)
   const backgroundDef = backgrounds?.find(bg => bg.id === panel.backgroundId)
-  const balloons = orderedPanelDialogues(panel, characters || [], { includeEmpty: true })
+  const dialogueBalloons = orderedPanelDialogues(panel, characters || [], { includeEmpty: true })
 
   const overlap = (a, b) => !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y)
   const BASE = { obj: 1000, char: 2000, sfx: 3000, gx: 4000 }
@@ -517,10 +517,13 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
         )}
 
         {/* Dialogue balloons (graphic indications, top layer) */}
-        {balloons.map((b) => (
+        {dialogueBalloons.map((b) => {
+          const templateBg = (balloons || []).find(t => t.id === b.balloonId)?.bgColor || null
+          const effectiveBgColor = b.bgColor || templateBg || null
+          return (
           <BalloonBlock
             key={`${b.characterId}-${b.isExtra ? `extra-${b.extraIdx}` : 'main'}`}
-            balloon={b}
+            balloon={{ ...b, effectiveBgColor }}
             isSelected={
               selectedBalloon &&
               selectedBalloon.characterId === b.characterId &&
@@ -533,15 +536,18 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, a
             onText={(text) => onTextBalloon?.(b, text)}
             onRemove={() => onRemoveBalloon?.(b)}
           />
-        ))}
+        )
+      })}
 
         {/* Globo X blocks (free balloons, top layer) */}
         {(panel.globosX || []).map((g, idx) => {
           const textIdx = (panel.globosX || []).slice(0, idx + 1).filter(x => x.text).length
+          const templateBg = (balloons || []).find(t => t.id === g.balloonId)?.bgColor || null
+          const effectiveBgColor = g.bgColor || templateBg || null
           return (
             <BalloonBlock
               key={g.id || `globox-${idx}`}
-              balloon={{ ...g, type: g.channel || 'speech', label: `X${textIdx || idx + 1}`, number: textIdx || idx + 1 }}
+              balloon={{ ...g, type: g.channel || 'speech', label: `X${textIdx || idx + 1}`, number: textIdx || idx + 1, effectiveBgColor }}
               isSelected={selectedGloboXIdx === idx}
               onSelect={() => onSelectGloboX?.(idx)}
               onMove={(x, y) => onMoveGloboX?.(idx, { x, y })}

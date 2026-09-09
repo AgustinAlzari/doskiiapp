@@ -46,8 +46,8 @@ export default function TextLayoutControls({ align = 'center', onAlignChange, fo
         <input
           type="range"
           className="size-slider"
-          min="-0.3"
-          max="0.3"
+          min="-1.0"
+          max="1.0"
           step="0.01"
           value={textY ?? 0}
           onChange={e => onTextY?.(Number(e.target.value))}

@@ -459,13 +459,14 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
           dialogueType: kindId,
           balloonId: (kindId === 'thought' ? defaultThoughtBalloon?.id : defaultSpeechBalloon?.id) || char.balloonId || null,
           linked: true,
+          bgColor: null,
           extraDialogues: [],
         }
       } else {
         const extras = [...(char.extraDialogues || [])]
         newIsExtra = true
         newExtraIdx = extras.length
-        extras.push({ text: '', type: kindId, balloonId: (kindId === 'thought' ? defaultThoughtBalloon?.id : defaultSpeechBalloon?.id) || null, linked: true, align: 'center', fontSize: 1, textX: 0, textY: 0, open: true })
+        extras.push({ text: '', type: kindId, balloonId: (kindId === 'thought' ? defaultThoughtBalloon?.id : defaultSpeechBalloon?.id) || null, linked: true, align: 'center', fontSize: 1, textX: 0, textY: 0, bgColor: null, open: true })
         characters[charIdx] = { ...char, extraDialogues: extras }
       }
       panels[0] = { ...panels[0], characters }
@@ -549,6 +550,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
         fontSize: 1,
         textX: 0,
         textY: 0,
+        bgColor: null,
         x: 0.4,
         y: 0.05,
         width: 0.3,
@@ -735,10 +737,10 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       const extra = (char.extraDialogues || [])[selectedBalloon.extraIdx]
       if (!extra) return null
       const found = orderedForPanel.find(d => d.characterId === char.characterId && d.isExtra && d.extraIdx === selectedBalloon.extraIdx)
-      return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: extra.text || '', channel: extra.type || 'speech', balloonId: extra.balloonId || null, align: extra.align || 'center', fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, linked: extra.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: extra.type || 'speech', imageRef: extra.imageRef || null }
+      return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: extra.text || '', channel: extra.type || 'speech', balloonId: extra.balloonId || null, align: extra.align || 'center', fontSize: extra.fontSize, textX: extra.textX, textY: extra.textY, bgColor: extra.bgColor || null, linked: extra.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: extra.type || 'speech', imageRef: extra.imageRef || null }
     }
     const found = orderedForPanel.find(d => d.characterId === char.characterId && !d.isExtra)
-    return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: char.dialogue || '', channel: char.dialogueType || 'speech', balloonId: char.balloonId || null, align: char.align || 'center', fontSize: char.fontSize, textX: char.textX, textY: char.textY, linked: char.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: char.dialogueType || 'speech', imageRef: char.imageRef || null }
+    return { label: found?.label || `G${found?.number || ''}`, characterName: def?.name || '', text: char.dialogue || '', channel: char.dialogueType || 'speech', balloonId: char.balloonId || null, align: char.align || 'center', fontSize: char.fontSize, textX: char.textX, textY: char.textY, bgColor: char.bgColor || null, linked: char.linked !== false, speaksFirst: !!char.speaksFirst, dialogueType: char.dialogueType || 'speech', imageRef: char.imageRef || null }
   })()
 
   const selectedGloboXLabel = selectedGloboXIdx != null
@@ -811,6 +813,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 characters={characters}
                 backgrounds={backgrounds}
                 objects={objects}
+                balloons={balloons}
                 aspectRatio={data.aspectRatio}
                 grid={panel?.grid || 'thirds'}
                 gridVisible={gridVisible}
@@ -889,6 +892,8 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       onTextX={(textX) => applyDialogueBalloonUpdate({ textX })}
                       textY={selectedDialogueBalloon.textY}
                       onTextY={(textY) => applyDialogueBalloonUpdate({ textY })}
+                      bgColor={selectedDialogueBalloon.bgColor}
+                      onBgColor={(bgColor) => applyDialogueBalloonUpdate({ bgColor })}
                       linked={selectedDialogueBalloon.linked !== false}
                       onLinked={(linked) => applyDialogueBalloonUpdate({ linked })}
                       speaksFirst={selectedDialogueBalloon.speaksFirst}
@@ -945,6 +950,8 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                       onTextX={(textX) => updateGloboXInPanel(0, selectedGloboXIdx, { textX })}
                       textY={selectedGloboXData.textY}
                       onTextY={(textY) => updateGloboXInPanel(0, selectedGloboXIdx, { textY })}
+                      bgColor={selectedGloboXData.bgColor}
+                      onBgColor={(bgColor) => updateGloboXInPanel(0, selectedGloboXIdx, { bgColor })}
                       onType={(id, kind) => updateGloboXInPanel(0, selectedGloboXIdx, { balloonId: id, channel: kind === 'thought' ? 'thought' : 'speech' })}
                       onAnchor={(anchor) => updateGloboXInPanel(0, selectedGloboXIdx, { anchor })}
                       onText={(newText) => updateGloboXInPanel(0, selectedGloboXIdx, { text: newText })}
