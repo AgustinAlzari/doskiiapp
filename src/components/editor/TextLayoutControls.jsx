@@ -8,7 +8,7 @@ const ALIGNS = [
 // Controles de layout del texto de un globo: sliders de tamaño y posición del
 // párrafo dentro del globo, más la alineación. Sin textarea: el texto se
 // escribe directamente en el globo del lienzo.
-export default function TextLayoutControls({ align = 'center', onAlignChange, fontSize = 1, onFontSize, textX = 0, onTextX, textY = 0, onTextY }) {
+export default function TextLayoutControls({ align = 'center', onAlignChange, fontSize = 1, onFontSize, textX = 0, onTextX, textY = 0, onTextY, maxFontSize = 2.0 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -17,7 +17,7 @@ export default function TextLayoutControls({ align = 'center', onAlignChange, fo
           type="range"
           className="size-slider"
           min="0.6"
-          max="1.6"
+          max={maxFontSize}
           step="0.05"
           value={fontSize ?? 1}
           onChange={e => onFontSize?.(Number(e.target.value))}

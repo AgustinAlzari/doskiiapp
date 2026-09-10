@@ -2,20 +2,55 @@ import { useRef, useState, useCallback } from 'react'
 import { DIRECTIONS, ACTION_EFFECTS, MOTION_LINE_DESCS } from '../../data/actionPresets'
 import useDoubleClick from './useDoubleClick'
 
-export default function CharacterBlock({ panelChar, charDef, isSelected, onSelect, onMove, onResize, onRemove, onConnOutStart, onConnInEnd, isConnDrag, connDragFrom, onDoubleClick }) {
+export default function CharacterBlock({ panelChar, charDef, isSelected, onSelect, onMove, onResize, onRotate, onRemove, onConnOutStart, onConnInEnd, isConnDrag, connDragFrom, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
+  const [rotating, setRotating] = useState(false)
   const [dragOverIn, setDragOverIn] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const rotateStart = useRef({ angle: 0, rotation: 0 })
   const isResizingRef = useRef(false)
+  const isRotatingRef = useRef(false)
   const detectDbl = useDoubleClick(onDoubleClick)
 
   const isConnSource = connDragFrom === panelChar.characterId
 
+  const handleRotateDown = useCallback((e) => {
+    e.stopPropagation()
+    isRotatingRef.current = true
+    setRotating(true)
+    const rect = blockRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI
+    rotateStart.current = { angle: startAngle, rotation: panelChar.rotation || 0 }
+    const handleMove = (ev) => {
+      const r = blockRef.current?.getBoundingClientRect()
+      if (!r) return
+      const ccx = r.left + r.width / 2
+      const ccy = r.top + r.height / 2
+      const curAngle = Math.atan2(ev.clientY - ccy, ev.clientX - ccx) * 180 / Math.PI
+      let delta = curAngle - rotateStart.current.angle
+      let next = (rotateStart.current.rotation + delta) % 360
+      if (next > 180) next -= 360
+      if (next < -180) next += 360
+      onRotate?.(Math.round(next))
+    }
+    const handleUp = () => {
+      isRotatingRef.current = false
+      setRotating(false)
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }, [panelChar.rotation, onRotate])
+
   const handleMouseDown = useCallback((e) => {
-    if (isResizingRef.current) return
+    if (isResizingRef.current || isRotatingRef.current) return
     if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
@@ -101,13 +136,15 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
   return (
     <div
       ref={blockRef}
-      className={`char-block ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
+      className={`char-block ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${rotating ? 'rotating' : ''}`}
       style={{
         left: `${panelChar.x * 100}%`,
         top: `${panelChar.y * 100}%`,
         width: `${panelChar.width * 100}%`,
         height: `${panelChar.height * 100}%`,
         zIndex: isSelected ? 9999 : 2 + (panelChar.z ?? 0),
+        transform: `rotate(${panelChar.rotation || 0}deg)`,
+        transformOrigin: 'center center',
       }}
       onMouseDown={handleMouseDown}
     >
@@ -128,6 +165,35 @@ export default function CharacterBlock({ panelChar, charDef, isSelected, onSelec
         onMouseLeave={handleInMouseLeave}
         title="soltar para recibir conexión"
       />
+
+      {/* Rotation handle */}
+      {isSelected && (
+        <div
+          onPointerDown={handleRotateDown}
+          title="arrastrar para rotar"
+          style={{
+            position: 'absolute',
+            top: -28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            background: 'var(--color-bg)',
+            border: '1.5px solid var(--color-border)',
+            cursor: 'grab',
+            zIndex: 23,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            lineHeight: 1,
+            userSelect: 'none',
+          }}
+        >
+          ↻
+        </div>
+      )}
 
       {/* Header: name + direction */}
       <div className="char-block-header" style={{ borderColor: charDef.color || 'var(--color-border-muted)' }}>

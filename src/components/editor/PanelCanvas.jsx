@@ -3,6 +3,7 @@ import CharacterBlock from './CharacterBlock'
 import ObjectBlock from './ObjectBlock'
 import SFXBlock from './SFXBlock'
 import NarrationBlock from './NarrationBlock'
+import TitleBlock from './TitleBlock'
 import BalloonBlock from './BalloonBlock'
 import ConnectionArrows from './ConnectionArrows'
 import CompositionGuides from './CompositionGuides'
@@ -97,7 +98,7 @@ function BehindOutline({ el, onSelect, onMove }) {
   )
 }
 
-export default function PanelCanvas({ panel, characters, objects, backgrounds, balloons, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedBalloon, selectedGloboXIdx, selectedBackground, onSelectBackground, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onTextBalloon, onMoveGloboX, onResizeGloboX, onTextGloboX, onTextNarr, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
+export default function PanelCanvas({ panel, characters, objects, backgrounds, balloons, aspectRatio, grid, gridVisible, selectedCharIdx, selectedObjIdx, selectedSfxIdx, selectedNarr, selectedTitle, selectedBalloon, selectedGloboXIdx, selectedBackground, onSelectBackground, onSelectChar, onSelectObj, onSelectSfx, onSelectNarr, onSelectTitle, onSelectBalloon, onSelectGloboX, onUpdateChar, onUpdateObj, onUpdateSfx, onUpdateNarr, onUpdateTitle, onRemoveChar, onRemoveObj, onRemoveSfx, onRemoveNarr, onRemoveTitle, onRemoveBalloon, onRemoveGloboX, onMoveBalloon, onResizeBalloon, onTextBalloon, onMoveGloboX, onResizeGloboX, onTextGloboX, onTextNarr, onTextTitle, onRemoveBackground, onUpdateBackground, onUpdateHorizon, connections, onAddConnection, onRemoveConnection, onCanvasClick, canvasRef, signature, selectedSignature, onSelectSignature, onUpdateSignature, onRemoveSignature, signatureColor, signatureText, signatureImagePath }) {
   const [connDrag, setConnDrag] = useState(null)
   const canvasRef2 = useRef(null)
   const wrapperRef = useRef(null)
@@ -356,6 +357,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
             onSelect={() => onSelectBackground?.()}
             onMove={(x, y) => onUpdateBackground({ x, y })}
             onResize={(updates) => onUpdateBackground(updates)}
+            onRotate={(rotation) => onUpdateBackground({ rotation })}
             onRemove={() => onRemoveBackground?.()}
             onConnInEnd={() => handleConnInEnd('background', panel.backgroundId)}
           />
@@ -383,6 +385,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
             onSelect={() => onSelectSfx(idx)}
             onMove={(x, y) => onUpdateSfx(idx, { x, y })}
             onResize={(width, height) => onUpdateSfx(idx, { width, height })}
+            onRotate={(rotation) => onUpdateSfx(idx, { rotation })}
             onUpdate={(updates) => onUpdateSfx(idx, updates)}
             onRemove={() => onRemoveSfx?.(idx)}
           />
@@ -395,8 +398,22 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
             onSelect={onSelectNarr}
             onMove={(x, y) => onUpdateNarr({ x, y })}
             onResize={(updates) => onUpdateNarr(updates)}
+            onRotate={(rotation) => onUpdateNarr({ rotation })}
             onText={(text) => onTextNarr?.(text)}
             onRemove={onRemoveNarr}
+          />
+        )}
+
+        {panel.title && (
+          <TitleBlock
+            panelTitle={panel.title}
+            isSelected={selectedTitle}
+            onSelect={onSelectTitle}
+            onMove={(x, y) => onUpdateTitle({ x, y })}
+            onResize={(updates) => onUpdateTitle(updates)}
+            onRotate={(rotation) => onUpdateTitle({ rotation })}
+            onText={(text) => onTextTitle?.(text)}
+            onRemove={onRemoveTitle}
           />
         )}
 
@@ -459,6 +476,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
               onSelect={() => onSelectObj(idx)}
               onMove={(x, y) => onUpdateObj(idx, { x, y })}
               onResize={(updates) => onUpdateObj(idx, updates)}
+              onRotate={(rotation) => onUpdateObj(idx, { rotation })}
               onRemove={() => onRemoveObj?.(idx)}
               onConnInEnd={(id) => handleConnInEnd('object', id)}
               isConnDrag={!!connDrag}
@@ -478,6 +496,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
               onSelect={() => onSelectChar(idx)}
               onMove={(x, y) => onUpdateChar(idx, { x, y })}
               onResize={(updates) => onUpdateChar(idx, updates)}
+              onRotate={(rotation) => onUpdateChar(idx, { rotation })}
               onRemove={() => onRemoveChar?.(idx)}
               onConnOutStart={handleConnOutStart}
               onConnInEnd={(id) => handleConnInEnd('character', id)}
@@ -533,6 +552,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
             onSelect={() => onSelectBalloon?.(b)}
             onMove={(x, y) => onMoveBalloon?.(b, { x, y })}
             onResize={(updates) => onResizeBalloon?.(b, updates)}
+            onRotate={(rotation) => onResizeBalloon?.(b, { rotation })}
             onText={(text) => onTextBalloon?.(b, text)}
             onRemove={() => onRemoveBalloon?.(b)}
           />
@@ -552,6 +572,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
               onSelect={() => onSelectGloboX?.(idx)}
               onMove={(x, y) => onMoveGloboX?.(idx, { x, y })}
               onResize={(updates) => onResizeGloboX?.(idx, updates)}
+              onRotate={(rotation) => onResizeGloboX?.(idx, { rotation })}
               onText={(text) => onTextGloboX?.(idx, text)}
               onRemove={() => onRemoveGloboX?.(idx)}
             />
@@ -568,6 +589,7 @@ export default function PanelCanvas({ panel, characters, objects, backgrounds, b
             onSelect={() => onSelectSignature?.()}
             onMove={(x, y) => onUpdateSignature?.({ x, y })}
             onResize={(updates) => onUpdateSignature?.(updates)}
+            onRotate={(rotation) => onUpdateSignature?.({ rotation })}
             onRemove={() => onRemoveSignature?.()}
           />
         )}

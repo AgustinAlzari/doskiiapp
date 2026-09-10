@@ -29,6 +29,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
   const [selectedObjIdx, setSelectedObjIdx] = useState(null)
   const [selectedSfxIdx, setSelectedSfxIdx] = useState(null)
   const [selectedNarr, setSelectedNarr] = useState(false)
+  const [selectedTitle, setSelectedTitle] = useState(false)
   const [selectedBalloon, setSelectedBalloon] = useState(null)
   const [selectedGloboXIdx, setSelectedGloboXIdx] = useState(null)
   const [selectedSignature, setSelectedSignature] = useState(false)
@@ -76,6 +77,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
     setSelectedSignature(false)
@@ -88,8 +90,22 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
+    setSelectedSignature(false)
+  }, [])
+
+  const selectTitle = useCallback(() => {
+    setSelectedTitle(true)
+    setSelectedNarr(false)
+    setSelectedTitle(false)
+    setSelectedCharIdx(null)
+    setSelectedObjIdx(null)
+    setSelectedSfxIdx(null)
+    setSelectedBalloon(null)
+    setSelectedGloboXIdx(null)
+    setSelectedBackground(false)
     setSelectedSignature(false)
   }, [])
 
@@ -351,6 +367,40 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
       return { ...prev, panels }
     })
     setSelectedNarr(false)
+    setSelectedTitle(false)
+  }, [])
+
+  // Title / Cartel — como narración pero con tamaño hasta 500% y colores elegibles
+  const addTitleToPanel = useCallback((panelIdx) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const zCounter = panels[panelIdx].zCounter || 0
+      panels[panelIdx] = {
+        ...panels[panelIdx],
+        title: { text: dataRef.current.title || 'título', x: 0.05, y: 0.02, width: 0.9, height: 0.1, align: 'center', fontSize: 1.2, textX: 0, textY: 0, textColor: null, bgColor: null, transparent: false, rotation: 0, z: zCounter },
+        zCounter: zCounter + 1,
+      }
+      return { ...prev, panels }
+    })
+    setSelectedTitle(true)
+  }, [])
+
+  const updateTitleInPanel = useCallback((panelIdx, updates) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      const title = { ...panels[panelIdx].title, ...updates }
+      panels[panelIdx] = { ...panels[panelIdx], title }
+      return { ...prev, panels }
+    })
+  }, [])
+
+  const removeTitleFromPanel = useCallback((panelIdx) => {
+    setData(prev => {
+      const panels = [...prev.panels]
+      panels[panelIdx] = { ...panels[panelIdx], title: null }
+      return { ...prev, panels }
+    })
+    setSelectedTitle(false)
   }, [])
 
   // Signature (firma)
@@ -384,6 +434,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBalloon(null)
     setSelectedGloboXIdx(null)
     setSelectedBackground(false)
@@ -486,6 +537,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBackground(false)
   }, [selectedCharIdx, addDialogueForChar])
 
@@ -504,6 +556,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedGloboXIdx(null)
     setSelectedBackground(false)
     setSelectedBalloon({ characterId: balloon.characterId, isExtra: balloon.isExtra, extraIdx: balloon.extraIdx })
@@ -515,6 +568,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBalloon(null)
     setSelectedBackground(false)
   }, [])
@@ -566,6 +620,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
     setSelectedObjIdx(null)
     setSelectedSfxIdx(null)
     setSelectedNarr(false)
+    setSelectedTitle(false)
     setSelectedBalloon(null)
   }, [data.panels, balloons])
 
@@ -823,11 +878,13 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 selectedSfxIdx={selectedSfxIdx}
                 selectedBalloon={selectedBalloon}
                 selectedGloboXIdx={selectedGloboXIdx}
-                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
-                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
-                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectChar={(idx) => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedTitle(false); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectObj={(idx) => { setSelectedObjIdx(idx); setSelectedCharIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedTitle(false); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectSfx={(idx) => { setSelectedSfxIdx(idx); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedNarr(false); setSelectedTitle(false); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
                 selectedNarr={selectedNarr}
-                onSelectNarr={() => { setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                onSelectNarr={() => { setSelectedNarr(true); setSelectedTitle(false); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                selectedTitle={selectedTitle}
+                onSelectTitle={() => { setSelectedTitle(true); setSelectedNarr(false); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
                 selectedBackground={selectedBackground}
                 onSelectBackground={selectBackground}
                 onSelectBalloon={selectBalloon}
@@ -849,6 +906,9 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                 onUpdateNarr={(updates) => updateNarrationInPanel(0, updates)}
                 onTextNarr={(text) => updateNarrationInPanel(0, { text })}
                 onRemoveNarr={() => removeNarrationFromPanel(0)}
+                onUpdateTitle={(updates) => updateTitleInPanel(0, updates)}
+                onTextTitle={(text) => updateTitleInPanel(0, { text })}
+                onRemoveTitle={() => removeTitleFromPanel(0)}
                 onRemoveBackground={() => setBackgroundForPanel(0, null)}
                 onUpdateBackground={(updates) => updateBackground(0, updates)}
                 onUpdateHorizon={(updates) => updatePanel(0, { horizon: updates })}
@@ -990,6 +1050,86 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                           {projectBalloons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                       </div>
+                    </div>
+                  )}
+                  {selectedTitle && panel?.title && (
+                    <div className="character-props-panel" style={{ width: '100%', flexShrink: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>título / cartel</span>
+                        <div style={{ flex: 1 }} />
+                        <button className="btn btn-ghost btn-sm btn-danger" onClick={() => { removeTitleFromPanel(0); setSelectedTitle(false) }}>×</button>
+                      </div>
+                      <TextLayoutControls
+                        align={panel.title.align || 'center'}
+                        onAlignChange={align => updateTitleInPanel(0, { align })}
+                        fontSize={panel.title.fontSize}
+                        onFontSize={fontSize => updateTitleInPanel(0, { fontSize })}
+                        textX={panel.title.textX}
+                        onTextX={textX => updateTitleInPanel(0, { textX })}
+                        textY={panel.title.textY}
+                        onTextY={textY => updateTitleInPanel(0, { textY })}
+                        maxFontSize={5.0}
+                      />
+                      <div>
+                        <label className="label">color tipografía</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="color"
+                            value={/^#[0-9a-fA-F]{6}$/.test(panel.title.textColor) ? panel.title.textColor : '#b5651d'}
+                            onChange={e => updateTitleInPanel(0, { textColor: e.target.value })}
+                            style={{ width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', padding: 2 }}
+                          />
+                          <input
+                            className="input"
+                            value={panel.title.textColor || ''}
+                            onChange={e => updateTitleInPanel(0, { textColor: e.target.value || null })}
+                            placeholder="#b5651d"
+                            style={{ width: 130, height: 28, fontSize: 12 }}
+                          />
+                          <button className="btn btn-sm" onClick={() => updateTitleInPanel(0, { textColor: null })} title="usar color por defecto">defecto</button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label">color fondo</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="color"
+                            value={/^#[0-9a-fA-F]{6}$/.test(panel.title.bgColor) ? panel.title.bgColor : '#ffffff'}
+                            onChange={e => updateTitleInPanel(0, { bgColor: e.target.value, transparent: false })}
+                            style={{ width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', padding: 2 }}
+                          />
+                          <input
+                            className="input"
+                            value={panel.title.bgColor || ''}
+                            onChange={e => updateTitleInPanel(0, { bgColor: e.target.value || null })}
+                            placeholder="#ffffff"
+                            style={{ width: 130, height: 28, fontSize: 12 }}
+                          />
+                          <button className="btn btn-sm" onClick={() => updateTitleInPanel(0, { bgColor: null })} title="sin color de fondo">defecto</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <label className="label" style={{ marginBottom: 0 }}>fondo</label>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <span
+                            className={`radio-pill ${!panel.title.transparent ? 'active' : ''}`}
+                            style={{ fontSize: 10, cursor: 'pointer' }}
+                            onClick={() => updateTitleInPanel(0, { transparent: false })}
+                            title="fondo sólido (con caja)"
+                          >
+                            con fondo
+                          </span>
+                          <span
+                            className={`radio-pill ${panel.title.transparent ? 'active' : ''}`}
+                            style={{ fontSize: 10, cursor: 'pointer' }}
+                            onClick={() => updateTitleInPanel(0, { transparent: true })}
+                            title="fondo transparente (solo texto)"
+                          >
+                            transparente
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>como narración — tamaño hasta 500% + colores elegibles (hex)</div>
                     </div>
                   )}
                   {selectedCharData && selectedCharDef && (
@@ -1255,7 +1395,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                             key={idx}
                             className="radio-pill"
                             style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: char.color, color: char.color }}
-                            onClick={() => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedBalloon(null); setSelectedBackground(false) }}
+                            onClick={() => { setSelectedCharIdx(idx); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedNarr(false); setSelectedTitle(false); setSelectedBalloon(null); setSelectedBackground(false) }}
                           >
                             <span className="color-dot" style={{ background: char.color || '#999' }} />
                             {char.name}
@@ -1352,7 +1492,7 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                   {/* Narración */}
                   <button
                     className="btn btn-sm"
-                    onClick={() => { addNarrationToPanel(0); setSelectedNarr(true); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                    onClick={() => { addNarrationToPanel(0); setSelectedNarr(true); setSelectedTitle(false); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
                     title="crear una narración"
                     style={{ alignSelf: 'flex-start' }}
                   >
@@ -1366,6 +1506,25 @@ export default function StripEditor({ strip, project, onBack, onEditCharacter, o
                     >
                       narración
                       <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeNarrationFromPanel(0); setSelectedNarr(false) }}>x</span>
+                    </span>
+                  )}
+                  {/* Título / Cartel */}
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => { addTitleToPanel(0); setSelectedTitle(true); setSelectedNarr(false); setSelectedCharIdx(null); setSelectedObjIdx(null); setSelectedSfxIdx(null); setSelectedBalloon(null); setSelectedGloboXIdx(null); setSelectedBackground(false) }}
+                    title="crear título / cartel"
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    + título / cartel
+                  </button>
+                  {panel?.title && (
+                    <span
+                      className="radio-pill"
+                      style={{ fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, borderColor: 'var(--color-title)', color: 'var(--color-title)' }}
+                      onClick={() => selectTitle()}
+                    >
+                      título
+                      <span style={{ cursor: 'pointer', fontWeight: 700, fontSize: 10 }} onClick={e => { e.stopPropagation(); removeTitleFromPanel(0); setSelectedTitle(false) }}>x</span>
                     </span>
                   )}
                 </div>

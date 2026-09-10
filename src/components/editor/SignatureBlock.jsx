@@ -1,13 +1,16 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 
-export default function SignatureBlock({ signature, color, text, imagePath, isSelected, onSelect, onMove, onResize, onRemove }) {
+export default function SignatureBlock({ signature, color, text, imagePath, isSelected, onSelect, onMove, onResize, onRotate, onRemove }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
+  const [rotating, setRotating] = useState(false)
   const [preview, setPreview] = useState(null)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const rotateStart = useRef({ angle: 0, rotation: 0 })
   const isResizingRef = useRef(false)
+  const isRotatingRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -17,8 +20,40 @@ export default function SignatureBlock({ signature, color, text, imagePath, isSe
     return () => { active = false }
   }, [imagePath])
 
+  const handleRotateDown = useCallback((e) => {
+    e.stopPropagation()
+    isRotatingRef.current = true
+    setRotating(true)
+    const rect = blockRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI
+    rotateStart.current = { angle: startAngle, rotation: signature.rotation || 0 }
+    const handleMove = (ev) => {
+      const r = blockRef.current?.getBoundingClientRect()
+      if (!r) return
+      const ccx = r.left + r.width / 2
+      const ccy = r.top + r.height / 2
+      const curAngle = Math.atan2(ev.clientY - ccy, ev.clientX - ccx) * 180 / Math.PI
+      let delta = curAngle - rotateStart.current.angle
+      let next = (rotateStart.current.rotation + delta) % 360
+      if (next > 180) next -= 360
+      if (next < -180) next += 360
+      onRotate?.(Math.round(next))
+    }
+    const handleUp = () => {
+      isRotatingRef.current = false
+      setRotating(false)
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }, [signature.rotation, onRotate])
+
   const handleMouseDown = useCallback((e) => {
-    if (isResizingRef.current) return
+    if (isResizingRef.current || isRotatingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -83,8 +118,8 @@ export default function SignatureBlock({ signature, color, text, imagePath, isSe
   return (
     <div
       ref={blockRef}
-      className={`signature-block ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
-      style={{ left: `${signature.x * 100}%`, top: `${signature.y * 100}%`, width: `${signature.width * 100}%`, height: `${signature.height * 100}%`, borderColor: border, zIndex: isSelected ? 9999 : 13 + (signature.z ?? 0) }}
+      className={`signature-block ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${rotating ? 'rotating' : ''}`}
+      style={{ left: `${signature.x * 100}%`, top: `${signature.y * 100}%`, width: `${signature.width * 100}%`, height: `${signature.height * 100}%`, borderColor: border, zIndex: isSelected ? 9999 : 13 + (signature.z ?? 0), transform: `rotate(${signature.rotation || 0}deg)`, transformOrigin: 'center center' }}
       onMouseDown={handleMouseDown}
       title="firma"
     >
@@ -96,6 +131,33 @@ export default function SignatureBlock({ signature, color, text, imagePath, isSe
         </div>
       )}
       {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title="quitar firma">{'\u00D7'}</button>}
+      {isSelected && (
+        <div
+          onPointerDown={handleRotateDown}
+          title="arrastrar para rotar"
+          style={{
+            position: 'absolute',
+            top: -28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            background: 'var(--color-bg)',
+            border: '1.5px solid var(--color-border)',
+            cursor: 'grab',
+            zIndex: 23,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            lineHeight: 1,
+            userSelect: 'none',
+          }}
+        >
+          ↻
+        </div>
+      )}
       {resizeHandle('top-left', { top: 0, left: 0 })}
       {resizeHandle('top-right', { top: 0, right: 0 })}
       {resizeHandle('bottom-left', { bottom: 0, left: 0 })}

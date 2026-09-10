@@ -1,17 +1,52 @@
 import { useRef, useState, useCallback } from 'react'
 import useDoubleClick from './useDoubleClick'
 
-export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, onMove, onResize, onRemove, onConnInEnd, showInputPort = true, isBackground = false, onDoubleClick }) {
+export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, onMove, onResize, onRotate, onRemove, onConnInEnd, showInputPort = true, isBackground = false, onDoubleClick }) {
   const blockRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
+  const [rotating, setRotating] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+  const rotateStart = useRef({ angle: 0, rotation: 0 })
   const isResizingRef = useRef(false)
+  const isRotatingRef = useRef(false)
   const detectDbl = useDoubleClick(onDoubleClick)
 
+  const handleRotateDown = useCallback((e) => {
+    e.stopPropagation()
+    isRotatingRef.current = true
+    setRotating(true)
+    const rect = blockRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI
+    rotateStart.current = { angle: startAngle, rotation: panelObj.rotation || 0 }
+    const handleMove = (ev) => {
+      const r = blockRef.current?.getBoundingClientRect()
+      if (!r) return
+      const ccx = r.left + r.width / 2
+      const ccy = r.top + r.height / 2
+      const curAngle = Math.atan2(ev.clientY - ccy, ev.clientX - ccx) * 180 / Math.PI
+      let delta = curAngle - rotateStart.current.angle
+      let next = (rotateStart.current.rotation + delta) % 360
+      if (next > 180) next -= 360
+      if (next < -180) next += 360
+      onRotate?.(Math.round(next))
+    }
+    const handleUp = () => {
+      isRotatingRef.current = false
+      setRotating(false)
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }, [panelObj.rotation, onRotate])
+
   const handleMouseDown = useCallback((e) => {
-    if (isResizingRef.current) return
+    if (isResizingRef.current || isRotatingRef.current) return
     if (detectDbl(e)) return
     e.stopPropagation()
     onSelect()
@@ -75,7 +110,7 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
   return (
     <div
       ref={blockRef}
-      className={`${isBackground ? 'background-block' : 'obj-block'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
+      className={`${isBackground ? 'background-block' : 'obj-block'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${rotating ? 'rotating' : ''}`}
       style={{
         left: `${panelObj.x * 100}%`,
         top: `${panelObj.y * 100}%`,
@@ -84,6 +119,8 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
         borderColor: objDef.color || 'var(--color-border)',
         zIndex: isBackground ? 0 : isSelected ? 9999 : 2 + (panelObj.z ?? 0),
         pointerEvents: isBackground ? 'none' : 'auto',
+        transform: `rotate(${panelObj.rotation || 0}deg)`,
+        transformOrigin: 'center center',
       }}
       onMouseDown={isBackground ? undefined : handleMouseDown}
     >
@@ -94,6 +131,33 @@ export default function ObjectBlock({ panelObj, objDef, isSelected, onSelect, on
         title="soltar para recibir conexion"
         style={{ pointerEvents: isBackground ? 'auto' : undefined }}
       />}
+      {isSelected && !isBackground && (
+        <div
+          onPointerDown={handleRotateDown}
+          title="arrastrar para rotar"
+          style={{
+            position: 'absolute',
+            top: -28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            background: 'var(--color-bg)',
+            border: '1.5px solid var(--color-border)',
+            cursor: 'grab',
+            zIndex: 23,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            lineHeight: 1,
+            userSelect: 'none',
+          }}
+        >
+          ↻
+        </div>
+      )}
       <div
         className="char-block-header"
         style={{ borderColor: objDef.color || 'var(--color-border-muted)', pointerEvents: isBackground ? 'auto' : undefined }}

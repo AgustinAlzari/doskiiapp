@@ -529,16 +529,17 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
 
   lines.push('')
   lines.push('LAYERS AND DEPTH (back to front): landscape, then objects, then characters.')
-  if (panel.backgroundId) {
-    const backgroundDef = ctx.bgs.find(item => item.id === panel.backgroundId)
-    if (backgroundDef) {
-      const background = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
-      const placement = describeLandscapePlacement(background)
-      const prompt = backgroundDef.comodin
-        ? `ONE-OFF BACKGROUND — ${panel.comodinDesc?.trim() ? panel.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
-        : `${cleanPromptText(backgroundDef.promptText)}.${referenceText(backgroundDef)}`
-      lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${prompt} ${placement}`)
-    }
+    if (panel.backgroundId) {
+      const backgroundDef = ctx.bgs.find(item => item.id === panel.backgroundId)
+      if (backgroundDef) {
+        const background = panel.background || { x: 0, y: 0, width: 1, height: 0.5 }
+        const placement = describeLandscapePlacement(background)
+        const rotationText = background.rotation ? ` Rotation: ${background.rotation} degrees.` : ''
+        const prompt = backgroundDef.comodin
+          ? `ONE-OFF BACKGROUND — ${panel.comodinDesc?.trim() ? panel.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
+          : `${cleanPromptText(backgroundDef.promptText)}.${referenceText(backgroundDef)}`
+        lines.push(`- LANDSCAPE, SPATIAL LAYER: "${backgroundDef.name}". ${prompt} ${placement}${rotationText}`)
+      }
   } else {
     lines.push('- No landscape defined: do not invent a dominant background.')
   }
@@ -552,10 +553,11 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
       if (!definition) return
       const { size } = describePosition(item.x, item.y, item.width, item.height)
       const framePos = framePlacementText(item)
+      const rotationText = item.rotation ? ` Rotation: ${item.rotation} degrees clockwise.` : ''
       const prompt = definition.comodin
         ? `ONE-OFF OBJECT — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
         : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}${item.note ? ` Note: ${item.note}.` : ''}`
-      lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${framePos ? ` ${framePos}` : ''}`)
+      lines.push(`- "${definition.name}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${rotationText}${framePos ? ` ${framePos}` : ''}`)
     })
   }
 
@@ -570,10 +572,11 @@ function sceneBodyLines(ctx, panel, styleText = '', paletteColors = [], author =
     const instanceName = `${definition.name} ${occurrence}`
     const { size } = describePosition(item.x, item.y, item.width, item.height)
     const framePos = framePlacementText(item)
+    const rotationText = item.rotation ? ` Rotation: ${item.rotation} degrees clockwise.` : ''
     const prompt = definition.comodin
       ? `ONE-OFF CHARACTER — ${item.comodinDesc?.trim() ? item.comodinDesc : '(sin describir)'}. Drawn in the project's global style: "${styleText}".`
       : `${cleanPromptText(definition.promptText)}.${referenceText(definition)}`
-    lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${framePos ? ` ${framePos}` : ''}`)
+    lines.push(`- CHARACTER "${instanceName}": ${prompt} Coordinates: ${coordinates(item)}. Relative size: ${size}.${rotationText}${framePos ? ` ${framePos}` : ''}`)
     if (item.expression) lines.push(`  Expression: ${item.expression}.`)
     if (item.framing) {
       const shot = SHOT_TYPES.find(s => s.id === item.framing)
@@ -637,9 +640,10 @@ function signaturePromptLines(signature, author, paletteColors = []) {
   } else {
     graphic = 'No signature graphic available: leave this area empty.'
   }
+  const rotationText = signature.rotation ? ` Rotation: ${signature.rotation} degrees.` : ''
   return [
     'SIGNATURE: Place the author\'s signature in the area at ' +
-      `x ${Math.round(signature.x * 100)}%, y ${Math.round(signature.y * 100)}%, w ${Math.round(signature.width * 100)}%, h ${Math.round(signature.height * 100)}%.`,
+      `x ${Math.round(signature.x * 100)}%, y ${Math.round(signature.y * 100)}%, w ${Math.round(signature.width * 100)}%, h ${Math.round(signature.height * 100)}%.${rotationText}`,
     `- Color: ${colorDesc}.`,
     `- Graphic: ${graphic}`,
   ]
@@ -703,13 +707,15 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
 
   const panelSfx = panel.sfx || []
   const hasNarration = panel.narration && panel.narration.text
-  if (hasNarration || panelSfx.some(item => item.text)) {
+  const hasTitle = panel.title && panel.title.text
+  if (hasNarration || hasTitle || panelSfx.some(item => item.text)) {
     lines.push('')
     lines.push('TEXT AND GRAPHIC ELEMENTS:')
     if (hasNarration) {
       const narr = panel.narration
       const { size } = describePosition(narr.x, narr.y, narr.width, narr.height)
       const style = narr.framed ? 'FRAMED' : 'FREEFORM'
+      const rotationText = narr.rotation ? ` Rotation: ${narr.rotation} degrees.` : ''
       let narrStyle = ''
       if (narr.balloonId) {
         const override = (balloonDefs || []).find(b => b.id === narr.balloonId)
@@ -721,12 +727,27 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       narrExtras.push(...narrParts.lineBreaks)
       narrExtras.push(` ${narrParts.align}`)
       narrExtras.push(layoutPrompt(narr.fontSize, narr.textX, narr.textY))
-      lines.push(`- Narration [${style}]: "${narrParts.literal}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}${narrExtras.join('')}${narrStyle}`)
+      lines.push(`- Narration [${style}]: "${narrParts.literal}". Coordinates: ${coordinates(narr)}. Relative size: ${size}.${rotationText}${narr.framed ? ' Text inside a visible border box.' : ' Floating text without border.'}${narrExtras.join('')}${narrStyle}`)
+    }
+    if (hasTitle) {
+      const t = panel.title
+      const { size } = describePosition(t.x, t.y, t.width, t.height)
+      const rotationText = t.rotation ? ` Rotation: ${t.rotation} degrees.` : ''
+      const bgText = t.transparent ? ' Background: transparent (text-only, no box).' : (t.bgColor && /^#[0-9a-fA-F]{6}$/.test(t.bgColor) ? ` Background color: ${t.bgColor} — solid fill.` : ' Background: solid box.')
+      const textColorText = t.textColor && /^#[0-9a-fA-F]{6}$/.test(t.textColor) ? ` Text color: ${t.textColor} — must be rendered exactly this hex.` : ''
+      const titleParts = markdownPromptParts(t.text, t.align)
+      const titleExtras = []
+      if (titleParts.emphasis.length) titleExtras.push(` Lettering emphasis: ${titleParts.emphasis.join('; ')}.`)
+      titleExtras.push(...titleParts.lineBreaks)
+      titleExtras.push(` ${titleParts.align}`)
+      titleExtras.push(layoutPrompt(t.fontSize, t.textX, t.textY))
+      lines.push(`- Title/Cartel: "${titleParts.literal}". Coordinates: ${coordinates(t)}. Relative size: ${size}.${rotationText}${bgText}${textColorText}${titleExtras.join('')}`)
     }
     panelSfx.forEach(item => {
       if (!item.text) return
       const { size } = describePosition(item.x, item.y, item.width, item.height)
-      lines.push(`- Sound effect "${item.text}": coordinates ${coordinates(item)}, size ${size}, style ${item.style}.`)
+      const rotationText = item.rotation ? ` Rotation: ${item.rotation} degrees.` : ''
+      lines.push(`- Sound effect "${item.text}": coordinates ${coordinates(item)}, size ${size}, style ${item.style}.${rotationText}`)
     })
   }
 
@@ -830,11 +851,12 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
         : (chainMember && !isChainLast
           ? ` It has NO tail of its own: it is joined to the next balloon by the connector tube; only the last balloon of the chain carries the tail pointing to the speaker (${d.name}).`
           : ` Its tail must point to the head of the speaker (${d.name}).`)
+      const rotationText = d.rotation ? ` Rotation: ${d.rotation} degrees.` : ''
       const tabId = d.linked === false ? `${d.number} suelto` : `${d.number}`
       if (idx === 0) {
-        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") speaks FIRST: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${bgColorText}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") speaks FIRST: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${styleRef}${bgColorText}${rotationText}${anchor}`)
       } else {
-        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") responds: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linkage}${styleRef}${bgColorText}${anchor}`)
+        lines.push(`${d.number}. Balloon ${tabId} ("${d.label}") responds: it is placed ${placement} and ${content} Balloon type: ${typeLabel}.${isImage ? '' : channelStyleText(d.type)}${linkage}${styleRef}${bgColorText}${rotationText}${anchor}`)
       }
     })
 
@@ -854,6 +876,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
       const styleRef = entity ? ` Balloon style entity: "${entity.name}".` : ''
       const effectiveBg = g.bgColor && /^#[0-9a-fA-F]{6}$/.test(g.bgColor) ? g.bgColor : (entity?.bgColor && /^#[0-9a-fA-F]{6}$/.test(entity.bgColor) ? entity.bgColor : null)
       const bgColorText = effectiveBg ? ` Background color: ${effectiveBg} — CRITICAL: Must be rendered as a solid flat fill inside the balloon interior, exactly this hex color, uniform, no gradient, prominently visible.` : ''
+      const rotationText = g.rotation ? ` Rotation: ${g.rotation} degrees.` : ''
       const content = isImage
         ? imageBalloonContent(entity, g.text, project, generalStyle, paletteColors, g.imageRef || null)
         : (() => {
@@ -877,7 +900,7 @@ function letteringLines(ctx, panel, project, layoutFileName, balloonDefs = [], g
               : ` Connect it to its anchor by a trail of THREE small bubbles decreasing in size, pointing directly at the anchor, always visibly connected — NEVER hanging loose or disconnected.`
           })()
         : ''
-      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and ${content} Channel: ${channel}.${isImage ? '' : channelStyleText(g.channel)} Its ${anchor}.${bubbleTrail}${styleRef}${bgColorText}`)
+      lines.push(`${i + 1}. Balloon "X${i + 1}" is placed ${placement} and ${content} Channel: ${channel}.${isImage ? '' : channelStyleText(g.channel)} Its ${anchor}.${bubbleTrail}${styleRef}${bgColorText}${rotationText}`)
     })
   }
 

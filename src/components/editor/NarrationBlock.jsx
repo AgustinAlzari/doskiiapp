@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 
-export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove, onResize, onRemove, onText }) {
+export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove, onResize, onRotate, onRemove, onText }) {
   const blockRef = useRef(null)
   const textRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState(false)
+  const [rotating, setRotating] = useState(false)
   const dragStart = useRef({ mx: 0, my: 0, x: 0, y: 0 })
   const resizeStart = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 })
+  const rotateStart = useRef({ angle: 0, rotation: 0 })
   const isResizingRef = useRef(false)
+  const isRotatingRef = useRef(false)
 
   useEffect(() => {
     if (isSelected && textRef.current) textRef.current.focus()
@@ -50,10 +53,42 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
     return () => ro.disconnect()
   }, [autoGrow])
 
+  const handleRotateDown = useCallback((e) => {
+    e.stopPropagation()
+    isRotatingRef.current = true
+    setRotating(true)
+    const rect = blockRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI
+    rotateStart.current = { angle: startAngle, rotation: panelNarr.rotation || 0 }
+    const handleMove = (ev) => {
+      const r = blockRef.current?.getBoundingClientRect()
+      if (!r) return
+      const ccx = r.left + r.width / 2
+      const ccy = r.top + r.height / 2
+      const curAngle = Math.atan2(ev.clientY - ccy, ev.clientX - ccx) * 180 / Math.PI
+      let delta = curAngle - rotateStart.current.angle
+      let next = (rotateStart.current.rotation + delta) % 360
+      if (next > 180) next -= 360
+      if (next < -180) next += 360
+      onRotate?.(Math.round(next))
+    }
+    const handleUp = () => {
+      isRotatingRef.current = false
+      setRotating(false)
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }, [panelNarr.rotation, onRotate])
+
   const handleMouseDown = useCallback((e) => {
     if (e.target.tagName === 'BUTTON') return
     if (e.target.tagName === 'TEXTAREA') return
-    if (isResizingRef.current) return
+    if (isResizingRef.current || isRotatingRef.current) return
     e.stopPropagation()
     onSelect()
     setDragging(true)
@@ -121,7 +156,7 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
   return (
     <div
       ref={blockRef}
-      className={`narration-block ${panelNarr.framed ? 'framed' : 'unframed'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''}`}
+      className={`narration-block ${panelNarr.framed ? 'framed' : 'unframed'} ${isSelected ? 'selected' : ''} ${dragging ? 'dragging' : ''} ${rotating ? 'rotating' : ''}`}
       style={{
         left: `${panelNarr.x * 100}%`,
         top: `${panelNarr.y * 100}%`,
@@ -129,6 +164,8 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         minHeight: `${panelNarr.height * 100}%`,
         height: 'auto',
         zIndex: isSelected ? 9999 : 2 + (panelNarr.z ?? 0),
+        transform: `rotate(${panelNarr.rotation || 0}deg)`,
+        transformOrigin: 'center center',
       }}
       onMouseDown={handleMouseDown}
     >
@@ -164,6 +201,34 @@ export default function NarrationBlock({ panelNarr, isSelected, onSelect, onMove
         />
 
       {onRemove && <button className="block-remove-btn" onClick={e => { e.stopPropagation(); onRemove(); }} title="quitar narración">{'\u00D7'}</button>}
+
+      {isSelected && (
+        <div
+          onPointerDown={handleRotateDown}
+          title="arrastrar para rotar"
+          style={{
+            position: 'absolute',
+            top: -28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            background: 'var(--color-bg)',
+            border: '1.5px solid var(--color-border)',
+            cursor: 'grab',
+            zIndex: 23,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            lineHeight: 1,
+            userSelect: 'none',
+          }}
+        >
+          ↻
+        </div>
+      )}
 
       {resizeHandle('top-left', { top: 0, left: 0 })}
       {resizeHandle('top-right', { top: 0, right: 0 })}
