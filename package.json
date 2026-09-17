@@ -36,6 +36,7 @@
   "build": {
     "appId": "com.agustinalzari.doski",
     "productName": "doski",
+    "afterPack": "electron/afterpack-adhoc.cjs",
     "directories": {
       "output": "release"
     },
