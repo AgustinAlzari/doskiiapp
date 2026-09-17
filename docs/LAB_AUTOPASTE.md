@@ -128,7 +128,7 @@ const letteringFiles = (panel, idx) => {
 2. Editar `src/components/export/PromptExporter.jsx` para importar `chatInjector`, `sceneLayoutFileNameFor`/`letteringLayoutFileNameFor` ya importados, añadir estados `sending`, y los 2 botones por cuadro.
 3. (Opcional) Exponer `webviewRef` en `ChatPanel.jsx` vía `window.__chatWebview` o `useChatStore` si `querySelector` no encuentra por shadow.
 4. Probar con `chatgpt` y `gemini` (cambiar modelo en `ChatPanel.jsx:74-89`).
-5. `export PATH="/Users/edicionesalz/.local/node-v20.18.0-darwin-x64/bin:$PATH" && npm run build` (`AGENTS.md`).
+5. `npm run build` (`AGENTS.md`).
 6. `./push.sh "lab autopaste: blueprint"` — no `git` local.
 
 ## 5. edge cases y mitigaciones

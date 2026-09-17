@@ -22,7 +22,7 @@
 
 * Electron + React 18 + Zustand + Vite. `package.json:13` dependencias solo `react`, `zustand`, `uuid`, `nspell`; no hay SDK de IA.
 * Persistencia: 1 JSON por entidad en `~/Library/Application Support/dibuweb/data/<colección>/<id>.json` (`electron/main.js:114` `DATA_DIR`, `127` `ensureDataDirs`). Carpeta espejo `data/` en repo solo para portabilidad (`sync.sh`), nunca se sube con `push.sh` (`AGENTS.md`).
-* **Verificación obligatoria:** `export PATH="/Users/edicionesalz/.local/node-v20.18.0-darwin-x64/bin:$PATH" && npm run build` tras cada fase (`AGENTS.md`).
+* **Verificación obligatoria:** `npm run build` tras cada fase (`AGENTS.md`).
 * **Subida de código:** `./push.sh "mensaje"` (API GitHub via `electron/push-script.cjs`), no `git` local.
 * **Leyes UI** (`AGENTS.md`, `src/index.css:1`):
   - Todo texto visible en minúsculas (excepciones: `ChatGPT/Gemini/Claude`, siglas `PNG/WebP`, atajos `Ctrl+Z`).

@@ -24,7 +24,8 @@ REPO="AgustinAlzari/doskiiapp"
 BRANCH="main"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-export PATH="/Users/edicionesalz/.local/node-v20.18.0-darwin-x64/bin:$PATH"
+# node portable (si existe instalación local, se antepone; si no, se usa el PATH actual)
+[ -d "$HOME/.local/node-v20.18.0-darwin-x64/bin" ] && export PATH="$HOME/.local/node-v20.18.0-darwin-x64/bin:$PATH"
 
 MSG="${1:-}"
 if [ -z "$MSG" ]; then

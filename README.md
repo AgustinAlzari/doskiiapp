@@ -60,4 +60,8 @@ la app usa `muse-image-1.0` (image_generation) por defecto. configurá tu `MODEL
 
 ## licencia
 
-MIT — ver `LICENSE`.
+MIT — ver `LICENSE`. el código propio de doskii está bajo MIT.
+
+las obras que crees **con** doskii (historietas, imágenes, prompts, textos) son tuyas y no quedan alcanzadas por esta licencia: podés usarlas y publicarlas como quieras.
+
+componentes de terceros conservan sus licencias: `react`, `electron`, `vite`, `nspell`, `zustand`, `uuid` (MIT); `openai` (Apache-2.0); diccionarios hunspell de español en `src/assets/dictionaries/` (MPL/GPL/LGPL, origen LibreOffice); fuente IBM Plex Mono vía Google Fonts (OFL). el contenido de ejemplo en `data/` y `docs/assets/` es de autoría propia del proyecto y se publica bajo MIT.

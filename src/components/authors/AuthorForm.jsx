@@ -59,7 +59,7 @@ export default function AuthorForm({ author, onCancel }) {
             className="input"
             value={fullName}
             onChange={e => setFullName(e.target.value)}
-            placeholder="Agustín Alzari"
+            placeholder="Nombre Apellido"
             autoFocus
           />
         </div>
@@ -70,7 +70,7 @@ export default function AuthorForm({ author, onCancel }) {
           <AutoTextarea
             value={signatureText}
             onChange={e => setSignatureText(e.target.value)}
-            placeholder="el nombre tal como se firma (ej: A. Alzari, @doski...)"
+            placeholder="el nombre tal como se firma (ej: A. Apellido, @usuario...)"
             minRows={2}
           />
         </div>
