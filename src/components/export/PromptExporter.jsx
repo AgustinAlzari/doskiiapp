@@ -232,7 +232,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
       const refPaths = (refs || []).map(r => r.path).filter(Boolean)
       const allPaths = dedupPaths([...refPaths, svgPath])
       const items = await collectImageDataUrls(allPaths)
-      console.log('[autopaste scene] paths', allPaths, 'items', items.length, items.map(i=>i.fileName))
+      if (import.meta.env.DEV) console.log('[autopaste scene] paths', allPaths, 'items', items.length, items.map(i=>i.fileName))
       // nonce para evitar dedupe de prompt idéntico en chatgpt
       const uniquePrompt = promptText + `\n\n<!-- doski:${Date.now().toString(36)} -->`
       const res = await sendToChat({ text: uniquePrompt, imageItems: items, newChat: true })
@@ -273,7 +273,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
       const refPaths = (refs || []).map(r => r.path).filter(Boolean)
       const allPaths = dedupPaths([cover.path, ...refPaths, svgPath])
       const items = await collectImageDataUrls(allPaths)
-      console.log('[autopaste lettering] cover', cover.path, 'refs', refPaths, 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName))
+      if (import.meta.env.DEV) console.log('[autopaste lettering] cover', cover.path, 'refs', refPaths, 'svg', svgPath, 'items', items.length, items.map(i=>i.fileName))
       if (!items.length) {
         alert('no se pudo leer la imagen de escena aprobada')
         return
@@ -385,7 +385,7 @@ export default function PromptExporter({ strip, characters, project, balloons })
     useChatStore.getState().setOpen(true)
     try {
       const model = museModel || 'muse-image-1.0'
-      console.log(`[muse api generate] mode=${mode} refs=${items.length}/${maxRefs} prev=${previousResponseId || 'none'} reasoning=${reasoningEffort}`)
+      if (import.meta.env.DEV) console.log(`[muse api generate] mode=${mode} refs=${items.length}/${maxRefs} prev=${previousResponseId || 'none'} reasoning=${reasoningEffort}`)
       const resp = await generateMuseImage({ apiKey, provider, model, promptText: effectivePrompt, imageDataUrls: dataUrls, previousResponseId, layoutFileName: mode === 'scene' ? sceneLayoutFileNameFor(strip, idx) : letteringLayoutFileNameFor(strip, idx), reasoningEffort })
       const { base64, responseId, usage } = extractImageResult(resp)
       const dataUrl = buildDataUrlFromBase64(base64, 'image/webp')

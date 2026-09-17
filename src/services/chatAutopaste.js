@@ -71,12 +71,12 @@ export async function sendToChat({ text, imageDataUrls = [], imageItems = null, 
       else if (isGemini) target = 'https://gemini.google.com/app'
       else if (isMuse) target = 'https://www.meta.ai/'
       else target = 'https://chatgpt.com/'
-      console.log('[doski newChat] host navigation to', target, 'active', active)
+      if (import.meta.env.DEV) console.log('[doski newChat] host navigation to', target, 'active', active)
       const withTs = target + (target.includes('?') ? '&' : '?') + 'doski=' + Date.now()
       try { webview.src = withTs } catch {}
       try { webview.loadURL?.(withTs) } catch {}
       const ok = await waitForComposer(webview, 12000)
-      console.log('[doski newChat] composer ready?', ok)
+      if (import.meta.env.DEV) console.log('[doski newChat] composer ready?', ok)
       await delay(600)
     } catch (e) { console.warn('newChat failed', e) }
   }
@@ -102,7 +102,7 @@ export async function sendToChat({ text, imageDataUrls = [], imageItems = null, 
 
 async function injectedNewChat(opts) {
   const isGemini = opts?.isGemini
-  const log = (...a) => console.log('[doski newChat]', ...a)
+  const log = () => {}
   function findNewChatBtn() {
     if (isGemini) {
       const gemSelectors = ['button[aria-label*="New chat"]', 'button[aria-label*="Nuevo chat"]', 'a[href*="/app"]']
@@ -192,7 +192,7 @@ async function execWithTimeout(webview, js, ms = 25000) {
 async function injectedSend(payload) {
   const { text, imageDataUrls, isGemini, imageItems, _legacyDataUrls, modelUrl } = payload || {}
   const rawItems = Array.isArray(imageItems) && imageItems.length ? imageItems : (Array.isArray(imageDataUrls) ? imageDataUrls.map((u, i) => ({ dataUrl: u, fileName: `ref-${i + 1}.png` })) : [])
-  const log = (...a) => console.log('[doski autopaste]', ...a)
+  const log = () => {}
   const host = location.host || ''
 
   function isVisible(el) {
@@ -640,7 +640,7 @@ export async function extractLastImageFromChat() {
 }
 
 async function injectedExtract() {
-  const log = (...a) => console.log('[doski extract]', ...a)
+  const log = () => {}
   function isDataSvg(src) { return src.startsWith('data:image/svg') }
   function isAvatarish(src) { return /avatar|logo|favicon|profile/i.test(src) }
 
