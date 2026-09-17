@@ -1,7 +1,7 @@
 {
   "name": "doski",
   "version": "2.0.0",
-  "description": "Compositor de prompts para historietas estilo nórdico/Sempé",
+  "description": "Compositor de prompts para historietas",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",

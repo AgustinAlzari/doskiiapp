@@ -143,7 +143,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <label className="label">género / tono</label>
-            <input className="input" value={genre} onChange={e => setGenre(e.target.value)} placeholder="gag diario, absurdo nórdico..." />
+            <input className="input" value={genre} onChange={e => setGenre(e.target.value)} placeholder="gag diario, absurdo, costumbrismo..." />
           </div>
           <div style={{ flex: 1 }}>
             <label className="label">mundo / época</label>
@@ -153,7 +153,7 @@ export default function ProjectForm({ project, onBack, onProjectChanged, onDelet
 
         <div>
           <label className="label">estilo de dibujo</label>
-          <input className="input" value={drawingStyle} onChange={e => setDrawingStyle(e.target.value)} placeholder="Sempé, línea fina B&N, acuarela..." />
+          <input className="input" value={drawingStyle} onChange={e => setDrawingStyle(e.target.value)} placeholder="línea fina B&N, acuarela..." />
         </div>
 
         <div>

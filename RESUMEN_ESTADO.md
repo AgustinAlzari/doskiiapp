@@ -69,7 +69,7 @@ Verificar: `ls "$APP_DATA/projects/"` → debe aparecer `6448d0d0-...json`.
 
 ### Contenido actual de los datos
 
-- **1 proyecto:** "Ansiedad" (género absurdo nórdico, adultos, irónico, extraño; estilo "Sempé pero con líneas dudosas"; B/N, formato cuadrado, 1 panel)
+- **1 proyecto:** "Ansiedad" (género absurdo, adultos, irónico, extraño; estilo "con líneas dudosas"; B/N, formato cuadrado, 1 panel)
 - **2 personajes:** Carlos, Paola
 - **2 fondos**
 - **1 objeto:** microondas abandonado
@@ -130,5 +130,5 @@ Datos clave del script:
 ## 8. Notas generales
 
 - **AGENTS.md** del repo documenta todo esto (build, datos, restauración) y ya está subido.
-- La app se llama **@doski** y es un "Compositor de prompts para historietas estilo nórdico/Sempé".
+- La app se llama **@doski** y es un "Compositor de prompts para historietas".
 - Último commit subido: `78fbbe8a` "Add user data folder and restoration docs" (67 archivos).

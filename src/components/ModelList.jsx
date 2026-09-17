@@ -58,7 +58,7 @@ export default function ModelList() {
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>modelo</span>
             <div style={{ flex: 1, minWidth: 220 }}><ModelPicker value={museModel} onChange={setMuseModel} filter="image" /></div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>👁️ = puede ver (vision). solo image_generation para mvp.</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>solo image_generation para mvp.</div>
         </div>
 
       {/* Nuevo modelo */}

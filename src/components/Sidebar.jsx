@@ -21,6 +21,15 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
   const boxRef = useRef(null)
   const chatOpen = useChatStore(s => s.open)
   const toggleChat = useChatStore(s => s.toggle)
+  const [showInfo, setShowInfo] = useState(() => {
+    try {
+      const v = localStorage.getItem('doski:sidebarInfoVisible')
+      return v === null ? true : v === 'true'
+    } catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('doski:sidebarInfoVisible', String(showInfo)) } catch {}
+  }, [showInfo])
 
   const playFizz = () => {
     try {
@@ -133,6 +142,21 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
             >
               doskii
             </div>
+            <div style={{ textAlign: 'center', marginTop: -10 }}>
+              <a
+                href="https://instagram.com/legutix"
+                onClick={(e) => {
+                  e.preventDefault()
+                  const url = 'https://instagram.com/legutix'
+                  if (window.api?.chat?.openExternal) window.api.chat.openExternal(url)
+                  else window.open(url, '_blank')
+                }}
+                style={{ fontSize: 11, color: '#5f6f52', fontWeight: 700, textDecoration: 'none', cursor: 'pointer', letterSpacing: '-0.01em' }}
+                title="instagram @legutix"
+              >
+                [by @legutix]
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -177,6 +201,33 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
             {chatOpen ? 'ocultar chat' : 'chat ia'}
           </div>
         </div>
+        {showInfo ? (
+          <>
+            <div style={{ marginTop: 8, padding: '10px 12px', border: '1px solid var(--color-border-muted)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)', position: 'relative' }}>
+              <div
+                onClick={() => setShowInfo(false)}
+                style={{ position: 'absolute', top: 4, right: 8, fontSize: 12, color: 'var(--color-text-muted)', cursor: 'pointer', userSelect: 'none', lineHeight: 1 }}
+                title="cerrar"
+              >
+                ...
+              </div>
+              <div style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--color-text-muted)', paddingRight: 16 }}>
+                doskii es una herramienta creativa open source que pone la dirección creativa humana en el centro de la narrativa visual con IA
+              </div>
+            </div>
+            <div style={{ marginTop: 8, padding: '10px 12px', border: '1px solid var(--color-border-muted)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)' }}>
+              <div style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--color-text-muted)' }}>
+                visitar la web
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ marginTop: 8 }}>
+            <button className="btn" style={{ width: '100%' }} onClick={() => setShowInfo(true)} title="mostrar info">
+              ...
+            </button>
+          </div>
+        )}
       </nav>
 
       {!activeProject && (

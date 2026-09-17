@@ -1,15 +1,24 @@
 {
   "id": "b0b6eee6-1bde-45e3-9bbe-f973902ac385",
   "name": "bosque",
-  "promptText": "Deep forest interior viewed from a centered, eye-level camera, with a winding dirt path receding in precise perspective to a distant central vanishing point. Multiple receding planes of tree trunks and varied undergrowth define the space, starting with large foreground trees flanking the path. The canopy is a balanced, leafy ceiling. Daytime, high-key monochrome light provides a clean range of grays, defining textures of bark and foliage without harsh shadows. The central path and upper canopy are large, balanced free zones for subsequent content layers.",
-  "color": "#fff585",
+  "promptText": "Dense forest interior with a winding dirt path receding to a central vanishing point, eye-level centered camera, multiple receding planes of tree trunks and varied undergrowth, large foreground trees flanking the path and leafy canopy overhead. Rendered in the exact warm painterly style of references 'loma' and 'casa de campo': high-key natural daylight with soft shadows and medium contrast (no harsh B&W), palette of warm sandy ochre for the dirt path, golden-yellow and sage greens for fields and foliage, olive and muted greens for trees, stone greys for rocks, soft sky blue and creamy cloud whites, subtle canvas texture and visible brushwork, highly detailed foreground flora (ferns, grasses, small white flowers) and scattered grey stones, slightly impressionistic yet naturalistic, matching the color grading, lighting and detail density of loma and casa de campo. Preserve large clear central path and upper canopy zones for characters and lettering, borderless, immersive.",
+  "color": "#C9A86A",
   "referenceImages": [
     {
       "fileName": "bosque.png",
       "path": "/Users/agustinalzari/Library/Application Support/dibuweb/data/references/bosque.png"
+    },
+    {
+      "fileName": "loma.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/loma.png"
+    },
+    {
+      "fileName": "casa_de_campo-pegada.png",
+      "path": "/Users/edicionesalz/Library/Application Support/dibuweb/data/references/casa_de_campo-pegada.png"
     }
   ],
   "createdAt": "2026-08-05T13:38:38.149Z",
-  "updatedAt": "2026-08-08T03:01:49.531Z",
-  "projectId": "8cb1b454-897b-4acb-a103-70430990962e"
+  "updatedAt": "2026-09-07T13:25:34Z",
+  "projectId": "8cb1b454-897b-4acb-a103-70430990962e",
+  "savedAt": "2026-09-07T13:25:34Z"
 }

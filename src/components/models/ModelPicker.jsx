@@ -13,10 +13,9 @@ export default function ModelPicker({ value, onChange, filter = null }) {
       const { apiKey, provider } = getMuseSecrets()
       const list = await listModels({ metaKey: provider === 'meta' ? apiKey : '', zenKey: provider === 'zen' ? apiKey : apiKey })
       if (!alive) return
-      // filter: 'image' | 'vision' | null
+      // filter: 'image' | null (mvp solo image_generation)
       let filtered = list
       if (filter === 'image') filtered = list.filter(m => m.capabilities.includes('image_generation'))
-      if (filter === 'vision') filtered = list.filter(m => m.vision)
       setModels(filtered)
       setLoading(false)
       // auto-select first if value missing
@@ -35,7 +34,7 @@ export default function ModelPicker({ value, onChange, filter = null }) {
     <select className="input" value={value || ''} onChange={e => onChange?.(e.target.value)} style={{ height: 28, fontSize: 12 }}>
       {models.map(m => (
         <option key={`${m.provider}:${m.id}`} value={m.id}>
-          {String(m.id).toLowerCase()} {m.vision ? '👁️' : ''} {m.free ? '(gratis)' : ''} {m.provider === 'zen' ? '[zen]' : ''} {m.cost ? `· ${m.cost}` : ''}
+          {String(m.id).toLowerCase()} {m.free ? '(gratis)' : ''} {m.provider === 'zen' ? '[zen]' : ''} {m.cost ? `· ${m.cost}` : ''}
         </option>
       ))}
     </select>

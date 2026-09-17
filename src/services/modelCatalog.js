@@ -1,4 +1,4 @@
-// modelCatalog.js — lista modelos meta + opencode zen, con flag vision (👁️) y free
+// modelCatalog.js — lista modelos meta + opencode zen, con flag vision y free
 
 const META_URL = 'https://api.meta.ai/v1/models'
 const ZEN_URL = 'https://opencode.ai/zen/v1/models'
