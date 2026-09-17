@@ -142,7 +142,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
             >
               doskii
             </div>
-            <div style={{ textAlign: 'center', marginTop: -10 }}>
+            <div style={{ textAlign: 'center', marginTop: -8 }}>
               <a
                 href="https://instagram.com/legutix"
                 onClick={(e) => {
@@ -151,7 +151,7 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
                   if (window.api?.chat?.openExternal) window.api.chat.openExternal(url)
                   else window.open(url, '_blank')
                 }}
-                style={{ fontSize: 11, color: '#5f6f52', fontWeight: 700, textDecoration: 'none', cursor: 'pointer', letterSpacing: '-0.01em' }}
+                style={{ fontSize: 11, color: '#5f6f52', fontWeight: 400, textDecoration: 'none', cursor: 'pointer', letterSpacing: '-0.01em' }}
                 title="instagram @legutix"
               >
                 [by @legutix]
