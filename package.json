@@ -1,6 +1,6 @@
 {
   "name": "doski",
-  "version": "2.0.0",
+  "version": "0.5.0",
   "description": "Compositor de prompts para historietas",
   "license": "MIT",
   "main": "electron/main.js",
@@ -64,6 +64,28 @@
         }
       ],
       "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Graphics",
+      "maintainer": "doskiiapp <73148834+AgustinAlzari@users.noreply.github.com>"
     },
     "publish": {
       "provider": "github",
