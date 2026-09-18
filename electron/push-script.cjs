@@ -7,7 +7,8 @@ const REPO = process.env.GIT_API_REPO
 const BRANCH = process.env.GIT_API_BRANCH || 'main'
 const ROOT = process.env.GIT_API_ROOT || process.cwd()
 
-const EXCLUDE_DIRS = new Set(['node_modules', 'dist', 'release', 'data', '.sync-backup', 'docs', '.git'])
+const GLOBAL_EXCLUDE = new Set(['node_modules', 'dist', 'release', '.sync-backup', '.git'])
+const ROOT_EXCLUDE = new Set(['data', 'docs'])
 const EXCLUDE_FILES = new Set(['.DS_Store'])
 
 const gh = async (url, opts = {}) => {
@@ -32,7 +33,7 @@ const blobSha = (content) => crypto.createHash('sha1').update(`blob ${Buffer.byt
 function collectFiles(dir, base) {
   const out = {}
   for (const name of fs.readdirSync(dir)) {
-    if (EXCLUDE_DIRS.has(name) || EXCLUDE_FILES.has(name)) continue
+    if (GLOBAL_EXCLUDE.has(name) || EXCLUDE_FILES.has(name) || (base === '' && ROOT_EXCLUDE.has(name))) continue
     const full = path.join(dir, name)
     const rel = path.posix.join(base, name)
     const st = fs.statSync(full)

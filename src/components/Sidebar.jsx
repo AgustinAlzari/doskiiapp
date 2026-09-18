@@ -216,9 +216,18 @@ export default function Sidebar({ currentView, onNavigate, activeProject, onExit
               </div>
             </div>
             <div style={{ marginTop: 8, padding: '10px 12px', border: '1px solid var(--color-border-muted)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface)' }}>
-              <div style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--color-text-muted)' }}>
+              <a
+                href="https://agustinalzari.github.io/doskiiapp/"
+                onClick={(e) => {
+                  e.preventDefault()
+                  const url = 'https://agustinalzari.github.io/doskiiapp/'
+                  if (window.api?.chat?.openExternal) window.api.chat.openExternal(url)
+                  else window.open(url, '_blank')
+                }}
+                style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--color-text-muted)', textDecoration: 'none', cursor: 'pointer', display: 'block' }}
+              >
                 visitar la web
-              </div>
+              </a>
             </div>
           </>
         ) : (
