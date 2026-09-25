@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>esto es cine · galería privada</title>
+<meta name="description" content="esto es cine · galería privada de tiras">
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root{
+  --font:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --color-bg:#ffffff;--color-surface:#f5f5f7;
+  --color-text:#1d1d1f;--color-text-2:#424245;--color-text-muted:#6e6e73;
+  --color-border:#d2d2d7;--color-border-muted:#e5e5ea;
+  --color-title:#b5651d;--radius-md:5px;--radius-lg:8px;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);font-size:14px;background:var(--color-bg);color:var(--color-text);line-height:1.5;-webkit-font-smoothing:antialiased}
+img{-webkit-user-drag:none;user-select:none}
+.wrap{max-width:960px;margin:0 auto;padding:32px 16px 64px}
+.hero{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:20px;text-align:center}
+.title{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--color-title);line-height:1}
+.sub{font-size:11px;color:var(--color-text-muted)}
+.tagline{font-size:11px;color:var(--color-text-muted);text-align:center;max-width:520px}
+/* toolbar */
+.toolbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:10px 0;border-bottom:1px solid var(--color-border-muted);margin:0 -16px 20px;padding-left:16px;padding-right:16px}
+.toolbar-row{display:flex;gap:8px;align-items:center;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.toolbar-row::-webkit-scrollbar{display:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:transparent;color:var(--color-text);font-size:12px;font-weight:500;cursor:pointer;transition:background .12s;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.btn:hover{background:var(--color-border-muted)}
+.btn.active{background:var(--color-text);color:#fff;border-color:var(--color-text)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.spacer{flex:1 0 8px}
+/* tira */
+.tira{margin-bottom:32px}
+.tira-head{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.tira-head h2{font-size:16px;font-weight:700}
+.tira-head .meta{font-size:11px;color:var(--color-text-muted)}
+.tira-head .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:720px){.grid{grid-template-columns:repeat(2,1fr)}}
+.covers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:720px){.covers{grid-template-columns:1fr;max-width:420px;margin:0 auto}}
+.cover{border:1px solid var(--color-border-muted);border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface);cursor:pointer}
+.cover img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#e9e9ee}
+.cover .cap{padding:10px 12px;display:flex;align-items:center;gap:8px}
+.cover .cap h2{font-size:16px;font-weight:700;flex:1}
+.cover .row{display:flex;gap:8px;padding:0 12px 12px}
+.card{border:1px solid var(--color-border-muted);border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface);cursor:pointer;position:relative}
+.card .ph{aspect-ratio:4/5;width:100%;display:block;object-fit:cover;background:#e9e9ee}
+.card .ft{display:flex;align-items:center;gap:6px;padding:6px 8px}
+.card .fn{font-size:10px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.card .dl{font-size:11px;color:var(--color-text-2);text-decoration:none;padding:4px 6px;border-radius:4px}
+.card .dl:hover{background:var(--color-border-muted)}
+.badge{font-size:9px;color:var(--color-text-muted);border:1px solid var(--color-border-muted);border-radius:20px;padding:1px 7px;white-space:nowrap}
+/* viewer */
+.viewer{position:fixed;inset:0;z-index:10000;background:#0a0a0c;color:#f5f5f7;display:none;flex-direction:column;height:100dvh;overscroll-behavior:contain}
+.viewer.open{display:flex}
+.v-top{display:flex;align-items:center;gap:8px;padding:calc(8px + var(--sat)) 12px 8px;flex-shrink:0}
+.back-arrow{background:none;border:none;color:#f5f5f7;font-size:22px;line-height:1;cursor:pointer;padding:10px 12px;margin-left:-8px;min-width:44px;min-height:44px}
+.back-arrow:hover{opacity:.7}
+.v-title{font-size:12px;color:#f5f5f7;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v-count{font-size:11px;color:#a1a1a6}
+.v-act{display:flex;gap:4px;align-items:center}
+.v-btn{background:none;border:1px solid #3a3a3f;color:#f5f5f7;font-size:11px;border-radius:6px;min-height:36px;padding:0 10px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.v-btn:hover{background:#26262b}
+.v-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;min-height:0}
+.v-stage img{max-width:100%;max-height:100%;object-fit:contain;display:block;transition:transform .18s ease,opacity .18s ease}
+.v-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(20,20,24,.55);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:20px;width:44px;height:64px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+.v-arrow:hover{background:rgba(20,20,24,.85)}
+.v-prev{left:10px}.v-next{right:10px}
+@media(max-width:720px){.v-arrow{display:none}}
+.v-strip{display:flex;gap:8px;overflow-x:auto;padding:10px 12px calc(10px + var(--sab));flex-shrink:0;scrollbar-width:none}
+.v-strip::-webkit-scrollbar{display:none}
+.v-thumb{width:56px;height:70px;object-fit:cover;border-radius:6px;border:2px solid transparent;cursor:pointer;flex-shrink:0;opacity:.6}
+.v-thumb.on{border-color:#fff;opacity:1}
+.v-hint{font-size:10px;color:#8e8e93;text-align:center;padding:0 0 4px;flex-shrink:0}
+@media(max-width:720px){.v-hint{display:none}}
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--color-border-muted);font-size:11px;color:var(--color-text-muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hidden-input{display:none}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%);background:#1d1d1f;color:#fff;font-size:12px;padding:8px 14px;border-radius:8px;z-index:10001;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="title">esto es cine</div>
+    <div class="sub" id="counts">3 tiras · 12 imágenes</div>
+    <div class="tagline">galería privada para mostrar · tocá una portada para entrar a la tira</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-row" id="menu"></div>
+    <div class="toolbar-row" style="margin-top:8px">
+      <button class="btn" id="btn-add">agregar imágenes</button>
+      <button class="btn" id="btn-zip-all">descargar todo (.zip)</button>
+      <span class="sub" style="font-size:11px;color:var(--color-text-muted)" id="add-note"></span>
+    </div>
+  </div>
+
+  <div id="tiras"></div>
+
+  <div class="footer">
+    <span>oscar · v2 · enlace privado, no indexar</span>
+    <span>deslizá o usá ← → · esc para salir</span>
+  </div>
+</div>
+
+<input type="file" id="filepick" class="hidden-input" accept="image/png,image/jpeg,image/webp" multiple>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="visor">
+  <div class="v-top">
+    <button class="back-arrow" id="v-close" title="salir (esc)">←</button>
+    <div class="v-title"><span id="v-name">tira</span> <span class="v-count" id="v-count">1/4</span></div>
+    <div class="v-act">
+      <button class="v-btn" id="v-dl">descargar</button>
+      <button class="v-btn" id="v-zip">tira .zip</button>
+    </div>
+  </div>
+  <div class="v-stage" id="v-stage">
+    <button class="v-arrow v-prev" id="v-prev" title="anterior">‹</button>
+    <img id="v-img" alt="">
+    <button class="v-arrow v-next" id="v-next" title="siguiente">›</button>
+  </div>
+  <div class="v-hint">deslizá en el celu · ← → en compu · clic en la imagen = siguiente</div>
+  <div class="v-strip" id="v-strip"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const BASE_TIRAS = [
+  {id:'luz', title:'luz', files:['1-no-hace-falta-mucho-2.png','2-no-hace-falta-mucho.png','3-no-hace-falta-mucho-3.png','4-cartel-copia-copia-copia.png']},
+  {id:'telas', title:'telas', files:['1-las-telas.png','2-las-telas-2.png','3-las-telas-3.png','4-cartel-copia-copia.png']},
+  {id:'oficio', title:'oficio', files:['1-viejo-arte.png','2-viejo-arte-2.png','3-viejo-arte-remate.png','4-cartel.png']},
+];
+// estado: {id,title,items:[{src,name,added}]}
+const state = { tiras: BASE_TIRAS.map(t=>({id:t.id,title:t.title,items:t.files.map(f=>({src:'img/'+t.id+'/'+encodeURIComponent(f),name:f,added:false}))})), filter:'todas' };
+const $ = s=>document.querySelector(s);
+const menuEl=$('#menu'), tirasEl=$('#tiras'), countsEl=$('#counts');
+function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
+function totalImgs(){return state.tiras.reduce((a,t)=>a+t.items.length,0);}
+function renderMenu(){
+  const opts=['todas',...state.tiras.map(t=>t.id)];
+  menuEl.innerHTML='';
+  opts.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='btn'+(state.filter===o?' active':'');
+    b.textContent=o;
+    b.onclick=()=>{state.filter=o;renderMenu();renderTiras();};
+    menuEl.appendChild(b);
+  });
+}
+function renderTiras(){
+  tirasEl.innerHTML='';
+  const list=state.tiras.filter(t=>state.filter==='todas'||t.id===state.filter);
+  countsEl.textContent=state.tiras.length+' tiras · '+totalImgs()+' imágenes';
+  const wraps=document.createElement('div');
+  wraps.className='covers';
+  list.forEach(t=>{
+    const cover0=t.items[0];
+    const card=document.createElement('div');
+    card.className='cover';card.id='tira-'+t.id;
+    const img=document.createElement('img');
+    img.loading='lazy';img.decoding='async';
+    img.src=cover0?cover0.src:'';img.alt=t.title+' · portada';
+    img.onclick=()=>openViewer(t.id,0);
+    const cap=document.createElement('div');cap.className='cap';
+    cap.innerHTML='<h2>'+esc(t.title)+'</h2><span class="meta" style="font-size:11px;color:var(--color-text-muted)">'+t.items.length+' imágenes</span>';
+    if(t.items.some(i=>i.added)){const b=document.createElement('span');b.className='badge';b.textContent='sesión';cap.appendChild(b);}
+    const row=document.createElement('div');row.className='row';
+    const bv=document.createElement('button');bv.className='btn';bv.textContent='ver tira';
+    bv.onclick=()=>openViewer(t.id,0);
+    const bz=document.createElement('button');bz.className='btn';bz.textContent='descargar tira';
+    bz.onclick=e=>{e.stopPropagation();downloadTira(t.id);};
+    row.appendChild(bv);row.appendChild(bz);
+    card.appendChild(img);card.appendChild(cap);card.appendChild(row);
+    wraps.appendChild(card);
+  });
+  tirasEl.appendChild(wraps);
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// ---- viewer ----
+const viewer=$('#viewer'), vImg=$('#v-img'), vStrip=$('#v-strip'), vName=$('#v-name'), vCount=$('#v-count'), stage=$('#v-stage');
+let cur={tira:null,idx:0};
+function getTira(id){return state.tiras.find(t=>t.id===id);}
+function openViewer(tiraId,idx){
+  cur={tira:tiraId,idx:idx||0};
+  renderViewer();
+  viewer.classList.add('open');
+  document.body.style.overflow='hidden';
+  history.replaceState(null,'','#'+tiraId+'-'+(cur.idx+1));
+}
+function closeViewer(){
+  viewer.classList.remove('open');
+  document.body.style.overflow='';
+  history.replaceState(null,'',' ');
+}
+function renderViewer(){
+  const t=getTira(cur.tira);if(!t)return;
+  const it=t.items[cur.idx];
+  vImg.style.opacity=0;
+  const pre=new Image();
+  pre.onload=()=>{vImg.src=it.src;vImg.alt=t.title+' '+(cur.idx+1);requestAnimationFrame(()=>vImg.style.opacity=1);};
+  pre.onerror=()=>{vImg.src=it.src;vImg.style.opacity=1;};
+  pre.src=it.src;
+  vName.textContent=t.title;
+  vCount.textContent=(cur.idx+1)+'/'+t.items.length;
+  vStrip.innerHTML='';
+  t.items.forEach((s,i)=>{
+    const th=document.createElement('img');
+    th.className='v-thumb'+(i===cur.idx?' on':'');th.src=s.src;th.alt='';th.loading='lazy';
+    th.onclick=e=>{e.stopPropagation();cur.idx=i;renderViewer();};
+    vStrip.appendChild(th);
+  });
+  const on=vStrip.children[cur.idx];
+  if(on)on.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+}
+function step(d){
+  const t=getTira(cur.tira);if(!t)return;
+  cur.idx=(cur.idx+d+t.items.length)%t.items.length;
+  renderViewer();
+  history.replaceState(null,'','#'+t.id+'-'+(cur.idx+1));
+}
+$('#v-close').onclick=closeViewer;
+$('#v-prev').onclick=e=>{e.stopPropagation();step(-1);};
+$('#v-next').onclick=e=>{e.stopPropagation();step(1);};
+vImg.onclick=()=>step(1);
+document.addEventListener('keydown',e=>{
+  if(!viewer.classList.contains('open'))return;
+  if(e.key==='Escape')closeViewer();
+  else if(e.key==='ArrowRight')step(1);
+  else if(e.key==='ArrowLeft')step(-1);
+});
+// swipe horizontal + swipe down para salir
+let tx=null,ty=null,dx=0,dy=0;
+stage.addEventListener('touchstart',e=>{const t=e.touches[0];tx=t.clientX;ty=t.clientY;dx=0;dy=0;vImg.style.transition='none';},{passive:true});
+stage.addEventListener('touchmove',e=>{
+  if(tx===null)return;
+  const t=e.touches[0];dx=t.clientX-tx;dy=t.clientY-ty;
+  if(Math.abs(dx)>Math.abs(dy)){vImg.style.transform='translateX('+dx+'px)';}
+  else if(dy>0){vImg.style.transform='translateY('+(dy*0.6)+'px)';vImg.style.opacity=1-Math.min(dy/400,.6);}
+},{passive:true});
+stage.addEventListener('touchend',()=>{
+  vImg.style.transition='';
+  if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)){step(dx<0?1:-1);}
+  else if(dy>90&&Math.abs(dy)>Math.abs(dx)){closeViewer();}
+  vImg.style.transform='';vImg.style.opacity=1;tx=null;
+});
+// mouse drag en compu
+let mdown=null;
+stage.addEventListener('mousedown',e=>{mdown=e.clientX;});
+stage.addEventListener('mouseup',e=>{
+  if(mdown===null||e.target.closest('.v-arrow'))return;
+  const d=e.clientX-mdown;
+  if(Math.abs(d)>40)step(d<0?1:-1);
+  mdown=null;
+});
+// ---- descargas ----
+async function saveBlob(url,name){
+  try{
+    const r=await fetch(url);const b=await r.blob();
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch{
+    const a=document.createElement('a');a.href=url;a.download=name;a.target='_blank';
+    document.body.appendChild(a);a.click();a.remove();
+  }
+}
+$('#v-dl').onclick=()=>{
+  const t=getTira(cur.tira);const it=t.items[cur.idx];
+  saveBlob(it.src,t.id+'-'+it.name);
+};
+async function downloadTira(tiraId){
+  const t=getTira(tiraId);if(!t)return;
+  toast('preparando '+t.title+' ('+t.items.length+')…');
+  if(window.JSZip){
+    try{
+      const zip=new JSZip();
+      for(const it of t.items){
+        const r=await fetch(it.src);const b=await r.blob();
+        zip.file(t.id+'-'+it.name,b);
+      }
+      const blob=await zip.generateAsync({type:'blob'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=t.id+'-v2.zip';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+      toast(t.title+' descargada ✓');
+      return;
+    }catch(e){/* fallback abajo */}
+  }
+  for(const it of t.items){await saveBlob(it.src,t.id+'-'+it.name);await new Promise(r=>setTimeout(r,400));}
+}
+$('#v-zip').onclick=()=>downloadTira(cur.tira);
+$('#btn-zip-all').onclick=async()=>{
+  if(!window.JSZip){state.tiras.forEach(t=>downloadTira(t.id));return;}
+  toast('preparando todo…');
+  try{
+    const zip=new JSZip();
+    for(const t of state.tiras)for(const it of t.items){
+      const r=await fetch(it.src);zip.file(t.id+'/'+t.id+'-'+it.name,await r.blob());
+    }
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='oscar-v2.zip';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast('todo descargado ✓');
+  }catch{toast('falló el zip, probá por tira');}
+};
+// ---- agregar (solo sesión, sin servidor) ----
+const filepick=$('#filepick');
+let addTarget='nuevas';
+$('#btn-add').onclick=()=>{
+  const names=state.tiras.map(t=>t.id).concat(['+ nueva tira…']);
+  const pick=prompt('¿a qué tira las agrego?\n'+names.join(' · ')+'\n(escribí el nombre, o uno nuevo)','nuevas');
+  if(pick===null)return;
+  addTarget=pick.trim().toLowerCase()||'nuevas';
+  filepick.click();
+};
+filepick.onchange=()=>{
+  const files=[...filepick.files];if(!files.length)return;
+  let t=getTira(addTarget);
+  if(!t){t={id:addTarget,title:addTarget,items:[]};state.tiras.push(t);}
+  files.forEach(f=>{
+    t.items.push({src:URL.createObjectURL(f),name:f.name.toLowerCase(),added:true});
+  });
+  state.filter='todas';renderMenu();renderTiras();
+  $('#add-note').textContent=t.items.filter(i=>i.added).length+' en sesión (no se suben)';
+  toast(files.length+' agregadas a '+t.title+' (sesión)');
+  filepick.value='';
+  document.getElementById('tira-'+CSS.escape(t.id))?.scrollIntoView({behavior:'smooth'});
+};
+// hash inicial #tira-n
+(function(){
+  const m=location.hash.match(/^#([a-z0-9_-]+)-(\d+)/i);
+  renderMenu();renderTiras();
+  if(m){const t=getTira(m[1]);if(t)openViewer(t.id,Math.min(t.items.length-1,parseInt(m[2],10)-1));}
+})();
+</script>
+</body>
+</html>
