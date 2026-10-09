@@ -178,12 +178,7 @@ img{-webkit-user-drag:none;user-select:none}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-const BASE_TIRAS = [
-  {id:'no-te-la-complicas', title:'no te la complicas', files:['1-no-te-la-complic-s.png','2-no-te-la-complicas-2.png','3-no-te-la-complicas-2-copia.png','4-no-te-la-complicas-6.png','5-no-te-la-complicas-4.png','6-no-te-la-complicas-4-copia.png']},
-  {id:'luz', title:'luz', files:['1-no-hace-falta-mucho-2.png','2-no-hace-falta-mucho.png','3-no-hace-falta-mucho-3.png','4-cartel-copia-copia-copia.png']},
-  {id:'telas', title:'telas', files:['1-las-telas.png','2-las-telas-2.png','3-las-telas-3.png','4-cartel-copia-copia.png']},
-  {id:'oficio', title:'oficio', files:['1-viejo-arte.png','2-viejo-arte-2.png','3-viejo-arte-remate.png','4-cartel.png']},
-];
+const BASE_TIRAS = [{"files":["1-no-te-la-complic-s.png","2-no-te-la-complicas-2.png","3-no-te-la-complicas-2-copia.png","4-no-te-la-complicas-6.png","5-no-te-la-complicas-4.png","6-no-te-la-complicas-4-copia.png"],"id":"no-te-la-complicas","title":"no te la complicas"},{"files":["1-no-hace-falta-mucho-2.png","2-no-hace-falta-mucho.png","3-no-hace-falta-mucho-3.png","4-cartel-copia-copia-copia.png"],"id":"luz","title":"luz"},{"files":["1-las-telas.png","2-las-telas-2.png","3-las-telas-3.png","4-cartel-copia-copia.png"],"id":"telas","title":"telas"},{"files":["1-viejo-arte.png","2-viejo-arte-2.png","3-viejo-arte-remate.png","4-cartel.png"],"id":"oficio","title":"oficio"},{"id":"rulos","title":"rulos","files":["1-lentes-y-rulos-1.png","2-lentes-y-rulos-1-copia.png","3-lentes-y-rulos-3.png","4-cartel-rulos.png"]}];
 // manifiesto: tiras.json manda, BASE_TIRAS es respaldo por si falla la red
 let manifest = BASE_TIRAS.map(t=>({id:t.id,title:t.title,files:t.files.slice()}));
 function itemsFromManifest(){
