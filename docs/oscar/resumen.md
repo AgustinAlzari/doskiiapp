@@ -9,14 +9,18 @@ commit galería: 1f08d13 ("galería privada oscar en docs/oscar, sin linkear")
 galería web estática, estética doski (IBM Plex Mono, grises, botones 28px,
 todo en minúsculas), para mostrar tiras a una persona interesada.
 
-- portada: una sola imagen por tira (luz · telas · oficio, 4 png c/u).
+- portada: una sola imagen por tira (luz · telas · oficio · no te la
+  complicas; 4 png c/u salvo la última, 6).
 - entrar a la tira: visor a pantalla completa (fondo negro, imagen completa).
 - navegación: flechas ‹ ›, swipe lateral en celu, clic = siguiente,
   filmstrip abajo, contador, hash compartible (#luz-2).
 - salida rápida: ← arriba a la izquierda, ×, esc, o swipe hacia abajo.
 - descargas: por imagen (↓), por tira en .zip (JSZip por CDN, con fallback),
   botón "descargar todo".
-- menú: filtrar por tira + "agregar imágenes" (solo sesión, no se suben).
+- menú: filtrar por tira + "ver / probar (sesión)" (vista previa local,
+  no se publica) + "subir tira nueva" (publica de verdad, ver abajo).
+- manifiesto: la página lee `tiras.json`; si falla la red usa el respaldo
+  `BASE_TIRAS` dentro de index.html (se actualiza solo al publicar).
 - `noindex`: google no la indexa. no está linkeada desde el index de la web.
 - ojo: el repo es público, así que es "no listada", no privada de verdad.
 
@@ -24,16 +28,47 @@ todo en minúsculas), para mostrar tiras a una persona interesada.
 
 ```
 docs/oscar/
-  index.html        # toda la galería (una sola página)
+  index.html        # toda la galería (una sola página + publicador)
+  tiras.json        # manifiesto que manda: [{id,title,files}]
   img/luz/*.png     # 4 imágenes 1122×1402
   img/telas/*.png
   img/oficio/*.png
+  img/no-te-la-complicas/*.png  # 6 imágenes
   resumen.md        # este archivo
 ```
 
-para agregar una tira nueva: copiar los png a `img/<nombre>/` (nombres en
-minúsculas, con número adelante para ordenar: `1-....png`) y agregar la
-entrada en `BASE_TIRAS` al principio del `<script>` de index.html.
+## subir una tira nueva sin ayuda (desde la misma página)
+
+la página trae su propio publicador: no hace falta tocar código.
+
+1. abrir la galería y tocar **subir tira nueva**.
+2. **token** (solo la primera vez, y solo en cada aparato nuevo):
+   - en github: settings → developer settings → personal access tokens
+     → tokens (classic) → generate new token (classic).
+   - permiso necesario: `repo` (solo lectura/escritura del repo).
+   - copiar el token, pegarlo en la página y darle a **guardar**.
+   - queda guardado solo en ese aparato (localstorage del navegador),
+     nunca se sube al repo.
+3. en **¿a qué tira van?** elegir una existente o **+ nueva tira…**
+   y escribir el nombre (ej. `no te la complicas`).
+4. **elegir imágenes…** (png o jpg, del celu o la compu), revisar las
+   miniaturas, quitar la que no va si hace falta.
+5. **publicar ✓** y esperar sin cerrar (sube imagen por imagen).
+6. listo: la tira se ve al momento en tu pantalla; para todo el mundo
+   tarda ~1 min (lo que tarda github pages en publicar).
+
+notas:
+
+- los nombres se normalizan solos (minúsculas, sin espacios ni tildes;
+  si no empiezan con número se les agrega para ordenar).
+- cada publicación hace un solo commit (`… vía web`) con las imágenes
+  + `tiras.json` + respaldo en index.html.
+- si algo falla, la página dice por qué (casi siempre es el token:
+  vencido, sin permiso `repo`, o mal copiado).
+- "ver / probar (sesión)" sigue existiendo pero es solo vista previa
+  local: se borra al recargar, no publica nada.
+
+## forma vieja (manual, con script)
 
 ## ver en local
 

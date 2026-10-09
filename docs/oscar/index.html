@@ -80,7 +80,24 @@ img{-webkit-user-drag:none;user-select:none}
 @media(max-width:720px){.v-hint{display:none}}
 .footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--color-border-muted);font-size:11px;color:var(--color-text-muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .hidden-input{display:none}
-.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%);background:#1d1d1f;color:#fff;font-size:12px;padding:8px 14px;border-radius:8px;z-index:10001;display:none}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%);background:#1d1d1f;color:#fff;font-size:12px;padding:8px 14px;border-radius:8px;z-index:10001;display:none;max-width:90vw;text-align:center}
+/* subir */
+.admin{display:none;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:14px;margin-bottom:20px}
+.admin.open{display:block}
+.admin h3{font-size:14px;font-weight:700;margin-bottom:4px}
+.admin p{font-size:11px;color:var(--color-text-muted);margin-bottom:10px}
+.admin label{font-size:11px;color:var(--color-text-2);display:block;margin:10px 0 4px}
+.admin input[type=text],.admin input[type=password],.admin select{font-family:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--color-border);border-radius:var(--radius-md);width:100%;background:#fff;color:var(--color-text)}
+.admin .row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.admin .hint{font-size:10px;color:var(--color-text-muted)}
+.admin .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.admin .th{width:72px;text-align:center}
+.admin .th img{width:72px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--color-border);display:block;background:#e9e9ee}
+.admin .th span{font-size:9px;color:var(--color-text-muted);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px}
+.admin .th button{font-size:9px;background:none;border:none;color:#a00;cursor:pointer;padding:2px;font-family:inherit}
+.admin .status{font-size:11px;margin-top:10px;min-height:16px}
+.admin .status.ok{color:#1a7f37}
+.admin .status.err{color:#a00}
 </style>
 </head>
 <body>
@@ -94,10 +111,39 @@ img{-webkit-user-drag:none;user-select:none}
   <div class="toolbar">
     <div class="toolbar-row" id="menu"></div>
     <div class="toolbar-row" style="margin-top:8px">
-      <button class="btn" id="btn-add">agregar imágenes</button>
+      <button class="btn" id="btn-add">ver / probar (sesión)</button>
+      <button class="btn" id="btn-admin">subir tira nueva</button>
       <button class="btn" id="btn-zip-all">descargar todo (.zip)</button>
       <span class="sub" style="font-size:11px;color:var(--color-text-muted)" id="add-note"></span>
     </div>
+  </div>
+
+  <div class="admin" id="admin">
+    <h3>subir tira nueva</h3>
+    <p>elegí las imágenes desde el celu o la compu y publicalas. tardan ~1 min en aparecer para todo el mundo. solo vos ves esta parte.</p>
+    <label for="ad-token">token de github (solo la primera vez)</label>
+    <div class="row2">
+      <input type="password" id="ad-token" placeholder="pegar token…" autocomplete="off" style="flex:1;min-width:180px">
+      <button class="btn" id="ad-save-tok">guardar</button>
+      <button class="btn" id="ad-forget-tok">olvidar</button>
+    </div>
+    <div class="hint" id="ad-tok-state">sin token guardado en este aparato.</div>
+    <label for="ad-tira">¿a qué tira van?</label>
+    <div class="row2">
+      <select id="ad-tira" style="flex:1;min-width:160px"></select>
+      <input type="text" id="ad-new" placeholder="o escribí el nombre nuevo…" style="flex:2;min-width:180px">
+    </div>
+    <label>imágenes (png o jpg)</label>
+    <div class="row2">
+      <button class="btn" id="ad-pick">elegir imágenes…</button>
+      <span class="hint" id="ad-count">ninguna elegida todavía.</span>
+    </div>
+    <div class="thumbs" id="ad-thumbs"></div>
+    <div class="row2" style="margin-top:12px">
+      <button class="btn active" id="ad-pub">publicar ✓</button>
+      <button class="btn" id="ad-cancel">cerrar</button>
+    </div>
+    <div class="status" id="ad-status"></div>
   </div>
 
   <div id="tiras"></div>
@@ -138,8 +184,13 @@ const BASE_TIRAS = [
   {id:'telas', title:'telas', files:['1-las-telas.png','2-las-telas-2.png','3-las-telas-3.png','4-cartel-copia-copia.png']},
   {id:'oficio', title:'oficio', files:['1-viejo-arte.png','2-viejo-arte-2.png','3-viejo-arte-remate.png','4-cartel.png']},
 ];
+// manifiesto: tiras.json manda, BASE_TIRAS es respaldo por si falla la red
+let manifest = BASE_TIRAS.map(t=>({id:t.id,title:t.title,files:t.files.slice()}));
+function itemsFromManifest(){
+  return manifest.map(t=>({id:t.id,title:t.title,items:t.files.map(f=>({src:'img/'+t.id+'/'+encodeURIComponent(f),name:f,added:false}))}));
+}
 // estado: {id,title,items:[{src,name,added}]}
-const state = { tiras: BASE_TIRAS.map(t=>({id:t.id,title:t.title,items:t.files.map(f=>({src:'img/'+t.id+'/'+encodeURIComponent(f),name:f,added:false}))})), filter:'todas' };
+const state = { tiras: itemsFromManifest(), filter:'todas' };
 const $ = s=>document.querySelector(s);
 const menuEl=$('#menu'), tirasEl=$('#tiras'), countsEl=$('#counts');
 function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
@@ -312,12 +363,12 @@ $('#btn-zip-all').onclick=async()=>{
     toast('todo descargado ✓');
   }catch{toast('falló el zip, probá por tira');}
 };
-// ---- agregar (solo sesión, sin servidor) ----
+// ---- ver/probar en sesión (sin subir, se borra al recargar) ----
 const filepick=$('#filepick');
 let addTarget='nuevas';
 $('#btn-add').onclick=()=>{
   const names=state.tiras.map(t=>t.id).concat(['+ nueva tira…']);
-  const pick=prompt('¿a qué tira las agrego?\n'+names.join(' · ')+'\n(escribí el nombre, o uno nuevo)','nuevas');
+  const pick=prompt('solo vista previa en este aparato (no se publica).\n¿en qué tira las miro?\n'+names.join(' · ')+'\n(escribí el nombre, o uno nuevo)','nuevas');
   if(pick===null)return;
   addTarget=pick.trim().toLowerCase()||'nuevas';
   filepick.click();
@@ -327,18 +378,191 @@ filepick.onchange=()=>{
   let t=getTira(addTarget);
   if(!t){t={id:addTarget,title:addTarget,items:[]};state.tiras.push(t);}
   files.forEach(f=>{
-    t.items.push({src:URL.createObjectURL(f),name:f.name.toLowerCase(),added:true});
+    t.items.push({src:URL.createObjectURL(f),name:String(f.name||'img').toLowerCase(),added:true});
   });
   state.filter='todas';renderMenu();renderTiras();
-  $('#add-note').textContent=t.items.filter(i=>i.added).length+' en sesión (no se suben)';
-  toast(files.length+' agregadas a '+t.title+' (sesión)');
+  $('#add-note').textContent=t.items.filter(i=>i.added).length+' en sesión (no se publican)';
+  toast(files.length+' en vista previa (sesión)');
   filepick.value='';
   document.getElementById('tira-'+CSS.escape(t.id))?.scrollIntoView({behavior:'smooth'});
 };
-// hash inicial #tira-n
-(function(){
+// ---- subir y publicar (sí queda guardado, vía github) ----
+const GH_REPO='AgustinAlzari/doskiiapp', GH_BRANCH='main', GH_BASE='docs/oscar';
+const adminEl=$('#admin'), adTira=$('#ad-tira'), adNew=$('#ad-new'),
+  adThumbs=$('#ad-thumbs'), adCount=$('#ad-count'), adStatus=$('#ad-status'),
+  adTok=$('#ad-token'), adTokState=$('#ad-tok-state');
+let staged=[]; // [{file,url}]
+const adFile=document.createElement('input');
+adFile.type='file';adFile.accept='image/png,image/jpeg,image/webp';adFile.multiple=true;adFile.className='hidden-input';
+document.body.appendChild(adFile);
+function slug(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'nueva';
+}
+function cleanName(s){
+  s=String(s||'imagen').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  s=s.replace(/\s+/g,'-').replace(/[^a-z0-9._-]+/g,'').replace(/-+/g,'-');
+  if(!/\.(png|jpe?g|webp)$/.test(s))s+='.png';
+  return s||'imagen.png';
+}
+function getToken(){return (adTok.value.trim()||localStorage.getItem('oscar-gh-token')||'').trim();}
+function paintTok(){
+  const has=!!localStorage.getItem('oscar-gh-token');
+  adTokState.textContent=has?'token guardado en este aparato ✓':'sin token guardado en este aparato.';
+}
+function paintTiraSel(){
+  const cur=adTira.value;
+  adTira.innerHTML='';
+  state.tiras.forEach(t=>{
+    const o=document.createElement('option');o.value=t.id;o.textContent=t.title+' ('+t.items.length+')';
+    adTira.appendChild(o);
+  });
+  const o=document.createElement('option');o.value='__new';o.textContent='+ nueva tira…';
+  adTira.appendChild(o);
+  adTira.value=[...adTira.options].some(o=>o.value===cur)?cur:'__new';
+  adNew.style.display=adTira.value==='__new'?'':'none';
+}
+function paintStaged(){
+  adThumbs.innerHTML='';
+  staged.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='th';
+    const im=document.createElement('img');im.src=s.url;im.alt='';
+    const nm=document.createElement('span');nm.textContent=s.file.name;
+    const q=document.createElement('button');q.textContent='quitar';
+    q.onclick=()=>{URL.revokeObjectURL(s.url);staged.splice(i,1);paintStaged();};
+    d.appendChild(im);d.appendChild(nm);d.appendChild(q);
+    adThumbs.appendChild(d);
+  });
+  adCount.textContent=staged.length?staged.length+' elegida(s), listas para publicar.':'ninguna elegida todavía.';
+}
+function adMsg(msg,cls){adStatus.textContent=msg;adStatus.className='status'+(cls?' '+cls:'');}
+async function fileToB64(file){
+  const buf=new Uint8Array(await file.arrayBuffer());
+  let bin='';
+  for(let i=0;i<buf.length;i+=0x8000){bin+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000));}
+  return btoa(bin);
+}
+async function gh(path,opts={}){
+  const res=await fetch('https://api.github.com/'+path,{
+    method:opts.method||'GET',
+    headers:{Authorization:'token '+getToken(),'Content-Type':'application/json','User-Agent':'oscar-web-upload',...(opts.headers||{})},
+    body:opts.body?JSON.stringify(opts.body):undefined});
+  const text=await res.text();
+  const data=text?JSON.parse(text):null;
+  if(!res.ok)throw new Error((data&&data.message)||('github '+res.status));
+  return data;
+}
+$('#btn-admin').onclick=()=>{
+  adminEl.classList.toggle('open');
+  if(adminEl.classList.contains('open')){paintTok();paintTiraSel();paintStaged();adminEl.scrollIntoView({behavior:'smooth',block:'nearest'});}
+};
+$('#ad-cancel').onclick=()=>adminEl.classList.remove('open');
+adTira.onchange=()=>{adNew.style.display=adTira.value==='__new'?'':'none';};
+$('#ad-save-tok').onclick=()=>{
+  if(!adTok.value.trim()){adMsg('pegá el token primero.','err');return;}
+  localStorage.setItem('oscar-gh-token',adTok.value.trim());
+  adTok.value='';paintTok();adMsg('token guardado en este aparato ✓','ok');
+};
+$('#ad-forget-tok').onclick=()=>{localStorage.removeItem('oscar-gh-token');adTok.value='';paintTok();adMsg('token olvidado.');};
+$('#ad-pick').onclick=()=>adFile.click();
+adFile.onchange=()=>{
+  [...adFile.files].forEach(f=>staged.push({file:f,url:URL.createObjectURL(f)}));
+  adFile.value='';paintStaged();
+};
+$('#ad-pub').onclick=async()=>{
+  try{
+    if(!staged.length){adMsg('elegí al menos una imagen.','err');return;}
+    if(!getToken()){adMsg('falta el token: pedímelo una vez, pegalo arriba y dale a guardar.','err');return;}
+    let tiraId,tiraTitle;
+    if(adTira.value==='__new'){
+      tiraTitle=(adNew.value.trim()||'nueva tira').toLowerCase();
+      tiraId=slug(tiraTitle);
+    }else{
+      const t=getTira(adTira.value);tiraId=t.id;tiraTitle=t.title;
+    }
+    $('#ad-pub').disabled=true;
+    adMsg('subiendo '+staged.length+' imágenes… (no cierres)');
+    // manifiesto nuevo
+    const nm=JSON.parse(JSON.stringify(manifest));
+    let me=nm.find(t=>t.id===tiraId);
+    if(!me){me={id:tiraId,title:tiraTitle,files:[]};nm.push(me);}
+    const used=new Set(me.files);
+    const names=[];
+    staged.forEach((s,i)=>{
+      let n=cleanName(s.file.name);
+      if(!/^\d+-/.test(n))n=(me.files.length+i+1)+'-'+n;
+      while(used.has(n))n=n.replace(/(\.[a-z]+)$/,'-2$1');
+      used.add(n);me.files.push(n);names.push(n);
+    });
+    me.files.sort();
+    // blobs de imágenes
+    const entries=[];
+    let k=0;
+    for(let i=0;i<staged.length;i++){
+      k++;
+      adMsg('subiendo imagen '+k+'/'+staged.length+'…');
+      const b64=await fileToB64(staged[i].file);
+      const blob=await gh('repos/'+GH_REPO+'/git/blobs',{method:'POST',body:{content:b64,encoding:'base64'}});
+      entries.push({path:GH_BASE+'/img/'+tiraId+'/'+names[i],mode:'100644',type:'blob',sha:blob.sha});
+    }
+    // tiras.json nuevo
+    adMsg('actualizando lista…');
+    const tj=await gh('repos/'+GH_REPO+'/git/blobs',{method:'POST',
+      body:{content:btoa(unescape(encodeURIComponent(JSON.stringify(nm)))),encoding:'base64'}});
+    entries.push({path:GH_BASE+'/tiras.json',mode:'100644',type:'blob',sha:tj.sha});
+    // index.html con respaldo al día (si se puede leer el actual)
+    try{
+      const cur=await gh('repos/'+GH_REPO+'/contents/'+GH_BASE+'/index.html?ref='+GH_BRANCH);
+      const html=decodeURIComponent(escape(atob(cur.content.replace(/\n/g,''))));
+      const block='const BASE_TIRAS = '+JSON.stringify(nm)+';';
+      const next=html.replace(/const BASE_TIRAS = \[[\s\S]*?\];/,block);
+      if(next!==html){
+        const b=await gh('repos/'+GH_REPO+'/git/blobs',{method:'POST',
+          body:{content:btoa(unescape(encodeURIComponent(next))),encoding:'base64'}});
+        entries.push({path:GH_BASE+'/index.html',mode:'100644',type:'blob',sha:b.sha});
+      }
+    }catch(e){/* igual publicamos imgs + json */}
+    adMsg('guardando…');
+    const head=await gh('repos/'+GH_REPO+'/commits/'+GH_BRANCH);
+    const tree=await gh('repos/'+GH_REPO+'/git/trees',{method:'POST',body:{base_tree:head.commit.tree.sha,tree:entries}});
+    const commit=await gh('repos/'+GH_REPO+'/git/commits',{method:'POST',
+      body:{message:'agrega '+staged.length+' imgs a '+tiraId+' vía web',tree:tree.sha,parents:[head.sha]}});
+    await gh('repos/'+GH_REPO+'/git/refs/heads/'+GH_BRANCH,{method:'PATCH',body:{sha:commit.sha}});
+    // reflejo local inmediato
+    manifest=nm;
+    const keep=state.tiras.flatMap(t=>t.items.filter(i=>i.added).map(i=>({tira:t.id,item:i})));
+    state.tiras=itemsFromManifest();
+    staged.forEach((s,i)=>{
+      const t=getTira(tiraId);
+      if(t)t.items.push({src:s.url,name:names[i],added:true});
+    });
+    keep.forEach(k=>{const t=getTira(k.tira);if(t)t.items.push(k.item);});
+    state.filter='todas';renderMenu();renderTiras();paintTiraSel();
+    staged=[];paintStaged();
+    adMsg('publicado ✓ en ~1 min se ve para todo el mundo.','ok');
+    toast('tira publicada ✓');
+  }catch(e){
+    console.error(e);
+    adMsg('falló: '+e.message+' (revisá el token o probá de nuevo)','err');
+  }finally{$('#ad-pub').disabled=false;}
+};
+// arranque: primero lo local, después tiras.json si hay red
+(async function(){
+  renderMenu();renderTiras();paintTok();
+  try{
+    const r=await fetch('tiras.json?v='+Date.now(),{cache:'no-store'});
+    if(r.ok){
+      const j=await r.json();
+      if(Array.isArray(j)&&j.length&&j.every(t=>t.id&&t.title&&Array.isArray(t.files))){
+        manifest=j;
+        const keep=state.tiras.flatMap(t=>t.items.filter(i=>i.added).map(i=>({tira:t.id,item:i})));
+        state.tiras=itemsFromManifest();
+        keep.forEach(k=>{const t=getTira(k.tira);if(t)t.items.push(k.item);});
+        renderMenu();renderTiras();
+      }
+    }
+  }catch(e){/* sin red: queda el respaldo */}
   const m=location.hash.match(/^#([a-z0-9_-]+)-(\d+)/i);
-  renderMenu();renderTiras();
   if(m){const t=getTira(m[1]);if(t)openViewer(t.id,Math.min(t.items.length-1,parseInt(m[2],10)-1));}
 })();
 </script>
