@@ -9,8 +9,8 @@ commit galería: 1f08d13 ("galería privada oscar en docs/oscar, sin linkear")
 galería web estática, estética doski (IBM Plex Mono, grises, botones 28px,
 todo en minúsculas), para mostrar tiras a una persona interesada.
 
-- portada: una sola imagen por tira (luz · telas · oficio · no te la
-  complicas; 4 png c/u salvo la última, 6).
+- portada: una sola imagen por tira (osa · no te la complicas · luz ·
+  telas · oficio · rulos; 4–7 png c/u según la tira).
 - entrar a la tira: visor a pantalla completa (fondo negro, imagen completa).
 - navegación: flechas ‹ ›, swipe lateral en celu, clic = siguiente,
   filmstrip abajo, contador, hash compartible (#luz-2).
@@ -30,10 +30,12 @@ todo en minúsculas), para mostrar tiras a una persona interesada.
 docs/oscar/
   index.html        # toda la galería (una sola página + publicador)
   tiras.json        # manifiesto que manda: [{id,title,files}]
+  img/osa/*.png       # 5 imágenes 1122×1402
+  img/no-te-la-complicas/*.png  # 7 imágenes
+  img/rulos/*.png     # 5 imágenes
   img/luz/*.png     # 4 imágenes 1122×1402
   img/telas/*.png
   img/oficio/*.png
-  img/no-te-la-complicas/*.png  # 6 imágenes
   resumen.md        # este archivo
 ```
 
