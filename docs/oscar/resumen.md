@@ -10,7 +10,7 @@ galería web estática, estética doski (IBM Plex Mono, grises, botones 28px,
 todo en minúsculas), para mostrar tiras a una persona interesada.
 
 - portada: una sola imagen por tira (osa · no te la complicas · luz ·
-  telas · oficio · rulos; 4–7 png c/u según la tira).
+  telas · oficio · rulos · las monjas de winsconsin; 4–7 png c/u según la tira).
 - entrar a la tira: visor a pantalla completa (fondo negro, imagen completa).
 - navegación: flechas ‹ ›, swipe lateral en celu, clic = siguiente,
   filmstrip abajo, contador, hash compartible (#luz-2).
@@ -36,7 +36,10 @@ docs/oscar/
   img/luz/*.png     # 4 imágenes 1122×1402
   img/telas/*.png
   img/oficio/*.png
+  img/las-monjas-de-winsconsin/*.png  # 6 imágenes 1122×1402
   resumen.md        # este archivo
+  PROCEDIMIENTO.md  # cómo volver a subir una tira
+  subir-tira.mjs    # script de subida (API de GitHub, commit aditivo)
 ```
 
 ## subir una tira nueva sin ayuda (desde la misma página)
